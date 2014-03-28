@@ -260,4 +260,5 @@ object MLUtils {
     }
     sqDist
   }
+  implicit def rddToVectorRDDFunctions(rdd: RDD[Vector]) = new VectorRDDFunctions(rdd)
 }
