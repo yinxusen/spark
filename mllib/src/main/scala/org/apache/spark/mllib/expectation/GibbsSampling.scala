@@ -20,7 +20,7 @@ object GibbsSampling extends Logging {
   /**
    * A multinomial distribution sampler, using roulette method to sample an Int back.
    */
-  private def multinomialDistSampler(rand: Random, dist: DoubleMatrix): Int = {
+  private[mllib] def multinomialDistSampler(rand: Random, dist: DoubleMatrix): Int = {
     val roulette = rand.nextDouble()
 
     def loop(index: Int, accum: Double): Int = {

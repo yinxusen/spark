@@ -23,7 +23,13 @@ import org.scalatest.FunSuite
 
 import org.apache.spark.SparkContext
 import org.apache.spark.mllib.util.MLUtils
-
+import org.apache.spark.rdd.RDD
+import org.apache.spark.mllib.linalg.Vector
+import org.apache.spark.mllib.linalg.Vectors
+import breeze.stats.distributions.{Multinomial, Poisson, Uniform}
+import breeze.linalg.{sum, DenseVector, normalize}
+import scala.util._
+import org.apache.spark.mllib.expectation.GibbsSampling._
 
 class LDASuite extends FunSuite with BeforeAndAfterAll {
   @transient private var sc: SparkContext = _
@@ -47,4 +53,34 @@ class LDASuite extends FunSuite with BeforeAndAfterAll {
   }
 
 
+}
+
+object LDASuite {
+
+  val numTopics = 10
+  val numTerms = 1000
+  val numDocs = 500
+  val docLength = 300
+
+  val topicParameterSampler = new Uniform(0, numTerms-1)
+  val topicSelectSampler = new Poisson(numTopics/2)
+  val topics = (0 until numTopics).map {
+    _ => new Multinomial(
+      DenseVector(
+        Poisson.distribution(topicParameterSampler.draw())
+          .sample(numTerms)
+          .toArray
+          .map(_.toDouble))
+    )
+  }
+  val terms = (0 until numTerms).toArray
+
+  def sampleCorpus(numDocs: Int, numTerms: Int, numTopics: Int): Array[Document] = {
+    (0 until numDocs).map { Document(_,
+      (0 until docLength).map { _ =>
+        val selectedTopic = topicSelectSampler.draw() % numTopics
+        terms(topics(selectedTopic).draw())
+      }.toArray)
+    }.toArray
+  }
 }
