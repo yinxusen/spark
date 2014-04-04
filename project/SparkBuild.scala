@@ -429,6 +429,8 @@ object SparkBuild extends Build {
   // assembly jar.
   def hiveSettings = sharedSettings ++ Seq(
     name := "spark-hive",
+    jarName in assembly <<= version map { v => "spark-hive-assembly-" + v + "-hadoop" + hadoopVersion + ".jar" },
+    jarName in packageDependency <<= version map { v => "spark-hive-assembly-" + v + "-hadoop" + hadoopVersion + "-deps.jar" },
     javaOptions += "-XX:MaxPermSize=1g",
     libraryDependencies ++= Seq(
       "org.apache.hive" % "hive-metastore" % hiveVersion,
