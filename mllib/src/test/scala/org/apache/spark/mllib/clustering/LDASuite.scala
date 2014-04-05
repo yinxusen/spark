@@ -52,6 +52,10 @@ class LDASuite extends FunSuite with BeforeAndAfterAll {
     assert(docMap.size == 5)
   }
 
+  test("LDA || Gibbs sampling") {
+
+  }
+
 
 }
 

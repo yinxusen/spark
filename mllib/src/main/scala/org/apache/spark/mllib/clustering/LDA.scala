@@ -6,43 +6,73 @@ import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.mllib.expectation.GibbsSampling
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkContext, Logging}
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
-case class LDAParams (
-    docCounts: DoubleMatrix,
-    topicCounts: DoubleMatrix,
-    docTopicCounts: DoubleMatrix,
-    topicTermCounts: DoubleMatrix)
-  extends Serializable {
+import breeze.linalg.{DenseVector => BDV}
 
-  def inc(docId: Int, word: Int, topic: Int) {
-    docCounts.put(docId, 0, docCounts.get(docId, 0) + 1)
-    topicCounts.put(topic, 0, topicCounts.get(topic, 0) + 1)
-    docTopicCounts.put(docId, topic, docTopicCounts.get(docId, topic) + 1)
-    topicTermCounts.put(topic, word, topicTermCounts.get(topic, word) + 1)
+trait LDAParams {
+  def docCounts: Vector
+  def topicCounts: Vector
+  def docTopicCounts: Array[Vector]
+  def topicTermCounts: Array[Vector]
+}
+
+case class LDAComputingParams(
+    currDocCounts: BDV[Double],
+    currTopicCounts: BDV[Double],
+    currDocTopicCounts: Array[BDV[Double]],
+    currTopicTermCounts: Array[BDV[Double]])
+  extends Serializable with LDAParams {
+
+  override def docCounts: Vector = Vectors.fromBreeze(currDocCounts)
+
+  override def topicCounts: Vector = Vectors.fromBreeze(currTopicCounts)
+
+  override def docTopicCounts: Array[Vector] = currDocTopicCounts.map(Vectors.fromBreeze(_))
+
+  override def topicTermCounts: Array[Vector] = currTopicTermCounts.map(Vectors.fromBreeze(_))
+
+  private def update(doc: Int, term: Int, topic: Int, value: Double) {
+    currDocCounts(doc) += value
+    currTopicCounts(topic) += value
+    currDocTopicCounts(doc)(topic) += value
+    currTopicTermCounts(topic)(term) += value
   }
 
-  def dec(docId: Int, word: Int, topic: Int) {
-    docCounts.put(docId, 0, docCounts.get(docId, 0) - 1)
-    topicCounts.put(topic, 0, topicCounts.get(topic, 0) - 1)
-    docTopicCounts.put(docId, topic, docTopicCounts.get(docId, topic) - 1)
-    topicTermCounts.put(topic, word, topicTermCounts.get(topic, word) - 1)
+  def inc(doc: Int, term: Int, topic: Int) {
+    update(doc, term, topic, +1)
   }
 
-  def addi(other: LDAParams) = {
-    docCounts.addi(other.docCounts)
-    topicCounts.addi(other.topicCounts)
-    docTopicCounts.addi(other.docTopicCounts)
-    topicTermCounts.addi(other.topicTermCounts)
+  def dec(doc: Int, term: Int, topic: Int) {
+    update(doc, term, topic, -1)
+  }
+
+  def addi(other: LDAComputingParams) = {
+    currDocCounts :+= other.currDocCounts
+    currTopicCounts :+= other.currTopicCounts
+    var i = 0
+    while (i < currDocTopicCounts.length) {
+      currDocTopicCounts(i) :+= other.currDocTopicCounts(i)
+      i += 1
+    }
+
+    i = 0
+    while (i < currTopicTermCounts.length) {
+      currTopicTermCounts(i) :+= other.currTopicTermCounts(i)
+      i += 1
+    }
+
     this
   }
 }
 
-object LDAParams {
-  def apply(numDocs: Int, numTopics: Int, numTerms: Int) = new LDAParams(
-    DoubleMatrix.zeros(numDocs),
-    DoubleMatrix.zeros(numTopics),
-    DoubleMatrix.zeros(numDocs, numTopics),
-    DoubleMatrix.zeros(numTopics, numTerms))
+object LDAComputingParams {
+  def apply(numDocs: Int, numTopics: Int, numTerms: Int) = new LDAComputingParams(
+    BDV.zeros[Double](numDocs),
+    BDV.zeros[Double](numTopics),
+    Array(0 until numDocs).map(_ => BDV.zeros[Double](numTopics)),
+    Array(0 until numTopics).map(_ => BDV.zeros[Double](numTerms))
+  )
 }
 
 class LDA private (
