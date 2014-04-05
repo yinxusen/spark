@@ -165,12 +165,12 @@ object GibbsSampling extends Logging {
    * If using it on unseen data, you must do an iteration of Gibbs sampling before calling this.
    * Small perplexity means good result.
    */
-  def perplexity(data: RDD[Document], phi: DoubleMatrix, theta: DoubleMatrix): Double = {
+  def perplexity(data: RDD[Document], phi: Array[Vector], theta: Array[Vector]): Double = {
     val (termProb, totalNum) = data.flatMap { case Document(docId, content) =>
-      val currentTheta = theta.getRow(docId).mmul(phi)
-      content.map(x => (math.log(currentTheta.get(x)), 1))
-    }.reduce { (left, right) =>
-      (left._1 + right._1, left._2 + right._2)
+      val currentTheta = phi.map(vec => vec.toBreeze.dot(theta(docId).toBreeze))
+      content.map(x => (math.log(currentTheta(x)), 1))
+    }.reduce { (lhs, rhs) =>
+      (lhs._1 + rhs._1, lhs._2 + rhs._2)
     }
     math.exp(-1 * termProb / totalNum)
   }
