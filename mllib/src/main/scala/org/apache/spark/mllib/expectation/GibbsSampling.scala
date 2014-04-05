@@ -7,6 +7,7 @@ import scala.util._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Logging
 import org.apache.spark.mllib.clustering.{LDAComputingParams, LDAParams, Document}
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
 class GibbsSampling
 
@@ -148,13 +149,14 @@ object GibbsSampling extends Logging {
       numTerms: Int,
       docTopicSmoothing: Double,
       topicTermSmoothing: Double)
-    : (DoubleMatrix, DoubleMatrix) =
+    : (Array[Vector], Array[Vector]) =
   {
-    val docCount = params.docCounts.add(docTopicSmoothing * numTopics)
-    val topicCount = params.topicCounts.add(topicTermSmoothing * numTerms)
-    val docTopicCount = params.docTopicCounts.add(docTopicSmoothing)
-    val topicTermCount = params.topicTermCounts.add(topicTermSmoothing)
-    (topicTermCount.divColumnVector(topicCount), docTopicCount.divColumnVector(docCount))
+    val docCount = params.docCounts.toBreeze :+ (docTopicSmoothing * numTopics)
+    val topicCount = params.topicCounts.toBreeze :+ (topicTermSmoothing * numTerms)
+    val docTopicCount = params.docTopicCounts.map(vec => vec.toBreeze :+ docTopicSmoothing)
+    val topicTermCount = params.topicTermCounts.map(vec => vec.toBreeze :+ topicTermSmoothing)
+    (topicTermCount.map(vec => Vectors.fromBreeze(vec :/ topicCount)),
+      docTopicCount.map(vec => Vectors.fromBreeze(vec :/ docCount)))
   }
 
   /**
