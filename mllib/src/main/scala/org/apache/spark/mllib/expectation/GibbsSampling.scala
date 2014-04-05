@@ -1,13 +1,12 @@
 package org.apache.spark.mllib.expectation
 
-import org.jblas.DoubleMatrix
-
 import scala.util._
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Logging
 import org.apache.spark.mllib.clustering.{LDAComputingParams, LDAParams, Document}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
+import breeze.linalg.{DenseVector => BDV, sum}
 
 class GibbsSampling
 
@@ -21,11 +20,11 @@ object GibbsSampling extends Logging {
   /**
    * A multinomial distribution sampler, using roulette method to sample an Int back.
    */
-  private[mllib] def multinomialDistSampler(rand: Random, dist: DoubleMatrix): Int = {
+  private def multinomialDistSampler(rand: Random, dist: BDV[Double]): Int = {
     val roulette = rand.nextDouble()
 
     def loop(index: Int, accum: Double): Int = {
-      val sum = accum + dist.get(index)
+      val sum = accum + dist(index)
       if (sum >= roulette) index else loop(index + 1, sum)
     }
 
@@ -46,19 +45,17 @@ object GibbsSampling extends Logging {
       numTerms: Int,
       termIdx: Int,
       docIdx: Int,
-      rand: Random)
-    : Int =
-  {
-    val topicThisTerm = new DoubleMatrix(numTopics, 1)
-    val topicThisDoc = new DoubleMatrix(numTopics, 1)
-    val fraction = params.topicCounts.add(numTerms * topicTermSmoothing)
-    params.topicTermCounts.getColumn(termIdx, topicThisTerm)
-    params.docTopicCounts.getRow(docIdx, topicThisDoc)
-    topicThisTerm.addi(topicTermSmoothing)
-    topicThisDoc.addi(docTopicSmoothing)
-    topicThisTerm.divi(fraction)
-    topicThisTerm.muli(topicThisDoc)
-    topicThisTerm.divi(topicThisTerm.sum)
+      rand: Random): Int = {
+    val topicThisTerm = BDV.zeros[Double](numTopics)
+    val topicThisDoc = BDV.zeros[Double](numTopics)
+    val fraction = params.topicCounts.toBreeze :+ (numTerms * topicTermSmoothing)
+    topicThisTerm.copy(params.topicTermCounts.map(vec => vec(termIdx)))
+    topicThisDoc.copy(params.docTopicCounts(docIdx).toBreeze)
+    topicThisTerm :+= topicTermSmoothing
+    topicThisDoc :+= docTopicSmoothing
+    topicThisTerm :/= fraction
+    topicThisTerm :+= topicThisDoc
+    topicThisTerm :/= sum[BDV[Double], Double](topicThisTerm)
     multinomialDistSampler(rand, topicThisTerm)
   }
 

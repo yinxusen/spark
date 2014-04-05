@@ -1,7 +1,5 @@
 package org.apache.spark.mllib.clustering
 
-import org.jblas.DoubleMatrix
-
 import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.mllib.expectation.GibbsSampling
 import org.apache.spark.rdd.RDD
@@ -106,7 +104,7 @@ object LDA {
       topicTermSmoothing: Double,
       numIterations: Int,
       numDocs: Int,
-      numTerms: Int): (DoubleMatrix, DoubleMatrix) = {
+      numTerms: Int): (Array[Vector], Array[Vector]) = {
     val lda = new LDA(numTopics,
       docTopicSmoothing,
       topicTermSmoothing,
