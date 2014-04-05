@@ -6,7 +6,7 @@ import scala.util._
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Logging
-import org.apache.spark.mllib.clustering.{LDAParams, Document}
+import org.apache.spark.mllib.clustering.{LDAComputingParams, LDAParams, Document}
 
 class GibbsSampling
 
@@ -85,7 +85,7 @@ object GibbsSampling extends Logging {
 
     val init = data.mapPartitionsWithIndex { case (index, iterator) =>
       val rand = new Random(42 + index)
-      val params = LDAParams(numDocs, numTopics, numTerms)
+      val params = LDAComputingParams(numDocs, numTopics, numTerms)
       val assignedTopics = iterator.map { case Document(docId, content) =>
         content.map { term =>
           val topic = uniformDistSampler(rand, numTopics)
@@ -106,7 +106,7 @@ object GibbsSampling extends Logging {
         logInfo("Start Gibbs sampling")
 
         val assignedTopicsAndParams = data.zip(lastAssignedTopics).mapPartitions { iterator =>
-          val params = LDAParams(numDocs, numTopics, numTerms)
+          val params = LDAComputingParams(numDocs, numTopics, numTerms)
           val rand = new Random(42 + salt * numOuterIterations)
           val assignedTopics = iterator.map { case (Document(docId, content), topics) =>
             content.zip(topics).map { case (term, topic) =>
