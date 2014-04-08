@@ -6,7 +6,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.Logging
 import org.apache.spark.mllib.clustering.{LDAComputingParams, LDAParams, Document}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
-import breeze.linalg.{DenseVector => BDV, sum}
+import breeze.linalg.{Vector => BV, DenseVector => BDV, sum}
 
 class GibbsSampling
 
@@ -20,8 +20,13 @@ object GibbsSampling extends Logging {
   /**
    * A multinomial distribution sampler, using roulette method to sample an Int back.
    */
-  private def multinomialDistSampler(rand: Random, dist: BDV[Double]): Int = {
+  private[mllib] def multinomialDistSampler(rand: Random, dist: BV[Double]): Int = {
     val roulette = rand.nextDouble()
+
+    assert(sum[BV[Double], Double](dist) != 0.0)
+    dist :/= sum[BV[Double], Double](dist)
+
+    // assert(sum[BV[Double], Double](dist) == 1.0)
 
     def loop(index: Int, accum: Double): Int = {
       val sum = accum + dist(index)
@@ -49,8 +54,8 @@ object GibbsSampling extends Logging {
     val topicThisTerm = BDV.zeros[Double](numTopics)
     val topicThisDoc = BDV.zeros[Double](numTopics)
     val fraction = params.topicCounts.toBreeze :+ (numTerms * topicTermSmoothing)
-    topicThisTerm.copy(params.topicTermCounts.map(vec => vec(termIdx)))
-    topicThisDoc.copy(params.docTopicCounts(docIdx).toBreeze)
+    topicThisTerm := Vectors.dense(params.topicTermCounts.map(vec => vec(termIdx))).toBreeze
+    topicThisDoc := params.docTopicCounts(docIdx).toBreeze
     topicThisTerm :+= topicTermSmoothing
     topicThisDoc :+= docTopicSmoothing
     topicThisTerm :/= fraction
