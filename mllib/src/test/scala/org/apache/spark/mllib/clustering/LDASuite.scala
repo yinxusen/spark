@@ -35,7 +35,7 @@ class LDASuite extends FunSuite with BeforeAndAfterAll {
   @transient private var sc: SparkContext = _
 
   override def beforeAll() {
-    sc = new SparkContext("local", "test")
+    sc = new SparkContext("local", "LDA test")
   }
 
   override def afterAll() {
@@ -44,6 +44,8 @@ class LDASuite extends FunSuite with BeforeAndAfterAll {
   }
 
   test("LDA || Gibbs sampling") {
+    val checkPointDir = System.getProperty("spark.gibbsSampling.checkPointDir", "/tmp/lda")
+    sc.setCheckpointDir(checkPointDir)
     val model = generateRandomLDAModel(numTopics, numTerms)
     val corpus = sampleCorpus(model, numDocs, numTerms, numTopics)
     val data = sc.parallelize(corpus, 2)
@@ -60,7 +62,7 @@ object LDASuite {
   val expectedDocLength = 300
   val docTopicSmoothing = 0.01
   val topicTermSmoothing = 0.01
-  val numOuterIterations = 100
+  val numOuterIterations = 10
   val numInnerIterations = 1
 
   /**

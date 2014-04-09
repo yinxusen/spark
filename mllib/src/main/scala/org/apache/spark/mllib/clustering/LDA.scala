@@ -68,8 +68,8 @@ object LDAComputingParams {
   def apply(numDocs: Int, numTopics: Int, numTerms: Int) = new LDAComputingParams(
     BDV.zeros[Double](numDocs),
     BDV.zeros[Double](numTopics),
-    Array(0 until numDocs).map(_ => BDV.zeros[Double](numTopics)),
-    Array(0 until numTopics).map(_ => BDV.zeros[Double](numTerms))
+    (0 until numDocs).map(_ => BDV.zeros[Double](numTopics)).toArray,
+    (0 until numTopics).map(_ => BDV.zeros[Double](numTerms)).toArray
   )
 }
 
