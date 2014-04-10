@@ -62,7 +62,7 @@ object LDASuite {
   val expectedDocLength = 300
   val docTopicSmoothing = 0.01
   val topicTermSmoothing = 0.01
-  val numOuterIterations = 10
+  val numOuterIterations = 2
   val numInnerIterations = 1
 
   /**

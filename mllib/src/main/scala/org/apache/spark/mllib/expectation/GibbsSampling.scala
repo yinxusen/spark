@@ -158,8 +158,18 @@ object GibbsSampling extends Logging {
     val topicCount = params.topicCounts.toBreeze :+ (topicTermSmoothing * numTerms)
     val docTopicCount = params.docTopicCounts.map(vec => vec.toBreeze :+ docTopicSmoothing)
     val topicTermCount = params.topicTermCounts.map(vec => vec.toBreeze :+ topicTermSmoothing)
-    (topicTermCount.map(vec => Vectors.fromBreeze(vec :/ topicCount)),
-      docTopicCount.map(vec => Vectors.fromBreeze(vec :/ docCount)))
+    var i = 0
+    while (i < numTopics) {
+      topicTermCount(i) :/= topicCount(i)
+      i += 1
+    }
+    i = 0
+    while (i < docCount.length) {
+      docTopicCount(i) :/= docCount(i)
+      i += 1
+    }
+    (topicTermCount.map(vec => Vectors.fromBreeze(vec)),
+      docTopicCount.map(vec => Vectors.fromBreeze(vec)))
   }
 
   /**
