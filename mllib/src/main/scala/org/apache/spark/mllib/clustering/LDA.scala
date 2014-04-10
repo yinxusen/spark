@@ -6,13 +6,16 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkContext, Logging}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
-import breeze.linalg.{DenseVector => BDV}
+import breeze.linalg.{DenseVector => BDV, sum}
 
 trait LDAParams {
   def docCounts: Vector
   def topicCounts: Vector
   def docTopicCounts: Array[Vector]
   def topicTermCounts: Array[Vector]
+
+  def inc(arg0: Int, arg1: Int, arg2: Int)
+  def dec(arg0: Int, arg1: Int, arg2: Int)
 }
 
 case class LDAComputingParams(
@@ -37,15 +40,15 @@ case class LDAComputingParams(
     currTopicTermCounts(topic)(term) += value
   }
 
-  def inc(doc: Int, term: Int, topic: Int) {
+  override def inc(doc: Int, term: Int, topic: Int) {
     update(doc, term, topic, +1)
   }
 
-  def dec(doc: Int, term: Int, topic: Int) {
+  override def dec(doc: Int, term: Int, topic: Int) {
     update(doc, term, topic, -1)
   }
 
-  def addi(other: LDAComputingParams) = {
+  def addi(other: LDAComputingParams): LDAComputingParams = {
     currDocCounts :+= other.currDocCounts
     currTopicCounts :+= other.currTopicCounts
     var i = 0
@@ -83,7 +86,7 @@ class LDA private (
   extends Serializable with Logging
 {
   def run(input: RDD[Document]): LDAParams = {
-    GibbsSampling.runGibbsSampling(
+    new GibbsSampling(LDAComputingParams(numDocs, numTopics, numTerms)).runGibbsSampling(
       input,
       numIteration,
       1,

@@ -6,11 +6,105 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.Logging
 import org.apache.spark.mllib.clustering.{LDAComputingParams, LDAParams, Document}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
-import breeze.linalg.{Vector => BV, DenseVector => BDV, sum}
+import breeze.linalg.{Vector => BV, DenseVector => BDV, norm, sum}
 
-class GibbsSampling
+class GibbsSampling(params: LDAParams) extends Logging with Serializable {
+  import GibbsSampling._
+
+   /**
+   * Main function of running a Gibbs sampling method.
+   * It contains two phases of total Gibbs sampling:
+   * first is initialization, second is real sampling.
+   */
+  def runGibbsSampling(
+      data: RDD[Document],
+      numOuterIterations: Int,
+      numInnerIterations: Int,
+      numTerms: Int,
+      numDocs: Int,
+      numTopics: Int,
+      docTopicSmoothing: Double,
+      topicTermSmoothing: Double,
+      initParams: LDAParams = params)
+    : LDAParams =
+  {
+    // construct topic assignment RDD
+    logInfo("Start initialization")
+
+    val checkPointInterval = System
+      .getProperty("spark.gibbsSampling.checkPointInterval", "10").toInt
+
+    // Preprocessing
+    val (initialParams, initialAssignedTopics) = sampleTermAssignment(initParams, data)
+
+    // Gibbs sampling
+    val (param, _, _) = Iterator.iterate((initialParams, initialAssignedTopics, 0)) {
+      case (lastParams, lastAssignedTopics, salt) =>
+        logInfo("Start Gibbs sampling")
+
+        val assignedTopicsAndParams = data.zip(lastAssignedTopics).mapPartitions { iterator =>
+          val params = LDAComputingParams(numDocs, numTopics, numTerms)
+          val rand = new Random(42 + salt * numOuterIterations)
+          val assignedTopics = iterator.map { case (Document(docId, content), topics) =>
+            content.zip(topics).map { case (term, topic) =>
+              lastParams.dec(docId, term, topic)
+
+              val assignedTopic = dropOneDistSampler(
+                lastParams, docTopicSmoothing,
+                topicTermSmoothing, numTopics, numTerms, term, docId, rand)
+
+              lastParams.inc(docId, term, assignedTopic)
+              params.inc(docId, term, assignedTopic)
+              assignedTopic
+            }
+          }.toArray
+
+          Seq((assignedTopics, params)).iterator
+        }
+
+        val assignedTopics = assignedTopicsAndParams.flatMap(_._1).cache()
+        if (salt % checkPointInterval == 0) {
+          assignedTopics.checkpoint()
+        }
+        val paramsRdd = assignedTopicsAndParams.map(_._2)
+        val params = paramsRdd.zip(assignedTopics).map(_._1).reduce(_ addi _)
+        lastAssignedTopics.unpersist()
+
+        (params, assignedTopics, salt + 1)
+    }.drop(1 + numOuterIterations).next()
+
+    param
+  }
+}
 
 object GibbsSampling extends Logging {
+
+  private def sampleTermAssignment(params: LDAParams, data: RDD[Document]): (LDAParams, RDD[Array[Int]]) = {
+    val init = data.mapPartitionsWithIndex { case (index, iterator) =>
+      val rand = new Random(42 + index)
+      val docTopics = params.docTopicCounts(index).toBreeze
+      val assignedTopics = iterator.map { case Document(docId, content) =>
+        content.map { term =>
+          val topicTerms = Vectors.dense(params.topicTermCounts.map(vec => vec(term))).toBreeze
+          val dist = docTopics :* topicTerms
+          if (dist.norm(2) == 0) {
+            val topic = uniformDistSampler(rand, dist.size)
+            params.inc(docId, term, topic)
+            topic
+          } else {
+            multinomialDistSampler(rand, docTopics :* topicTerms)
+          }
+        }
+      }.toArray
+
+      Seq((assignedTopics, params)).iterator
+    }
+
+    val initialAssignedTopics = init.flatMap(_._1).cache()
+    val temp = init.map(_._2).collect()
+    val initialParams = temp.reduce(_.asInstanceOf[LDAComputingParams] addi _.asInstanceOf[LDAComputingParams])
+    (initialParams, initialAssignedTopics)
+  }
 
   /**
    * A uniform distribution sampler, which is only used for initialization.
@@ -64,84 +158,7 @@ object GibbsSampling extends Logging {
     multinomialDistSampler(rand, topicThisTerm)
   }
 
-  /**
-   * Main function of running a Gibbs sampling method.
-   * It contains two phases of total Gibbs sampling:
-   * first is initialization, second is real sampling.
-   */
-  def runGibbsSampling(
-      data: RDD[Document],
-      numOuterIterations: Int,
-      numInnerIterations: Int,
-      numTerms: Int,
-      numDocs: Int,
-      numTopics: Int,
-      docTopicSmoothing: Double,
-      topicTermSmoothing: Double)
-    : LDAParams =
-  {
-    // construct topic assignment RDD
-    logInfo("Start initialization")
 
-    val checkPointInterval = System
-      .getProperty("spark.gibbsSampling.checkPointInterval", "10").toInt
-
-    val init = data.mapPartitionsWithIndex { case (index, iterator) =>
-      val rand = new Random(42 + index)
-      val params = LDAComputingParams(numDocs, numTopics, numTerms)
-      val assignedTopics = iterator.map { case Document(docId, content) =>
-        content.map { term =>
-          val topic = uniformDistSampler(rand, numTopics)
-          params.inc(docId, term, topic)
-          topic
-        }
-      }.toArray
-
-      Seq((assignedTopics, params)).iterator
-    }
-
-    val initialAssignedTopics = init.flatMap(_._1).cache()
-    val temp = init.map(_._2).collect()
-    val initialParams = temp.reduce(_ addi _)
-
-    // Gibbs sampling
-    val (param, _, _) = Iterator.iterate((initialParams, initialAssignedTopics, 0)) {
-      case (lastParams, lastAssignedTopics, salt) =>
-        logInfo("Start Gibbs sampling")
-
-        val assignedTopicsAndParams = data.zip(lastAssignedTopics).mapPartitions { iterator =>
-          val params = LDAComputingParams(numDocs, numTopics, numTerms)
-          val rand = new Random(42 + salt * numOuterIterations)
-          val assignedTopics = iterator.map { case (Document(docId, content), topics) =>
-            content.zip(topics).map { case (term, topic) =>
-              lastParams.dec(docId, term, topic)
-
-              val assignedTopic = dropOneDistSampler(
-                lastParams, docTopicSmoothing,
-                topicTermSmoothing, numTopics, numTerms, term, docId, rand)
-
-              lastParams.inc(docId, term, assignedTopic)
-              params.inc(docId, term, assignedTopic)
-              assignedTopic
-            }
-          }.toArray
-
-          Seq((assignedTopics, params)).iterator
-        }
-
-        val assignedTopics = assignedTopicsAndParams.flatMap(_._1).cache()
-        if (salt % checkPointInterval == 0) {
-          assignedTopics.checkpoint()
-        }
-        val paramsRdd = assignedTopicsAndParams.map(_._2)
-        val params = paramsRdd.zip(assignedTopics).map(_._1).reduce(_ addi _)
-        lastAssignedTopics.unpersist()
-
-        (params, assignedTopics, salt + 1)
-    }.drop(1 + numOuterIterations).next()
-
-    param
-  }
 
   /**
    * We use LDAParams to infer parameters Phi and Theta.
@@ -180,7 +197,17 @@ object GibbsSampling extends Logging {
    */
   def perplexity(data: RDD[Document], phi: Array[Vector], theta: Array[Vector]): Double = {
     val (termProb, totalNum) = data.flatMap { case Document(docId, content) =>
-      val currentTheta = phi.map(vec => vec.toBreeze.dot(theta(docId).toBreeze))
+      val currentTheta = BDV.zeros[Double](phi.head.size)
+      var col = 0
+      var row = 0
+      while (col < phi.head.size) {
+        row = 0
+        while (row < phi.length) {
+          currentTheta(col) += phi(row)(col) * theta(docId)(row)
+          row += 1
+        }
+        col += 1
+      }
       content.map(x => (math.log(currentTheta(x)), 1))
     }.reduce { (lhs, rhs) =>
       (lhs._1 + rhs._1, lhs._2 + rhs._2)
