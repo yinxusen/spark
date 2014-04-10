@@ -67,7 +67,7 @@ class GibbsSampling(params: LDAParams) extends Logging with Serializable {
           assignedTopics.checkpoint()
         }
         val paramsRdd = assignedTopicsAndParams.map(_._2)
-        val params = paramsRdd.zip(assignedTopics).map(_._1).reduce(_ addi _)
+        val params = paramsRdd.reduce(_ addi _)
         lastAssignedTopics.unpersist()
 
         (params, assignedTopics, salt + 1)
@@ -92,7 +92,7 @@ object GibbsSampling extends Logging {
             params.inc(docId, term, topic)
             topic
           } else {
-            multinomialDistSampler(rand, docTopics :* topicTerms)
+            multinomialDistSampler(rand, dist)
           }
         }
       }.toArray
@@ -109,20 +109,23 @@ object GibbsSampling extends Logging {
   /**
    * A uniform distribution sampler, which is only used for initialization.
    */
-  private def uniformDistSampler(rand: Random, dimension: Int): Int = rand.nextInt(dimension)
+  private def uniformDistSampler(rand: Random, dimension: Int): Int = rand.nextInt(dimension) % dimension
 
   /**
    * A multinomial distribution sampler, using roulette method to sample an Int back.
    */
   private[mllib] def multinomialDistSampler(rand: Random, dist: BV[Double]): Int = {
+    // println(s"vector length is ${dist.length}")
     val roulette = rand.nextDouble()
 
-    assert(sum[BV[Double], Double](dist) != 0.0)
+    // assert(sum[BV[Double], Double](dist) != 0.0)
     dist :/= sum[BV[Double], Double](dist)
 
-    // assert(sum[BV[Double], Double](dist) == 1.0)
+    val sum1 = sum[BV[Double], Double](dist)
+    // println(s"sum1 is $sum1")
 
     def loop(index: Int, accum: Double): Int = {
+      if(index == dist.length) return dist.length - 1
       val sum = accum + dist(index)
       if (sum >= roulette) index else loop(index + 1, sum)
     }

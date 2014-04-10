@@ -6,7 +6,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkContext, Logging}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
-import breeze.linalg.{DenseVector => BDV, sum}
+import breeze.linalg.{DenseVector => BDV}
 
 trait LDAParams {
   def docCounts: Vector
@@ -49,6 +49,9 @@ case class LDAComputingParams(
   }
 
   def addi(other: LDAComputingParams): LDAComputingParams = {
+    if (currTopicTermCounts.length != 10) {
+      println("error here")
+    }
     currDocCounts :+= other.currDocCounts
     currTopicCounts :+= other.currTopicCounts
     var i = 0

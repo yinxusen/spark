@@ -51,7 +51,7 @@ class LDASuite extends FunSuite with BeforeAndAfterAll {
     val data = sc.parallelize(corpus, 2)
     var computedModel = LDAComputingParams(numDocs, numTopics, numTerms).asInstanceOf[LDAParams]
     var i = 0
-    while (i < 10) {
+    while (i < 1) {
       computedModel = new GibbsSampling(computedModel).runGibbsSampling(data, numOuterIterations, numInnerIterations, numTerms, numDocs, numTopics, docTopicSmoothing, topicTermSmoothing)
       val (phi, theta) = GibbsSampling.solvePhiAndTheta(computedModel, numTopics, numTerms, docTopicSmoothing, topicTermSmoothing)
       val pp = GibbsSampling.perplexity(data, phi, theta)
@@ -69,7 +69,7 @@ object LDASuite {
   val expectedDocLength = 300
   val docTopicSmoothing = 0.01
   val topicTermSmoothing = 0.01
-  val numOuterIterations = 2
+  val numOuterIterations = 20
   val numInnerIterations = 1
 
   /**
