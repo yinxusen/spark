@@ -28,7 +28,6 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.clustering.Document
 import breeze.util.Index
 import chalk.text.tokenize.JavaWordTokenizer
-import scala.collection.mutable.ArrayBuffer
 
 /**
  * Helper methods to load, save and pre-process data used in ML Lib.
@@ -275,12 +274,11 @@ object MLUtils extends Logging {
     logInfo("Translate documents of terms into integers...")
     val data = almostData.map { case (fileName, content) =>
       val fileIdx = broadcastDocMap.value.index(fileName)
-      val contentIdx = new ArrayBuffer[Int]
-      for (token <- JavaWordTokenizer(content)
-        if token(0).isLetter && !broadcastStopWord.value.contains(token)) {
-          contentIdx.append(broadcastWordMap.value.index(token))
-      }
-      Document(fileIdx, contentIdx.toArray)
+      val translatedContent = JavaWordTokenizer(content)
+        .filter(_(0).isLetter)
+        .filter(!broadcastStopWord.value.contains(_))
+        .map(broadcastWordMap.value.index)
+      Document(fileIdx, translatedContent)
     }
     (data, termMap, docMap)
   }

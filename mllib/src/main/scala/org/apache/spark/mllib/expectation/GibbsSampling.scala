@@ -146,7 +146,7 @@ object GibbsSampling extends Logging {
    */
   private def sampleTermAssignment(
       params: LDAComputingParams,
-      data: RDD[Document]): (LDAComputingParams, RDD[Array[Int]]) = {
+      data: RDD[Document]): (LDAComputingParams, RDD[Iterable[Int]]) = {
     val init = data.mapPartitionsWithIndex { case (index, iterator) =>
       val rand = new Random(42 + index)
       val docTopics = params.docTopicCounts(index).toBreeze
