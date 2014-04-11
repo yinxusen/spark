@@ -401,7 +401,8 @@ object SparkBuild extends Build {
     previousArtifact := sparkPreviousArtifact("spark-mllib"),
     libraryDependencies ++= Seq(
       "org.jblas" % "jblas" % jblasVersion,
-      "org.scalanlp" %% "breeze" % "0.7"
+      "org.scalanlp" %% "breeze" % "0.7",
+      "org.scalanlp" %% "chalk" % "1.3.0"
     )
   )
 

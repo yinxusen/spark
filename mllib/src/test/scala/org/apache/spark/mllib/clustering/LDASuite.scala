@@ -17,18 +17,16 @@
 
 package org.apache.spark.mllib.clustering
 
+import scala.util._
 
+import breeze.linalg.{DenseVector => BDV}
+import breeze.stats.distributions.Poisson
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.FunSuite
 
-import org.apache.spark.SparkContext
-import org.apache.spark.mllib.linalg.Vector
-import org.apache.spark.mllib.linalg.Vectors
-import breeze.stats.distributions.Poisson
-import breeze.linalg.{DenseVector => BDV}
-import scala.util._
-import org.apache.spark.mllib.expectation.GibbsSampling._
 import org.apache.spark.mllib.expectation.GibbsSampling
+import org.apache.spark.mllib.expectation.GibbsSampling._
+import org.apache.spark.SparkContext
 
 class LDASuite extends FunSuite with BeforeAndAfterAll {
   import LDASuite._
@@ -49,28 +47,36 @@ class LDASuite extends FunSuite with BeforeAndAfterAll {
     val model = generateRandomLDAModel(numTopics, numTerms)
     val corpus = sampleCorpus(model, numDocs, numTerms, numTopics)
     val data = sc.parallelize(corpus, 2)
-    var computedModel = LDAComputingParams(numDocs, numTopics, numTerms).asInstanceOf[LDAParams]
+    var computedModel = LDAComputingParams(numDocs, numTopics, numTerms)
+    val trainer = new GibbsSampling(
+      data,
+      numOuterIterations,
+      numInnerIterations,
+      docTopicSmoothing,
+      topicTermSmoothing)
     var i = 0
-    while (i < 1) {
-      computedModel = new GibbsSampling(computedModel).runGibbsSampling(data, numOuterIterations, numInnerIterations, numTerms, numDocs, numTopics, docTopicSmoothing, topicTermSmoothing)
-      val (phi, theta) = GibbsSampling.solvePhiAndTheta(computedModel, numTopics, numTerms, docTopicSmoothing, topicTermSmoothing)
-      val pp = GibbsSampling.perplexity(data, phi, theta)
-      println(pp)
+    var lastPP = Double.MaxValue
+    while (i < incrementalLearning) {
+      computedModel = trainer.runGibbsSampling(computedModel)
+      val (phi, theta) = trainer.solvePhiAndTheta(computedModel)
+      val pp = perplexity(data, phi, theta)
+      assert(lastPP >= pp)
+      lastPP = pp
       i += 1
     }
   }
 }
 
 object LDASuite {
-
-  val numTopics = 10
-  val numTerms = 1000
-  val numDocs = 500
-  val expectedDocLength = 300
+  val numTopics = 3
+  val numTerms = 200
+  val numDocs = 10
+  val expectedDocLength = 100
   val docTopicSmoothing = 0.01
   val topicTermSmoothing = 0.01
-  val numOuterIterations = 20
+  val numOuterIterations = 3
   val numInnerIterations = 1
+  val incrementalLearning = 10
 
   /**
    * Generate a random LDA model, i.e. the topic-term matrix.
@@ -85,7 +91,8 @@ object LDASuite {
       model(topic) = BDV.zeros[Double](numTerms)
       i = 0
       while (i < numTerms) {
-        // treat the term list as a circle, so the distance between the first one and the last one is 1, not n-1.
+        // treat the term list as a circle, so the distance between the first one and the last one
+        // is 1, not n-1.
         val distance = Math.abs(topicCentroid - i) % (numTerms / 2)
         // Possibility is decay along with distance
         model(topic)(i) = 1.0 / (1 + Math.abs(distance))
@@ -99,7 +106,10 @@ object LDASuite {
   /**
    * Sample one document given the topic-term matrix
    */
-  def ldaSampler(model: Array[BDV[Double]], topicDist: BDV[Double], numTermsPerDoc: Int): Array[Int] = {
+  def ldaSampler(
+      model: Array[BDV[Double]],
+      topicDist: BDV[Double],
+      numTermsPerDoc: Int): Array[Int] = {
     val samples = new Array[Int](numTermsPerDoc)
     val rand = new Random()
     (0 until numTermsPerDoc).foreach { i =>
@@ -114,7 +124,11 @@ object LDASuite {
   /**
    * Sample corpus (many documents) from a given topic-term matrix
    */
-  def sampleCorpus(model: Array[BDV[Double]], numDocs: Int, numTerms: Int, numTopics: Int): Array[Document] = {
+  def sampleCorpus(
+      model: Array[BDV[Double]],
+      numDocs: Int,
+      numTerms: Int,
+      numTopics: Int): Array[Document] = {
     (0 until numDocs).map { i =>
       val numTermsPerDoc = Poisson.distribution(expectedDocLength).sample()
       val numTopicsPerDoc = Random.nextInt(numTopics / 2) + 1

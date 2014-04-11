@@ -1,40 +1,70 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.spark.mllib.expectation
 
 import scala.util._
 
-import org.apache.spark.rdd.RDD
+import breeze.linalg.{Vector => BV, DenseVector => BDV, sum}
+
 import org.apache.spark.Logging
 import org.apache.spark.mllib.clustering.{LDAComputingParams, LDAParams, Document}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
-import breeze.linalg.{Vector => BV, DenseVector => BDV, norm, sum}
+import org.apache.spark.rdd.RDD
 
-class GibbsSampling(params: LDAParams) extends Logging with Serializable {
+/**
+ * Gibbs sampling from a given dataset and model.
+ * @param data Dataset, such as corpus.
+ * @param numOuterIterations Number of outer iteration.
+ * @param numInnerIterations Number of inner iteration, used in each partition.
+ * @param docTopicSmoothing Document-topic smoohing.
+ * @param topicTermSmoothing Topic-term smoothing.
+ */
+class GibbsSampling(
+    data: RDD[Document],
+    numOuterIterations: Int,
+    numInnerIterations: Int,
+    docTopicSmoothing: Double,
+    topicTermSmoothing: Double)
+  extends Logging with Serializable {
   import GibbsSampling._
 
    /**
-   * Main function of running a Gibbs sampling method.
-   * It contains two phases of total Gibbs sampling:
-   * first is initialization, second is real sampling.
+   * Main function of running a Gibbs sampling method. It contains two phases of total Gibbs
+   * sampling: first is initialization, second is real sampling.
    */
   def runGibbsSampling(
-      data: RDD[Document],
-      numOuterIterations: Int,
-      numInnerIterations: Int,
-      numTerms: Int,
-      numDocs: Int,
-      numTopics: Int,
-      docTopicSmoothing: Double,
-      topicTermSmoothing: Double,
-      initParams: LDAParams = params)
-    : LDAParams =
-  {
+      initParams: LDAComputingParams,
+      data: RDD[Document] = data,
+      numOuterIterations: Int = numOuterIterations,
+      numInnerIterations: Int = numInnerIterations,
+      docTopicSmoothing: Double = docTopicSmoothing,
+      topicTermSmoothing: Double = topicTermSmoothing): LDAComputingParams = {
+
+    val numTerms = initParams.topicTermCounts.head.size
+    val numDocs = initParams.docCounts.size
+    val numTopics = initParams.topicCounts.size
+
     // construct topic assignment RDD
     logInfo("Start initialization")
 
-    val checkPointInterval = System
-      .getProperty("spark.gibbsSampling.checkPointInterval", "10").toInt
+    val cpInterval = System.getProperty("spark.gibbsSampling.checkPointInterval", "10").toInt
 
-    // Preprocessing
+    // Pre-processing
     val (initialParams, initialAssignedTopics) = sampleTermAssignment(initParams, data)
 
     // Gibbs sampling
@@ -63,7 +93,7 @@ class GibbsSampling(params: LDAParams) extends Logging with Serializable {
         }
 
         val assignedTopics = assignedTopicsAndParams.flatMap(_._1).cache()
-        if (salt % checkPointInterval == 0) {
+        if (salt % cpInterval == 0) {
           assignedTopics.checkpoint()
         }
         val paramsRdd = assignedTopicsAndParams.map(_._2)
@@ -75,11 +105,45 @@ class GibbsSampling(params: LDAParams) extends Logging with Serializable {
 
     param
   }
+
+  /**
+   * Model matrix Phi and Theta are inferred via LDAParams.
+   */
+  def solvePhiAndTheta(
+      params: LDAParams,
+      docTopicSmoothing: Double = docTopicSmoothing,
+      topicTermSmoothing: Double = topicTermSmoothing): (Array[Vector], Array[Vector]) = {
+    val numTopics = params.topicCounts.size
+    val numTerms = params.topicTermCounts.head.size
+
+    val docCount = params.docCounts.toBreeze :+ (docTopicSmoothing * numTopics)
+    val topicCount = params.topicCounts.toBreeze :+ (topicTermSmoothing * numTerms)
+    val docTopicCount = params.docTopicCounts.map(vec => vec.toBreeze :+ docTopicSmoothing)
+    val topicTermCount = params.topicTermCounts.map(vec => vec.toBreeze :+ topicTermSmoothing)
+
+    var i = 0
+    while (i < numTopics) {
+      topicTermCount(i) :/= topicCount(i)
+      i += 1
+    }
+    i = 0
+    while (i < docCount.length) {
+      docTopicCount(i) :/= docCount(i)
+      i += 1
+    }
+    (topicTermCount.map(vec => Vectors.fromBreeze(vec)),
+      docTopicCount.map(vec => Vectors.fromBreeze(vec)))
+  }
 }
 
 object GibbsSampling extends Logging {
 
-  private def sampleTermAssignment(params: LDAParams, data: RDD[Document]): (LDAParams, RDD[Array[Int]]) = {
+  /**
+   * Initial step of Gibbs sampling, which supports incremental LDA.
+   */
+  private def sampleTermAssignment(
+      params: LDAComputingParams,
+      data: RDD[Document]): (LDAComputingParams, RDD[Array[Int]]) = {
     val init = data.mapPartitionsWithIndex { case (index, iterator) =>
       val rand = new Random(42 + index)
       val docTopics = params.docTopicCounts(index).toBreeze
@@ -102,27 +166,23 @@ object GibbsSampling extends Logging {
 
     val initialAssignedTopics = init.flatMap(_._1).cache()
     val temp = init.map(_._2).collect()
-    val initialParams = temp.reduce(_.asInstanceOf[LDAComputingParams] addi _.asInstanceOf[LDAComputingParams])
+    val initialParams = temp.reduce(_ addi _)
     (initialParams, initialAssignedTopics)
   }
 
   /**
    * A uniform distribution sampler, which is only used for initialization.
    */
-  private def uniformDistSampler(rand: Random, dimension: Int): Int = rand.nextInt(dimension) % dimension
+  private def uniformDistSampler(rand: Random, dimension: Int): Int = rand.nextInt(dimension)
 
   /**
    * A multinomial distribution sampler, using roulette method to sample an Int back.
    */
   private[mllib] def multinomialDistSampler(rand: Random, dist: BV[Double]): Int = {
-    // println(s"vector length is ${dist.length}")
     val roulette = rand.nextDouble()
 
-    // assert(sum[BV[Double], Double](dist) != 0.0)
+    assert(sum[BV[Double], Double](dist) != 0.0)
     dist :/= sum[BV[Double], Double](dist)
-
-    val sum1 = sum[BV[Double], Double](dist)
-    // println(s"sum1 is $sum1")
 
     def loop(index: Int, accum: Double): Int = {
       if(index == dist.length) return dist.length - 1
@@ -134,10 +194,9 @@ object GibbsSampling extends Logging {
   }
 
   /**
-   * I use this function to compute the new distribution after drop one from current document.
-   * This is a really essential part of Gibbs sampling for LDA, you can refer to the paper:
+   * This function used for computing the new distribution after drop one from current document,
+   * which is a really essential part of Gibbs sampling for LDA, you can refer to the paper:
    * <I>Parameter estimation for text analysis</I>
-   * In the end, I call multinomialDistSampler to sample a figure out.
    */
   private def dropOneDistSampler(
       params: LDAParams,
@@ -161,42 +220,10 @@ object GibbsSampling extends Logging {
     multinomialDistSampler(rand, topicThisTerm)
   }
 
-
-
   /**
-   * We use LDAParams to infer parameters Phi and Theta.
-   */
-  def solvePhiAndTheta(
-      params: LDAParams,
-      numTopics: Int,
-      numTerms: Int,
-      docTopicSmoothing: Double,
-      topicTermSmoothing: Double)
-    : (Array[Vector], Array[Vector]) =
-  {
-    val docCount = params.docCounts.toBreeze :+ (docTopicSmoothing * numTopics)
-    val topicCount = params.topicCounts.toBreeze :+ (topicTermSmoothing * numTerms)
-    val docTopicCount = params.docTopicCounts.map(vec => vec.toBreeze :+ docTopicSmoothing)
-    val topicTermCount = params.topicTermCounts.map(vec => vec.toBreeze :+ topicTermSmoothing)
-    var i = 0
-    while (i < numTopics) {
-      topicTermCount(i) :/= topicCount(i)
-      i += 1
-    }
-    i = 0
-    while (i < docCount.length) {
-      docTopicCount(i) :/= docCount(i)
-      i += 1
-    }
-    (topicTermCount.map(vec => Vectors.fromBreeze(vec)),
-      docTopicCount.map(vec => Vectors.fromBreeze(vec)))
-  }
-
-  /**
-   * Perplexity is a kind of evaluation method of LDA. Usually it is used on unseen data.
-   * But here we use it for current documents, which is also OK.
-   * If using it on unseen data, you must do an iteration of Gibbs sampling before calling this.
-   * Small perplexity means good result.
+   * Perplexity is a kind of evaluation method of LDA. Usually it is used on unseen data. But here
+   * we use it for current documents, which is also OK. If using it on unseen data, you must do an
+   * iteration of Gibbs sampling before calling this. Small perplexity means good result.
    */
   def perplexity(data: RDD[Document], phi: Array[Vector], theta: Array[Vector]): Double = {
     val (termProb, totalNum) = data.flatMap { case Document(docId, content) =>

@@ -1,21 +1,51 @@
-package org.apache.spark.mllib.clustering
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-import org.apache.spark.mllib.util.MLUtils
-import org.apache.spark.mllib.expectation.GibbsSampling
-import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkContext, Logging}
-import org.apache.spark.mllib.linalg.{Vector, Vectors}
+package org.apache.spark.mllib.clustering
 
 import breeze.linalg.{DenseVector => BDV}
 
-trait LDAParams {
-  def docCounts: Vector
-  def topicCounts: Vector
-  def docTopicCounts: Array[Vector]
-  def topicTermCounts: Array[Vector]
+import org.apache.spark.mllib.expectation.GibbsSampling
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
+import org.apache.spark.mllib.util.MLUtils
+import org.apache.spark.rdd.RDD
+import org.apache.spark.{SparkContext, Logging}
 
-  def inc(arg0: Int, arg1: Int, arg2: Int)
-  def dec(arg0: Int, arg1: Int, arg2: Int)
+trait LDAParams {
+
+  /**
+   * Count terms in each document.
+   */
+  def docCounts: Vector
+
+  /**
+   * Count terms in each topic.
+   */
+  def topicCounts: Vector
+
+  /**
+   * Count topics in documents.
+   */
+  def docTopicCounts: Array[Vector]
+
+  /**
+   * Count terms in documents.
+   */
+  def topicTermCounts: Array[Vector]
 }
 
 case class LDAComputingParams(
@@ -40,18 +70,15 @@ case class LDAComputingParams(
     currTopicTermCounts(topic)(term) += value
   }
 
-  override def inc(doc: Int, term: Int, topic: Int) {
+  def inc(doc: Int, term: Int, topic: Int) {
     update(doc, term, topic, +1)
   }
 
-  override def dec(doc: Int, term: Int, topic: Int) {
+  def dec(doc: Int, term: Int, topic: Int) {
     update(doc, term, topic, -1)
   }
 
   def addi(other: LDAComputingParams): LDAComputingParams = {
-    if (currTopicTermCounts.length != 10) {
-      println("error here")
-    }
     currDocCounts :+= other.currDocCounts
     currTopicCounts :+= other.currTopicCounts
     var i = 0
@@ -88,16 +115,15 @@ class LDA private (
     var numTerms: Int)
   extends Serializable with Logging
 {
-  def run(input: RDD[Document]): LDAParams = {
-    new GibbsSampling(LDAComputingParams(numDocs, numTopics, numTerms)).runGibbsSampling(
+  def run(input: RDD[Document]): (GibbsSampling, LDAParams) = {
+    val trainer = new GibbsSampling(
       input,
       numIteration,
       1,
-      numTerms,
-      numDocs,
-      numTopics,
       docTopicSmoothing,
-      topicTermSmoothing)
+      topicTermSmoothing
+    )
+    (trainer, trainer.runGibbsSampling(LDAComputingParams(numDocs, numTopics, numTerms)))
   }
 }
 
@@ -117,9 +143,8 @@ object LDA {
       numIterations,
       numDocs,
       numTerms)
-    val model = lda.run(data)
-    GibbsSampling.
-      solvePhiAndTheta(model, numTopics, numTerms, docTopicSmoothing, topicTermSmoothing)
+    val (trainer, model) = lda.run(data)
+    trainer.solvePhiAndTheta(model)
   }
 
   def main(args: Array[String]) {

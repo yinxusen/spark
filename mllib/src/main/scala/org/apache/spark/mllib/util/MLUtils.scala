@@ -225,32 +225,29 @@ object MLUtils {
   }
 
   def loadCorpus(
-                  sc: SparkContext,
-                  dir: String,
-                  miniSplit: Int,
-                  dirStopWords: String = "./english.stop.txt"):
+      sc: SparkContext,
+      dir: String,
+      miniSplit: Int,
+      dirStopWords: String = "./english.stop.txt"):
   (RDD[Document], Index[String], Index[String]) = {
 
     val wordMap = Index[String]()
     val docMap = Index[String]()
 
-    val almostData = sc.textFile(dir, miniSplit).cache()
+    val almostData = sc.wholeTextFiles(dir).cache()
 
     val stopWords = sc.textFile(dirStopWords, miniSplit).
-      map(x => x.replaceAll("""(?m)\s+$""", "")).distinct.collect.toSet
+      map(x => x.replaceAll( """(?m)\s+$""", "")).distinct().collect().toSet
 
     val broadcastStopWord = sc.broadcast(stopWords)
 
-    almostData.map { line =>
-      val (fileName, _) = splitNameAndContent(line)
+    almostData.map { case (fileName, _) =>
       fileName
-    }.distinct.collect.map(x => docMap.index(x))
+    }.distinct().collect().map(x => docMap.index(x))
 
-    almostData.flatMap { line =>
-      val (_, content) = splitNameAndContent(line)
-      JavaWordTokenizer(content)
-        .filter(x => x(0).isLetter && ! broadcastStopWord.value.contains(x))
-    }.distinct.collect.map(x => wordMap.index(x))
+    almostData.flatMap { case (_, content) =>
+      JavaWordTokenizer(content).filter(x => x(0).isLetter && !broadcastStopWord.value.contains(x))
+    }.distinct().collect().map(x => wordMap.index(x))
 
     println(wordMap.size)
     println(docMap.size)
@@ -258,15 +255,14 @@ object MLUtils {
     val broadcastWordMap = sc.broadcast(wordMap)
     val broadcastDocMap = sc.broadcast(docMap)
 
-    val data = almostData.map { line =>
-      val splitVersion = splitNameAndContent(line)
-      val fileIdx = broadcastDocMap.value.index(splitVersion._1)
-      val content = new ArrayBuffer[Int]
-      for (token <- JavaWordTokenizer(splitVersion._2)
-           if (token(0).isLetter && ! broadcastStopWord.value.contains(token))) {
-        content.append(broadcastWordMap.value.index(token))
+    val data = almostData.map { case (fileName, content) =>
+      val fileIdx = broadcastDocMap.value.index(fileName)
+      val contentIdx = new ArrayBuffer[Int]
+      for (token <- JavaWordTokenizer(content)
+        if token(0).isLetter && !broadcastStopWord.value.contains(token)) {
+          contentIdx.append(broadcastWordMap.value.index(token))
       }
-      Document(fileIdx, content.toArray)
+      Document(fileIdx, contentIdx.toArray)
     }
     (data, wordMap, docMap)
   }
