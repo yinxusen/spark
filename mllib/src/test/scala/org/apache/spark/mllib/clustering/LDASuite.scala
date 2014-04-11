@@ -54,27 +54,31 @@ class LDASuite extends FunSuite with BeforeAndAfterAll {
       numInnerIterations,
       docTopicSmoothing,
       topicTermSmoothing)
+
+    val pps = new Array[Double](incrementalLearning)
+
     var i = 0
-    var lastPP = Double.MaxValue
     while (i < incrementalLearning) {
       computedModel = trainer.runGibbsSampling(computedModel)
       val (phi, theta) = trainer.solvePhiAndTheta(computedModel)
-      val pp = perplexity(data, phi, theta)
-      assert(lastPP >= pp)
-      lastPP = pp
+      pps(i) = perplexity(data, phi, theta)
       i += 1
     }
+
+    val ppsDiff = pps.init.zip(pps.tail).map { case (lhs, rhs) => lhs - rhs }
+    assert(ppsDiff.count(_ > 0).toDouble / ppsDiff.size > 0.6)
+    assert(pps.head - pps.last > 0)
   }
 }
 
 object LDASuite {
-  val numTopics = 3
-  val numTerms = 200
-  val numDocs = 10
-  val expectedDocLength = 100
+  val numTopics = 5
+  val numTerms = 1000
+  val numDocs = 100
+  val expectedDocLength = 300
   val docTopicSmoothing = 0.01
   val topicTermSmoothing = 0.01
-  val numOuterIterations = 3
+  val numOuterIterations = 5
   val numInnerIterations = 1
   val incrementalLearning = 10
 

@@ -224,20 +224,34 @@ object MLUtils {
     nameAndContent.splitAt(pos)
   }
 
+  /**
+   * Load corpus from a given path. Terms and documents will be translated into integers, with a
+   * term-integer map and a document-integer map.
+   *
+   * @param dir The path of corpus.
+   * @param dirStopWords The path of stop words.
+   * @return (RDD[Document], Term-integer map, doc-integer map)
+   */
   def loadCorpus(
       sc: SparkContext,
       dir: String,
       miniSplit: Int,
-      dirStopWords: String = "./english.stop.txt"):
+      dirStopWords: String = ""):
   (RDD[Document], Index[String], Index[String]) = {
 
-    val wordMap = Index[String]()
+    val termMap = Index[String]()
     val docMap = Index[String]()
 
     val almostData = sc.wholeTextFiles(dir).cache()
 
-    val stopWords = sc.textFile(dirStopWords, miniSplit).
-      map(x => x.replaceAll( """(?m)\s+$""", "")).distinct().collect().toSet
+    val stopWords =
+      if (dirStopWords == "") {
+        Set.empty[String]
+      }
+      else {
+        sc.textFile(dirStopWords, miniSplit).
+          map(x => x.replaceAll( """(?m)\s+$""", "")).distinct().collect().toSet
+      }
 
     val broadcastStopWord = sc.broadcast(stopWords)
 
@@ -247,12 +261,12 @@ object MLUtils {
 
     almostData.flatMap { case (_, content) =>
       JavaWordTokenizer(content).filter(x => x(0).isLetter && !broadcastStopWord.value.contains(x))
-    }.distinct().collect().map(x => wordMap.index(x))
+    }.distinct().collect().map(x => termMap.index(x))
 
-    println(wordMap.size)
+    println(termMap.size)
     println(docMap.size)
 
-    val broadcastWordMap = sc.broadcast(wordMap)
+    val broadcastWordMap = sc.broadcast(termMap)
     val broadcastDocMap = sc.broadcast(docMap)
 
     val data = almostData.map { case (fileName, content) =>
@@ -264,6 +278,6 @@ object MLUtils {
       }
       Document(fileIdx, contentIdx.toArray)
     }
-    (data, wordMap, docMap)
+    (data, termMap, docMap)
   }
 }
