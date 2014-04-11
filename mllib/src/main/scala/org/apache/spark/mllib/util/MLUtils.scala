@@ -20,7 +20,7 @@ package org.apache.spark.mllib.util
 import breeze.linalg.{Vector => BV, SparseVector => BSV, squaredDistance => breezeSquaredDistance}
 
 import org.apache.spark.annotation.Experimental
-import org.apache.spark.SparkContext
+import org.apache.spark.{Logging, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.linalg.Vectors
@@ -33,7 +33,7 @@ import scala.collection.mutable.ArrayBuffer
 /**
  * Helper methods to load, save and pre-process data used in ML Lib.
  */
-object MLUtils {
+object MLUtils extends Logging {
 
   private[util] lazy val EPSILON = {
     var eps = 1.0
@@ -242,6 +242,7 @@ object MLUtils {
     val termMap = Index[String]()
     val docMap = Index[String]()
 
+    logInfo("Reading from corpus...")
     val almostData = sc.wholeTextFiles(dir).cache()
 
     val stopWords =
@@ -255,10 +256,12 @@ object MLUtils {
 
     val broadcastStopWord = sc.broadcast(stopWords)
 
+    logInfo("Extracting file names...")
     almostData.map { case (fileName, _) =>
       fileName
     }.distinct().collect().map(x => docMap.index(x))
 
+    logInfo("Extracting terms...")
     almostData.flatMap { case (_, content) =>
       JavaWordTokenizer(content).filter(x => x(0).isLetter && !broadcastStopWord.value.contains(x))
     }.distinct().collect().map(x => termMap.index(x))
@@ -269,6 +272,7 @@ object MLUtils {
     val broadcastWordMap = sc.broadcast(termMap)
     val broadcastDocMap = sc.broadcast(docMap)
 
+    logInfo("Translate documents of terms into integers...")
     val data = almostData.map { case (fileName, content) =>
       val fileIdx = broadcastDocMap.value.index(fileName)
       val contentIdx = new ArrayBuffer[Int]

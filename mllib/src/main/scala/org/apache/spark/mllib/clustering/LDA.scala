@@ -127,7 +127,7 @@ class LDA private (
   }
 }
 
-object LDA {
+object LDA extends Logging {
 
   def train(
       data: RDD[Document],
@@ -158,10 +158,13 @@ object LDA {
     val checkPointDir = System.getProperty("spark.gibbsSampling.checkPointDir", "/tmp/lda")
     val sc = new SparkContext(master, "LDA")
     sc.setCheckpointDir(checkPointDir)
+    logInfo("Call load corpus...")
     val (data, wordMap, docMap) = MLUtils.loadCorpus(sc, inputDir, minSplit)
     val numDocs = docMap.size
     val numTerms = wordMap.size
+    logInfo("Training start...")
     val (phi, theta) = LDA.train(data, k, 0.01, 0.01, iters, numDocs, numTerms)
+    logInfo("Computing perplexity...")
     val pp = GibbsSampling.perplexity(data, phi, theta)
     // println(s"final model Phi is $phi")
     // println(s"final model Theta is $theta")

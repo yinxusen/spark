@@ -65,6 +65,7 @@ class GibbsSampling(
     val cpInterval = System.getProperty("spark.gibbsSampling.checkPointInterval", "10").toInt
 
     // Pre-processing
+    logInfo("Pre-processing")
     val (initialParams, initialAssignedTopics) = sampleTermAssignment(initParams, data)
 
     // Gibbs sampling
@@ -91,6 +92,8 @@ class GibbsSampling(
 
           Seq((assignedTopics, params)).iterator
         }
+
+        logInfo("Aggregate topic assignment and parameters")
 
         val assignedTopics = assignedTopicsAndParams.flatMap(_._1).cache()
         if (salt % cpInterval == 0) {
