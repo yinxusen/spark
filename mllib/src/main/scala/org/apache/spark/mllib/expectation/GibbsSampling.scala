@@ -158,7 +158,7 @@ object GibbsSampling extends Logging {
             params.inc(docId, term, topic)
             topic
           } else {
-            multinomialDistSampler(rand, dist)
+            multiNomialDistSampler(rand, dist)
           }
         }
       }.toArray
@@ -179,7 +179,7 @@ object GibbsSampling extends Logging {
   /**
    * A multinomial distribution sampler, using roulette method to sample an Int back.
    */
-  private[mllib] def multinomialDistSampler(rand: Random, dist: BV[Double]): Int = {
+  private[mllib] def multiNomialDistSampler(rand: Random, dist: BV[Double]): Int = {
     val roulette = rand.nextDouble()
 
     assert(sum[BV[Double], Double](dist) != 0.0)
@@ -200,7 +200,7 @@ object GibbsSampling extends Logging {
    * <I>Parameter estimation for text analysis</I>
    */
   private def dropOneDistSampler(
-      params: LDAParams,
+      params: LDAComputingParams,
       docTopicSmoothing: Double,
       topicTermSmoothing: Double,
       numTopics: Int,
@@ -209,16 +209,15 @@ object GibbsSampling extends Logging {
       docIdx: Int,
       rand: Random): Int = {
     val topicThisTerm = BDV.zeros[Double](numTopics)
-    val topicThisDoc = BDV.zeros[Double](numTopics)
-    val fraction = params.topicCounts.toBreeze :+ (numTerms * topicTermSmoothing)
-    topicThisTerm := Vectors.dense(params.topicTermCounts.map(vec => vec(termIdx))).toBreeze
-    topicThisDoc := params.docTopicCounts(docIdx).toBreeze
-    topicThisTerm :+= topicTermSmoothing
-    topicThisDoc :+= docTopicSmoothing
-    topicThisTerm :/= fraction
-    topicThisTerm :+= topicThisDoc
-    topicThisTerm :/= sum[BDV[Double], Double](topicThisTerm)
-    multinomialDistSampler(rand, topicThisTerm)
+    var i = 0
+    while (i < numTopics) {
+      topicThisTerm(i) =
+        ((params.currTopicTermCounts(i)(termIdx) + topicTermSmoothing)
+          / (params.currTopicCounts(i) + (numTerms * topicTermSmoothing))
+        ) + (params.docTopicCounts(docIdx)(i) + docTopicSmoothing)
+      i += 1
+    }
+    multiNomialDistSampler(rand, topicThisTerm)
   }
 
   /**
