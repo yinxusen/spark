@@ -117,9 +117,9 @@ object LDASuite {
     val samples = new Array[Int](numTermsPerDoc)
     val rand = new Random()
     (0 until numTermsPerDoc).foreach { i =>
-      samples(i) = multiNomialDistSampler(
+      samples(i) = multinomialDistSampler(
         rand,
-        model(multiNomialDistSampler(rand, topicDist))
+        model(multinomialDistSampler(rand, topicDist))
       )
     }
     samples

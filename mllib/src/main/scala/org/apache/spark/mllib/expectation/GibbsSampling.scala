@@ -148,17 +148,17 @@ object GibbsSampling extends Logging {
       data: RDD[Document]): (LDAComputingParams, RDD[Iterable[Int]]) = {
     val init = data.mapPartitionsWithIndex { case (index, iterator) =>
       val rand = new Random(42 + index)
-      val docTopics = params.docTopicCounts(index).toBreeze
+      val docTopics = params.currDocTopicCounts(index)
       val assignedTopics = iterator.map { case Document(docId, content) =>
         content.map { term =>
-          val topicTerms = Vectors.dense(params.topicTermCounts.map(vec => vec(term))).toBreeze
-          val dist = docTopics :* topicTerms
-          if (dist.norm(2) == 0) {
-            val topic = uniformDistSampler(rand, dist.size)
+          if (docTopics.norm(2) == 0) {
+            val topic = uniformDistSampler(rand, docTopics.size)
             params.inc(docId, term, topic)
             topic
           } else {
-            multiNomialDistSampler(rand, dist)
+            val topicTerms = Vectors.dense(params.currTopicTermCounts.map(vec => vec(term))).toBreeze
+            val dist = docTopics :* topicTerms
+            multinomialDistSampler(rand, dist)
           }
         }
       }.toArray
@@ -179,10 +179,9 @@ object GibbsSampling extends Logging {
   /**
    * A multinomial distribution sampler, using roulette method to sample an Int back.
    */
-  private[mllib] def multiNomialDistSampler(rand: Random, dist: BV[Double]): Int = {
+  private[mllib] def multinomialDistSampler(rand: Random, dist: BV[Double]): Int = {
     val roulette = rand.nextDouble()
 
-    assert(sum[BV[Double], Double](dist) != 0.0)
     dist :/= sum[BV[Double], Double](dist)
 
     def loop(index: Int, accum: Double): Int = {
@@ -217,7 +216,7 @@ object GibbsSampling extends Logging {
         ) + (params.docTopicCounts(docIdx)(i) + docTopicSmoothing)
       i += 1
     }
-    multiNomialDistSampler(rand, topicThisTerm)
+    multinomialDistSampler(rand, topicThisTerm)
   }
 
   /**
