@@ -59,6 +59,8 @@ class GibbsSampling(
     val numDocs = initParams.docCounts.size
     val numTopics = initParams.topicCounts.size
 
+    logInfo(s"Degree of parallelism is ${data.partitions.length}.")
+
     val cpInterval = System.getProperty("spark.gibbsSampling.checkPointInterval", "10").toInt
 
     // construct topic assignment RDD
