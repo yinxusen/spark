@@ -234,7 +234,7 @@ object MLUtils extends Logging {
   def loadCorpus(
       sc: SparkContext,
       dir: String,
-      miniSplit: Int,
+      minSplits: Int,
       dirStopWords: String = ""):
   (RDD[Document], Index[String], Index[String]) = {
 
@@ -242,14 +242,14 @@ object MLUtils extends Logging {
     val docMap = Index[String]()
 
     logInfo("Reading from corpus...")
-    val almostData = sc.wholeTextFiles(dir).cache()
+    val almostData = sc.wholeTextFiles(dir, minSplits)
 
     val stopWords =
       if (dirStopWords == "") {
         Set.empty[String]
       }
       else {
-        sc.textFile(dirStopWords, miniSplit).
+        sc.textFile(dirStopWords, minSplits).
           map(x => x.replaceAll( """(?m)\s+$""", "")).distinct().collect().toSet
       }
 
@@ -279,7 +279,8 @@ object MLUtils extends Logging {
         .filter(!broadcastStopWord.value.contains(_))
         .map(broadcastWordMap.value.index)
       Document(fileIdx, translatedContent)
-    }
+    }.cache()
+
     (data, termMap, docMap)
   }
 }

@@ -59,13 +59,10 @@ class GibbsSampling(
     val numDocs = initParams.docCounts.size
     val numTopics = initParams.topicCounts.size
 
-    // construct topic assignment RDD
-    logInfo("Start initialization")
-
     val cpInterval = System.getProperty("spark.gibbsSampling.checkPointInterval", "10").toInt
 
-    // Pre-processing
-    logInfo("Pre-processing")
+    // construct topic assignment RDD
+    logInfo("Start initialization")
     val (initialParams, initialAssignedTopics) = sampleTermAssignment(initParams, data)
 
     // Gibbs sampling

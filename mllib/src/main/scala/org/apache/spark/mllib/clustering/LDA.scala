@@ -149,17 +149,17 @@ object LDA extends Logging {
 
   def main(args: Array[String]) {
     if (args.length != 5) {
-      println("Usage: LDA <master> <input_dir> <k> <max_iterations> <mini-split>")
+      println("Usage: LDA <master> <input_dir> <k> <max_iterations> <min-splits>")
       System.exit(1)
     }
 
-    val (master, inputDir, k, iters, minSplit) =
+    val (master, inputDir, k, iters, minSplits) =
       (args(0), args(1), args(2).toInt, args(3).toInt, args(4).toInt)
     val checkPointDir = System.getProperty("spark.gibbsSampling.checkPointDir", "/tmp/lda")
     val sc = new SparkContext(master, "LDA")
     sc.setCheckpointDir(checkPointDir)
     logInfo("Call load corpus...")
-    val (data, wordMap, docMap) = MLUtils.loadCorpus(sc, inputDir, minSplit)
+    val (data, wordMap, docMap) = MLUtils.loadCorpus(sc, inputDir, minSplits)
     val numDocs = docMap.size
     val numTerms = wordMap.size
     logInfo("Training start...")
