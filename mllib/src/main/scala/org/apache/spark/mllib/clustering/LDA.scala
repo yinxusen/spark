@@ -92,7 +92,6 @@ case class LDAComputingParams(
       currTopicTermCounts(i) :+= other.currTopicTermCounts(i)
       i += 1
     }
-
     this
   }
 }
@@ -101,8 +100,8 @@ object LDAComputingParams {
   def apply(numDocs: Int, numTopics: Int, numTerms: Int) = new LDAComputingParams(
     BDV.zeros[Double](numDocs),
     BDV.zeros[Double](numTopics),
-    (0 until numDocs).map(_ => BDV.zeros[Double](numTopics)).toArray,
-    (0 until numTopics).map(_ => BDV.zeros[Double](numTerms)).toArray
+    Array(0 until numDocs: _*).map(_ => BDV.zeros[Double](numTopics)),
+    Array(0 until numTopics: _*).map(_ => BDV.zeros[Double](numTerms))
   )
 }
 
@@ -155,15 +154,19 @@ object LDA extends Logging {
 
     val (master, inputDir, k, iters, minSplits) =
       (args(0), args(1), args(2).toInt, args(3).toInt, args(4).toInt)
-    val checkPointDir = System.getProperty("spark.gibbsSampling.checkPointDir", "/tmp/lda")
+
     val sc = new SparkContext(master, "LDA")
+    val checkPointDir = System.getProperty("spark.gibbsSampling.checkPointDir", "/tmp/lda")
     sc.setCheckpointDir(checkPointDir)
+
     logInfo("Call load corpus...")
     val (data, wordMap, docMap) = MLUtils.loadCorpus(sc, inputDir, minSplits)
     val numDocs = docMap.size
     val numTerms = wordMap.size
+
     logInfo("Training start...")
     val (phi, theta) = LDA.train(data, k, 0.01, 0.01, iters, numDocs, numTerms)
+
     logInfo("Computing perplexity...")
     val pp = GibbsSampling.perplexity(data, phi, theta)
     // println(s"final model Phi is $phi")

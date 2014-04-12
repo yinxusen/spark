@@ -238,11 +238,9 @@ object MLUtils extends Logging {
       dirStopWords: String = ""):
   (RDD[Document], Index[String], Index[String]) = {
 
+    // Containers and indexers for terms and documents
     val termMap = Index[String]()
     val docMap = Index[String]()
-
-    logInfo("Reading from corpus...")
-    val almostData = sc.wholeTextFiles(dir, minSplits).cache()
 
     val stopWords =
       if (dirStopWords == "") {
@@ -252,18 +250,21 @@ object MLUtils extends Logging {
         sc.textFile(dirStopWords, minSplits).
           map(x => x.replaceAll( """(?m)\s+$""", "")).distinct().collect().toSet
       }
-
     val broadcastStopWord = sc.broadcast(stopWords)
 
+    // Tokenize and filter terms
+    val almostData = sc.wholeTextFiles(dir, minSplits).map { case (fileName, content) =>
+      val tokens = JavaWordTokenizer(content)
+        .filter(_(0).isLetter)
+        .filter(!broadcastStopWord.value.contains(_))
+      (fileName, tokens)
+    }
+
     logInfo("Extracting file names...")
-    almostData.map { case (fileName, _) =>
-      fileName
-    }.distinct().collect().map(x => docMap.index(x))
+    almostData.map(_._1).foreach(x => docMap.index(x))
 
     logInfo("Extracting terms...")
-    almostData.flatMap { case (_, content) =>
-      JavaWordTokenizer(content).filter(x => x(0).isLetter && !broadcastStopWord.value.contains(x))
-    }.distinct().collect().map(x => termMap.index(x))
+    almostData.flatMap(_._2).foreach(x => termMap.index(x))
 
     println(termMap.size)
     println(docMap.size)
@@ -272,12 +273,9 @@ object MLUtils extends Logging {
     val broadcastDocMap = sc.broadcast(docMap)
 
     logInfo("Translate documents of terms into integers...")
-    val data = almostData.map { case (fileName, content) =>
+    val data = almostData.map { case (fileName, tokens) =>
       val fileIdx = broadcastDocMap.value.index(fileName)
-      val translatedContent = JavaWordTokenizer(content)
-        .filter(_(0).isLetter)
-        .filter(!broadcastStopWord.value.contains(_))
-        .map(broadcastWordMap.value.index)
+      val translatedContent = tokens.map(broadcastWordMap.value.index)
       Document(fileIdx, translatedContent)
     }.cache()
 
