@@ -56,9 +56,6 @@ import org.apache.spark.util.{ClosureCleaner, MetadataCleaner, MetadataCleanerTy
  *
  * @param config a Spark Config object describing the application configuration. Any settings in
  *   this config overrides the default configs as well as system properties.
- * @param preferredNodeLocationData used in YARN mode to select nodes to launch containers on. Can
- *   be generated using [[org.apache.spark.scheduler.InputFormatInfo.computePreferredLocations]]
- *   from a list of input files or InputFormats for the application.
  */
 
 @DeveloperApi
@@ -217,7 +214,6 @@ class SparkContext(config: SparkConf) extends Logging {
   // Initialize the Spark UI, registering all associated listeners
   private[spark] val ui = new SparkUI(this)
   ui.bind()
-  ui.start()
 
   // Optionally log Spark events
   private[spark] val eventLogger: Option[EventLoggingListener] = {
@@ -228,10 +224,6 @@ class SparkContext(config: SparkConf) extends Logging {
       Some(logger)
     } else None
   }
-
-  // Information needed to replay logged events, if any
-  private[spark] val eventLoggingInfo: Option[EventLoggingInfo] =
-    eventLogger.map { logger => Some(logger.info) }.getOrElse(None)
 
   // At this point, all relevant SparkListeners have been registered, so begin releasing events
   listenerBus.start()
@@ -816,10 +808,6 @@ class SparkContext(config: SparkConf) extends Logging {
    * Note that this does not necessarily mean the caching or computation was successful.
    */
   def getPersistentRDDs: Map[Int, RDD[_]] = persistentRdds.toMap
-
-  def getStageInfo: Map[Stage, StageInfo] = {
-    dagScheduler.stageToInfos
-  }
 
   /**
    * Return information about blocks stored in all of the slaves

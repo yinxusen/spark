@@ -85,10 +85,6 @@ class NewHadoopRDD[K, V](
 
     val jobContext = newJobContext(conf, jobId)
 
-    if (inputFormat.isInstanceOf[WholeTextFileInputFormat]) {
-      inputFormat.asInstanceOf[WholeTextFileInputFormat].setMaxSplitSize(jobContext, minSplits)
-    }
-
     val rawSplits = inputFormat.getSplits(jobContext).toArray
     val result = new Array[Partition](rawSplits.size)
     for (i <- 0 until rawSplits.size) {
