@@ -242,7 +242,7 @@ object MLUtils extends Logging {
     val docMap = Index[String]()
 
     logInfo("Reading from corpus...")
-    val almostData = sc.wholeTextFiles(dir, minSplits)
+    val almostData = sc.wholeTextFiles(dir, minSplits).cache()
 
     val stopWords =
       if (dirStopWords == "") {

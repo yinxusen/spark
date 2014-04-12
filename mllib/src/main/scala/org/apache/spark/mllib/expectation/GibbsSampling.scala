@@ -167,8 +167,7 @@ object GibbsSampling extends Logging {
     }
 
     val initialAssignedTopics = init.flatMap(_._1).cache()
-    val temp = init.map(_._2).collect()
-    val initialParams = temp.reduce(_ addi _)
+    val initialParams = init.map(_._2).reduce(_ addi _)
     (initialParams, initialAssignedTopics)
   }
 
