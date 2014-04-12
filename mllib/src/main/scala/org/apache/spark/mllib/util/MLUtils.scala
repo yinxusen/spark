@@ -261,10 +261,10 @@ object MLUtils extends Logging {
     }
 
     logInfo("Extracting file names...")
-    almostData.map(_._1).foreach(x => docMap.index(x))
+    almostData.map(_._1).collect().map(x => docMap.index(x))
 
     logInfo("Extracting terms...")
-    almostData.flatMap(_._2).foreach(x => termMap.index(x))
+    almostData.flatMap(_._2).collect().map(x => termMap.index(x))
 
     println(termMap.size)
     println(docMap.size)
