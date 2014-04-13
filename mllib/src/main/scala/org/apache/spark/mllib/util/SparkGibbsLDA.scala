@@ -48,10 +48,17 @@ object SparkGibbsLDA {
    * topicAssignArr Array[(word,topic)]
    * nmk: Array[n_{mk}]
    */
-  def gibbsSampling(topicAssignArr: Array[(Int, Int)],
-    nmk: Array[Int], nkv: Array[Array[Int]], nk: Array[Int],
-    kTopic: Int, alpha: Double, vSize: Int, beta: Double) = {
+  def gibbsSampling(
+      topicAssignArr: Array[(Int, Int)],
+      nmk: Array[Int],
+      nkv: Array[Array[Int]],
+      nk: Array[Int],
+      kTopic: Int,
+      alpha: Double,
+      vSize: Int,
+      beta: Double): (Array[(Int, Int)], Array[Int]) = {
     val length = topicAssignArr.length
+
     for (i <- 0 until length) {
       val topic = topicAssignArr(i)._2
       val word = topicAssignArr(i)._1
@@ -200,9 +207,17 @@ object SparkGibbsLDA {
    * 5,use gibbs sampling to infer the topic distribution of doc and estimate the parameter nkv and nk
    * 6,save the result in HDFS (result part 1: topic distribution of doc, result part 2: top words in each topic)
    */
-  def lda(filename: String, kTopic: Int, alpha: Double, beta: Double,
-    maxIter: Int, remote: Boolean, topKwordsForDebug: Int,
-    pathTopicDistOnDoc: String, pathWordDistOnTopic: String) {
+  def lda(
+      filename: String,
+      kTopic: Int,
+      alpha: Double,
+      beta: Double,
+      maxIter: Int,
+      remote: Boolean,
+      topKwordsForDebug: Int,
+      pathTopicDistOnDoc: String,
+      pathWordDistOnTopic: String) {
+
     //Step 1, start spark
     System.setProperty("file.encoding", "UTF-8")
     System.setProperty("spark.serializer", "spark.KryoSerializer")
@@ -219,19 +234,26 @@ object SparkGibbsLDA {
     }.filter(_._2.length > 0)
 
     //Step3, build a dictionary for alphabet : wordIndexMap
-    val allWords = rawFiles.flatMap { t =>
-      t._2.distinct
-    }.map{t=>(t,1)}.reduceByKey(_+_).map{_._1}.collect().toList.sortWith(_ < _)
+    val allWords = rawFiles
+      .flatMap(_._2.distinct)
+      .map((_, 1))
+      .reduceByKey(_+_)
+      .map(_._1)
+      .collect()
+      .toList.sortWith(_ < _)
+
     val vSize = allWords.length
-    //println(allWords)
+
     val wordIndexMap = new mutable.HashMap[String, Int]()
     for (i <- 0 until allWords.length) {
       wordIndexMap(allWords(i)) = i
     }
+
+    // Your want to use broadcast? Huh? -- Xusen
     val bWordIndexMap = wordIndexMap
 
     //Step4, init topic assignments for each word in the corpus
-    val documents = rawFiles.map { t => //t means (docId,words) where words is a List
+    val documents = rawFiles.map { t =>
       val docId = t._1
       val length = t._2.length
       val topicAssignArr = new Array[(Int, Int)](length)
@@ -241,9 +263,16 @@ object SparkGibbsLDA {
         topicAssignArr(i) = (bWordIndexMap(t._2(i)), topic)
         nmk(topic) = nmk(topic) + 1
       }
-      (docId, topicAssignArr, nmk) //t._1 means docId, t._2 means words
+      (docId, topicAssignArr, nmk)
     }.cache()
-    var wordsTopicReduced = documents.flatMap(t => t._2).map(t => (t, 1)).reduceByKey(_ + _).collect().toList
+
+    var wordsTopicReduced = documents
+      .flatMap(t => t._2)
+      .map(t => (t, 1))
+      .reduceByKey(_ + _)
+      .collect()
+      .toList
+
     //update nkv,nk
     var nkv = updateNKV(wordsTopicReduced, kTopic, vSize)
     var nkvGlobal = sc.broadcast(nkv)
@@ -253,33 +282,42 @@ object SparkGibbsLDA {
 
     //Step5, use gibbs sampling to infer the topic distribution in doc and estimate the parameter nkv and nk
     var iterativeInputDocuments = documents
-    var updatedDocuments=iterativeInputDocuments
+    var updatedDocuments = iterativeInputDocuments
     for (iter <- 0 until maxIter) {
-      iterativeInputDocuments.persist(StorageLevel.MEMORY_ONLY)//same as cache
-      updatedDocuments.persist(StorageLevel.MEMORY_ONLY)//same as cache
+      iterativeInputDocuments.cache()
+      updatedDocuments.cache()
       
       //broadcast the global data
       nkvGlobal = sc.broadcast(nkv)
       nkGlobal = sc.broadcast(nk)
 
-      updatedDocuments = iterativeInputDocuments.map {
-        case (docId, topicAssignArr, nmk) =>
-          //gibbs sampling
-          val (newTopicAssignArr, newNmk) = gibbsSampling(topicAssignArr,
-            nmk, nkvGlobal.value, nkGlobal.value,
-            kTopic, alpha, vSize, beta)
-          (docId, newTopicAssignArr, newNmk)
+      updatedDocuments = iterativeInputDocuments.map { case (docId, topicAssignArr, nmk) =>
+        //gibbs sampling
+        val (newTopicAssignArr, newNmk) = gibbsSampling(
+          topicAssignArr,
+          nmk,
+          nkvGlobal.value,
+          nkGlobal.value,
+          kTopic,
+          alpha,
+          vSize,
+          beta)
+        (docId, newTopicAssignArr, newNmk)
       }
       
-      //output to hdfs for DEBUG
-      //updatedDocuments.flatMap(t => t._2).map(t => (t, 1)).saveAsTextFile("hdfs://192.9.200.175:9000/out/collect"+iter)
-      
-      wordsTopicReduced = updatedDocuments.flatMap(t => t._2).map(t => (t, 1)).reduceByKey(_ + _).collect().toList
+      wordsTopicReduced = updatedDocuments.
+        flatMap(t => t._2).
+        map(t => (t, 1)).
+        reduceByKey(_ + _).
+        collect().
+        toList
+
       iterativeInputDocuments = updatedDocuments
+
       //update nkv,nk
       nkv = updateNKV(wordsTopicReduced, kTopic, vSize)
       nk = updateNK(wordsTopicReduced, kTopic, vSize)
-      //nkGlobal.value.foreach(println)
+
       println(topicsInfo(nkvGlobal.value, allWords, kTopic, vSize, topKwordsForDebug))
 
       println("iteration " + iter + " finished")
@@ -310,9 +348,8 @@ object SparkGibbsLDA {
         iterativeInputDocuments=sc.objectFile(pathDocument1)
         updatedDocuments=sc.objectFile(pathDocument2)
       }
-
     }
-    //Step6,save the result in HDFS (result part 1: topic distribution of doc, result part 2: top words in each topic)
+
     val resultDocuments = iterativeInputDocuments
     saveDocTopicDist(resultDocuments, pathTopicDistOnDoc)
     saveWordDistTopic(sc, nkv, nk, allWords, vSize, topKwordsForDebug, pathWordDistOnTopic)
