@@ -72,9 +72,7 @@ class GibbsSampling(
       case (lastParams, lastAssignedTopics, salt) =>
         logInfo("Start Gibbs sampling")
 
-        var z = 0
-        val assignedTopicsAndParams = data.zip(lastAssignedTopics).mapPartitions { iterator =>
-          z += 1
+        val assignedTopicsAndParams = data.zip(lastAssignedTopics).mapPartitionsWithIndex { case (parIdx, iterator) =>
           val params = LDAComputingParams(numDocs, numTopics, numTerms)
           val rand = new Random(42 + salt * numOuterIterations)
           var i = 0
@@ -95,7 +93,7 @@ class GibbsSampling(
             }
           }.toArray
 
-          logInfo(s"Partition $z has: files count is $i, terms count is $j.")
+          logInfo(s"Partition $parIdx has: files count is $i, terms count is $j.")
 
           Seq((assignedTopics, params)).iterator
         }
