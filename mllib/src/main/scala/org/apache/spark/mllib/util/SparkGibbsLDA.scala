@@ -29,17 +29,18 @@ object SparkGibbsLDA {
       kTopic: Int,
       vSize: Int,
       topK: Int): String = {
-    var res = ""
-    for (k <- 0 until kTopic) {
+    (0 until kTopic).map { k =>
+      val res = mutable.StringBuilder.newBuilder
       val distOnTopic = for (v <- 0 until vSize) yield (v, nkv(k)(v))
       val sorted = distOnTopic.sortWith((tupleA, tupleB) => tupleA._2 > tupleB._2)
-      res = res + "topic " + k + ":" + "\n"
+      res.append(s"topic $k:\n")
       for (j <- 0 until topK) {
-        res = res + "n(" + allWords(sorted(j)._1) + ")=" + sorted(j)._2 + " "
+        res.append(s"n(${allWords(sorted(j)._1)}) = ${sorted(j)._2}")
       }
-      res = res + "\n"
-    }
-    res
+      res.append("\n")
+    }.reduceOption { case (lhs, rhs) =>
+      lhs ++= rhs
+    }.toString
   }
 
   /**
