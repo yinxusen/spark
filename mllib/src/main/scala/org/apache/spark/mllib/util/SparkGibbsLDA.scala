@@ -16,6 +16,8 @@ import scala.collection.mutable
  * huangwaleking@gmail.com
  * liupeng9966@163.com
  * 2013-04-24
+ *
+ * gist: https://gist.github.com/waleking/5477002
  */
 object SparkGibbsLDA {
 
