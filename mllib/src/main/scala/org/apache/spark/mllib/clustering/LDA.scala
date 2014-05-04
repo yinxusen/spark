@@ -114,9 +114,9 @@ class LDAParamsAccumulableParam extends AccumulableParam[LDAParams, (Int, Int, I
 
 private[clustering] case class OutLinkBlock(elementIds: Array[Int], shouldSend: Array[mutable.BitSet])
 
-private[clustering] case class InLinkBlock(elementIds: Array[Int], termsInBlock: Array[Array[(Array[Int], Array[Int])]])
+private[clustering] case class InLinkBlock(elementIds: Array[Int], termsInBlock: Array[Array[TermsAndCountsPerDoc]])
 
-private[clustering] case class TopicAssign(elementIds: Array[Int], topicsInBlock: Array[Array[(Array[Int], Array[BDV[Double]])]])
+private[clustering] case class TopicAssign(elementIds: Array[Int], topicsInBlock: Array[Array[TermsAndTopicAssignsPerDoc]])
 
 class LDA private (
     var numTopics: Int,
@@ -169,8 +169,9 @@ class LDA private (
     // maybe there is a better way to house topic assignment
     var topicAssignment = docInLinks.mapPartitions { itr =>
       itr.map { case (x, y) =>
-        (x, TopicAssign(y.elementIds, y.termsInBlock.map { _.map { case (termIds, counts) =>
-          (termIds, counts.map(BDV.zeros[Double]))
+        (x, TopicAssign(y.elementIds, y.termsInBlock.map { _.map {
+          case TermsAndCountsPerDoc(termIds, counts) =>
+            TermsAndTopicAssignsPerDoc(termIds, counts.map(BDV.zeros[Double]))
         }}))
       }
     }
@@ -213,7 +214,7 @@ class LDA private (
       blockDocuments(term.termId % numBlocks) += term
     }
 
-    val documentsForBlock = new Array[Array[(Array[Int], Array[Int])]](numBlocks)
+    val documentsForBlock = new Array[Array[TermsAndCountsPerDoc]](numBlocks)
     for (termBlock <- 0 until numBlocks) {
       val groupedDocuments = blockDocuments(termBlock).groupBy(_.termId).toArray
       val ordering = new Ordering[(Int, ArrayBuffer[TermInDoc])] {
@@ -223,7 +224,7 @@ class LDA private (
       }
       Sorting.quickSort(groupedDocuments)(ordering)
       documentsForBlock(termBlock) = groupedDocuments.map { case (_, docs) =>
-        (docs.view.map(d => docIdToPos(d.docId)).toArray, docs.view.map(_.counts).toArray)
+        TermsAndCountsPerDoc(docs.view.map(d => docIdToPos(d.docId)).toArray, docs.view.map(_.counts).toArray)
       }
     }
 
@@ -260,21 +261,21 @@ class LDA private (
    * It returns an RDD of new feature vectors for each user block.
    */
   private def updateFeatures (
-      docTopics: RDD[(Int, Array[Array[Double]])],
-      termTopics: RDD[(Int, Array[Array[Double]])],
+      docTopics: RDD[(Int, Array[BDV[Double]])],
+      termTopics: RDD[(Int, Array[BDV[Double]])],
       topicAssignment: RDD[(Int, TopicAssign)],
       termOutLinks: RDD[(Int, OutLinkBlock)],
       docInLinks: RDD[(Int, InLinkBlock)],
       partitioner: Partitioner): RDD[(Int, Array[Array[Double]])] = {
     val numBlocks = termTopics.partitions.size
     termOutLinks.join(termTopics).flatMap { case (bid, (outLinkBlock, factors)) =>
-        val toSend = Array.fill(numBlocks)(new ArrayBuffer[Array[Double]])
-        for (p <- 0 until outLinkBlock.elementIds.length; userBlock <- 0 until numBlocks) {
-          if (outLinkBlock.shouldSend(p)(userBlock)) {
-            toSend(userBlock) += factors(p)
-          }
+      val toSend = Array.fill(numBlocks)(new ArrayBuffer[BDV[Double]])
+      for (t <- 0 until outLinkBlock.elementIds.length; docBlock <- 0 until numBlocks) {
+        if (outLinkBlock.shouldSend(t)(docBlock)) {
+          toSend(docBlock) += factors(t)
         }
-        toSend.zipWithIndex.map{ case (buf, idx) => (idx, (bid, buf.toArray)) }
+      }
+      toSend.zipWithIndex.map{ case (buf, idx) => (idx, (bid, buf.toArray)) }
     }.groupByKey(partitioner)
      .join(docInLinks.join(topicAssignment).join(docTopics))
      .mapValues{ case (termTopicMessages, ((inLinkBlock, topicAssign), docTopicMessages)) =>
@@ -285,8 +286,8 @@ class LDA private (
 
   // topic assign is termId, Array[(docId, termTimes, assign vector)]
   def updateBlock(
-      docTopics: Array[Array[Double]],
-      termTopics: Iterable[(Int, Array[Array[Double]])],
+      docTopics: Array[BDV[Double]],
+      termTopics: Iterable[(Int, Array[BDV[Double]])],
       data: InLinkBlock,
       topicAssign: TopicAssign):
   Iterator[(
