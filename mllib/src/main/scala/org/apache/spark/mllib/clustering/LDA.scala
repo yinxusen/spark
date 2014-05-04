@@ -124,7 +124,8 @@ class LDA private (
     var numDocs: Int,
     var numTerms: Int,
     var numBlocks: Int,
-    val sc: SparkContext)
+    val sc: SparkContext,
+    var seed: Long = System.nanoTime())
   extends Serializable with Logging {
 
   // topic assign is termId, Array[(docId, termTimes, assign vector)]
@@ -149,13 +150,37 @@ class LDA private (
 
     val partitioner = new HashPartitioner(numBlocks)
 
-    val ratingsByUserBlock = documents.map{ doc => (doc.docId % numBlocks, doc) }
-    val ratingsByProductBlock = documents.map{ doc =>
+    val documentsByUserBlock = documents.map{ doc => (doc.docId % numBlocks, doc) }
+    val documentsByProductBlock = documents.map{ doc =>
       (doc.termId % numBlocks, TermInDoc(doc.termId, doc.docId, doc.counts))
     }
 
-    val (userInLinks, userOutLinks) = makeLinkRDDs(numBlocks, ratingsByUserBlock)
-    val (productInLinks, productOutLinks) = makeLinkRDDs(numBlocks, ratingsByProductBlock)
+    val (docInLinks, docOutLinks) = makeLinkRDDs(numBlocks, documentsByUserBlock)
+    val (termInLinks, termOutLinks) = makeLinkRDDs(numBlocks, documentsByProductBlock)
+
+    // Initialize user and product factors randomly, but use a deterministic seed for each
+    // partition so that fault recovery works
+    val seedGen = new Random(seed)
+    val seed1 = seedGen.nextInt()
+    val seed2 = seedGen.nextInt()
+
+    // Hash an integer to propagate random bits at all positions, similar to java.util.HashTable
+    def hash(x: Int): Int = {
+      val r = x ^ (x >>> 20) ^ (x >>> 12)
+      r ^ (r >>> 7) ^ (r >>> 4)
+    }
+
+    var docTopics = docOutLinks.mapPartitionsWithIndex { (index, itr) =>
+      itr.map { case (x, y) =>
+        (x, y.elementIds.map(_ => BDV.zeros[Double](numTopics)))
+      }
+    }
+
+    var termTopics = termOutLinks.mapPartitionsWithIndex { (index, itr) =>
+      itr.map { case (x, y) =>
+        (x, y.elementIds.map(_ => BDV.zeros[Double](numTopics)))
+      }
+    }
 
     // keep the same partition
     val docTopicCounts = input.map { case (docId, terms) => (docId, BDV.zeros[Double](numTopics)) }
@@ -182,8 +207,8 @@ class LDA private (
   }
 
   /**
-   * Make the out-links table for a block of the users (or products) dataset given the list of
-   * (user, product, rating) values for the users in that block (or the opposite for products).
+   * Make the out-links table for a block of the users (or termTopics) dataset given the list of
+   * (user, product, rating) values for the users in that block (or the opposite for termTopics).
    */
   private def makeOutLinkBlock(numBlocks: Int, documents: Array[TermInDoc]): OutLinkBlock = {
     val docIds = documents.map(_.docId).distinct.sorted
@@ -197,8 +222,8 @@ class LDA private (
   }
 
   /**
-   * Make the in-links table for a block of the users (or products) dataset given a list of
-   * (user, product, rating) values for the users in that block (or the opposite for products).
+   * Make the in-links table for a block of the users (or termTopics) dataset given a list of
+   * (user, product, rating) values for the users in that block (or the opposite for termTopics).
    */
   private def makeInLinkBlock(numBlocks: Int, documents: Array[TermInDoc]): InLinkBlock = {
     val docIds = documents.map(_.docId).distinct.sorted
@@ -228,7 +253,7 @@ class LDA private (
 
   /**
    * Make RDDs of InLinkBlocks and OutLinkBlocks given an RDD of (blockId, (u, p, r)) values for
-   * the users (or (blockId, (p, u, r)) for the products). We create these simultaneously to avoid
+   * the users (or (blockId, (p, u, r)) for the termTopics). We create these simultaneously to avoid
    * having to shuffle the (blockId, (u, p, r)) RDD twice, or to cache it.
    */
   private def makeLinkRDDs(numBlocks: Int, ratings: RDD[(Int, TermInDoc)])
@@ -240,7 +265,7 @@ class LDA private (
       val inLinkBlock = makeInLinkBlock(numBlocks, ratings)
       val outLinkBlock = makeOutLinkBlock(numBlocks, ratings)
       Iterator.single((blockId, (inLinkBlock, outLinkBlock)))
-    }, true)
+    }, preservesPartitioning = true)
     val inLinks = links.mapValues(_._1)
     val outLinks = links.mapValues(_._2)
     inLinks.persist(StorageLevel.MEMORY_AND_DISK)
@@ -248,6 +273,33 @@ class LDA private (
     (inLinks, outLinks)
   }
 
+   /**
+   * Compute the user feature vectors given the current termTopics (or vice-versa). This first joins
+   * the termTopics with their out-links to generate a set of messages to each destination block
+   * (specifically, the features for the termTopics that user block cares about), then groups these
+   * by destination and joins them with the in-link info to figure out how to update each user.
+   * It returns an RDD of new feature vectors for each user block.
+   */
+  private def updateFeatures (
+      termTopics: RDD[(Int, Array[Array[Double]])],
+      termOutLinks: RDD[(Int, OutLinkBlock)],
+      docInLinks: RDD[(Int, InLinkBlock)],
+      partitioner: Partitioner): RDD[(Int, Array[Array[Double]])] = {
+    val numBlocks = termTopics.partitions.size
+    termOutLinks.join(termTopics).flatMap { case (bid, (outLinkBlock, factors)) =>
+        val toSend = Array.fill(numBlocks)(new ArrayBuffer[Array[Double]])
+        for (p <- 0 until outLinkBlock.elementIds.length; userBlock <- 0 until numBlocks) {
+          if (outLinkBlock.shouldSend(p)(userBlock)) {
+            toSend(userBlock) += factors(p)
+          }
+        }
+        toSend.zipWithIndex.map{ case (buf, idx) => (idx, (bid, buf.toArray)) }
+    }.groupByKey(partitioner)
+     .join(docInLinks)
+     .mapValues{ case (messages, inLinkBlock) =>
+        updateBlock(messages, inLinkBlock, rank, lambda, alpha, YtY)
+      }
+  }
 }
 
 /*
