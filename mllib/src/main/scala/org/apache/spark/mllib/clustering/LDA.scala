@@ -269,13 +269,14 @@ class LDA private (
       partitioner: Partitioner): RDD[(Int, Array[Array[Double]])] = {
     val numBlocks = termTopics.partitions.size
     termOutLinks.join(termTopics).flatMap { case (bid, (outLinkBlock, factors)) =>
-      val toSend = Array.fill(numBlocks)(new ArrayBuffer[BDV[Double]])
+      val toSend = Array.fill(numBlocks)((new ArrayBuffer[Int], new ArrayBuffer[BDV[Double]]))
       for (t <- 0 until outLinkBlock.elementIds.length; docBlock <- 0 until numBlocks) {
         if (outLinkBlock.shouldSend(t)(docBlock)) {
-          toSend(docBlock) += factors(t)
+          toSend(docBlock)._1 += t
+          toSend(docBlock)._2 += factors(t)
         }
       }
-      toSend.zipWithIndex.map{ case (buf, idx) => (idx, (bid, buf.toArray)) }
+      toSend.zipWithIndex.map{ case (buf, idx) => (idx, (bid, buf._1.toArray, buf._2.toArray)) }
     }.groupByKey(partitioner)
      .join(docInLinks.join(topicAssignment).join(docTopics))
      .mapValues{ case (termTopicMessages, ((inLinkBlock, topicAssign), docTopicMessages)) =>
@@ -287,7 +288,7 @@ class LDA private (
   // topic assign is termId, Array[(docId, termTimes, assign vector)]
   def updateBlock(
       docTopics: Array[BDV[Double]],
-      termTopics: Iterable[(Int, Array[BDV[Double]])],
+      termTopics: Iterable[(Int, Array[Int], Array[BDV[Double]])],
       data: InLinkBlock,
       topicAssign: TopicAssign):
   Iterator[(
