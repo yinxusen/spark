@@ -23,7 +23,7 @@ import breeze.linalg.{DenseVector => BDV, sum}
 
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.mllib.clustering.{Document, LDAParams}
+import org.apache.spark.mllib.clustering.{TermInDoc, LDAParams}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
 /**
@@ -35,7 +35,7 @@ import org.apache.spark.mllib.linalg.{Vector, Vectors}
  * @param topicTermSmoothing Topic-term smoothing.
  */
 class GibbsSampling(
-    data: RDD[Document],
+    data: RDD[TermInDoc],
     numOuterIterations: Int,
     numInnerIterations: Int,
     docTopicSmoothing: Double,
@@ -50,7 +50,7 @@ class GibbsSampling(
    */
   def runGibbsSampling(
       initParams: LDAParams,
-      data: RDD[Document] = data,
+      data: RDD[TermInDoc] = data,
       numOuterIterations: Int = numOuterIterations,
       numInnerIterations: Int = numInnerIterations,
       docTopicSmoothing: Double = docTopicSmoothing,
@@ -75,7 +75,7 @@ class GibbsSampling(
         val rand = new Random(42 + i * i)
         val params = sc.accumulable(LDAParams(numDocs, numTopics, numTerms))
         val chosenTopics = data.zip(lastChosenTopics).map {
-          case (Document(docId, content), topics) =>
+          case (TermInDoc(docId, content), topics) =>
             content.zip(topics).map { case (term, topic) =>
               lastParams += (docId, term, topic, -1)
 
@@ -142,12 +142,12 @@ object GibbsSampling extends Logging {
    */
   private def sampleTermAssignment(
       params: LDAParams,
-      data: RDD[Document]): (LDAParams, RDD[Iterable[Int]]) = {
+      data: RDD[TermInDoc]): (LDAParams, RDD[Iterable[Int]]) = {
 
     val sc = data.context
     val initialParams = sc.accumulable(params)
     val rand = new Random(42)
-    val initialChosenTopics = data.map { case Document(docId, content) =>
+    val initialChosenTopics = data.map { case TermInDoc(docId, content) =>
       val docTopics = params.docTopicCounts(docId)
       if (docTopics.toBreeze.norm(2) == 0) {
         content.map { term =>
@@ -197,8 +197,8 @@ object GibbsSampling extends Logging {
    * we use it for current documents, which is also OK. If using it on unseen data, you must do an
    * iteration of Gibbs sampling before calling this. Small perplexity means good result.
    */
-  def perplexity(data: RDD[Document], phi: Array[Vector], theta: Array[Vector]): Double = {
-    val (termProb, totalNum) = data.flatMap { case Document(docId, content) =>
+  def perplexity(data: RDD[TermInDoc], phi: Array[Vector], theta: Array[Vector]): Double = {
+    val (termProb, totalNum) = data.flatMap { case TermInDoc(docId, content) =>
       val currentTheta = BDV.zeros[Double](phi.head.size)
       var col = 0
       var row = 0

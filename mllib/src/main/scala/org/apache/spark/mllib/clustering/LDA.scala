@@ -19,15 +19,19 @@ package org.apache.spark.mllib.clustering
 
 import java.util.Random
 
-import breeze.linalg.{DenseVector => BDV}
+import breeze.linalg.{DenseVector => BDV, SparseVector => BSV}
+import scala.collection.mutable.{ArrayBuffer, BitSet}
+import scala.util.Sorting
 
-import org.apache.spark.{AccumulableParam, Logging, SparkContext}
+import org.apache.spark._
 import org.apache.spark.mllib.expectation.GibbsSampling
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
+import org.apache.spark.SparkContext._
+import scala.collection.mutable
+import org.apache.spark.storage.StorageLevel
 
-case class Document(docId: Int, content: Iterable[Int])
 
 case class LDAParams (
     docCounts: Vector,
@@ -108,25 +112,145 @@ class LDAParamsAccumulableParam extends AccumulableParam[LDAParams, (Int, Int, I
   def zero(initialValue: LDAParams): LDAParams = initialValue
 }
 
+private[clustering] case class OutLinkBlock(elementIds: Array[Int], shouldSend: Array[mutable.BitSet])
+
+private[clustering] case class InLinkBlock(elementIds: Array[Int], termsInBlock: Array[Array[(Array[Int], Array[Int])]])
+
 class LDA private (
     var numTopics: Int,
     var docTopicSmoothing: Double,
     var topicTermSmoothing: Double,
     var numIteration: Int,
     var numDocs: Int,
-    var numTerms: Int)
+    var numTerms: Int,
+    var numBlocks: Int,
+    val sc: SparkContext)
   extends Serializable with Logging {
-  def run(input: RDD[Document]): (GibbsSampling, LDAParams) = {
-    val trainer = new GibbsSampling(
-      input,
-      numIteration,
-      1,
-      docTopicSmoothing,
-      topicTermSmoothing)
-    (trainer, trainer.runGibbsSampling(LDAParams(numDocs, numTopics, numTerms)))
+
+  // topic assign is termId, Array[(docId, termTimes, assign vector)]
+  def updateBlock(
+      termTopics: Array[(Int, Array[Double])],
+      docTopics: Array[(Int, Array[Double])],
+      topicAssign: Array[(Int, Array[(Int, Int, BDV[Int])])]):
+  Iterator[(
+    Array[(Int, Array[Double])],
+    Array[(Int, Array[Double])],
+    Array[(Int, Array[(Int, Int, BDV[Int])])])] = {
+    ???
   }
+
+  def run(documents: RDD[TermInDoc]): LDAModel = {
+
+    val numBlocks = if (this.numBlocks == -1) {
+      math.max(sc.defaultParallelism, documents.partitions.size / 2)
+    } else {
+      this.numBlocks
+    }
+
+    val partitioner = new HashPartitioner(numBlocks)
+
+    val ratingsByUserBlock = documents.map{ doc => (doc.docId % numBlocks, doc) }
+    val ratingsByProductBlock = documents.map{ doc =>
+      (doc.termId % numBlocks, TermInDoc(doc.termId, doc.docId, doc.counts))
+    }
+
+    val (userInLinks, userOutLinks) = makeLinkRDDs(numBlocks, ratingsByUserBlock)
+    val (productInLinks, productOutLinks) = makeLinkRDDs(numBlocks, ratingsByProductBlock)
+
+    // keep the same partition
+    val docTopicCounts = input.map { case (docId, terms) => (docId, BDV.zeros[Double](numTopics)) }
+
+    val termTopicCounts = sc.parallelize((0 until numTerms).map((_, BDV.zeros[Double](numTopics))))
+
+    val a = input.join(docTopicCounts).mapPartitions { iter =>
+      iter.flatMap { case (docId, ((terms, topicAssigns), termCounts)) =>
+        terms.activeIterator.zipWithIndex.flatMap { case ((termId, times), id) =>
+          (0 until times).map { i =>
+            (termId, (docId, topicAssigns, id * times + i))
+          }
+        }
+      }
+    }
+
+    // partition w.r.t. term frequency here
+    // and compute according to terms
+
+    a.groupByKey(new HashPartitioner(1)).join(termTopicCounts).mapPartitions { iter =>
+
+    }
+    ???
+  }
+
+  /**
+   * Make the out-links table for a block of the users (or products) dataset given the list of
+   * (user, product, rating) values for the users in that block (or the opposite for products).
+   */
+  private def makeOutLinkBlock(numBlocks: Int, documents: Array[TermInDoc]): OutLinkBlock = {
+    val docIds = documents.map(_.docId).distinct.sorted
+    val numDocs = docIds.length
+    val docIdToPos = docIds.zipWithIndex.toMap
+    val shouldSend = Array.fill(numDocs)(new mutable.BitSet(numBlocks))
+    for (term <- documents) {
+      shouldSend(docIdToPos(term.docId))(term.termId % numBlocks) = true
+    }
+    OutLinkBlock(docIds, shouldSend)
+  }
+
+  /**
+   * Make the in-links table for a block of the users (or products) dataset given a list of
+   * (user, product, rating) values for the users in that block (or the opposite for products).
+   */
+  private def makeInLinkBlock(numBlocks: Int, documents: Array[TermInDoc]): InLinkBlock = {
+    val docIds = documents.map(_.docId).distinct.sorted
+    val docIdToPos = docIds.zipWithIndex.toMap
+
+    val blockDocuments = Array.fill(numBlocks)(new ArrayBuffer[TermInDoc])
+    for (term <- documents) {
+      blockDocuments(term.termId % numBlocks) += term
+    }
+
+    val documentsForBlock = new Array[Array[(Array[Int], Array[Int])]](numBlocks)
+    for (termBlock <- 0 until numBlocks) {
+      val groupedDocuments = blockDocuments(termBlock).groupBy(_.termId).toArray
+      val ordering = new Ordering[(Int, ArrayBuffer[TermInDoc])] {
+        def compare(a: (Int, ArrayBuffer[TermInDoc]), b: (Int, ArrayBuffer[TermInDoc])): Int = {
+          a._1 - b._1
+        }
+      }
+      Sorting.quickSort(groupedDocuments)(ordering)
+      documentsForBlock(termBlock) = groupedDocuments.map { case (_, docs) =>
+        (docs.view.map(d => docIdToPos(d.docId)).toArray, docs.view.map(_.counts).toArray)
+      }
+    }
+
+    InLinkBlock(docIds, documentsForBlock)
+  }
+
+  /**
+   * Make RDDs of InLinkBlocks and OutLinkBlocks given an RDD of (blockId, (u, p, r)) values for
+   * the users (or (blockId, (p, u, r)) for the products). We create these simultaneously to avoid
+   * having to shuffle the (blockId, (u, p, r)) RDD twice, or to cache it.
+   */
+  private def makeLinkRDDs(numBlocks: Int, ratings: RDD[(Int, TermInDoc)])
+    : (RDD[(Int, InLinkBlock)], RDD[(Int, OutLinkBlock)]) =
+  {
+    val grouped = ratings.partitionBy(new HashPartitioner(numBlocks))
+    val links = grouped.mapPartitionsWithIndex((blockId, elements) => {
+      val ratings = elements.map{_._2}.toArray
+      val inLinkBlock = makeInLinkBlock(numBlocks, ratings)
+      val outLinkBlock = makeOutLinkBlock(numBlocks, ratings)
+      Iterator.single((blockId, (inLinkBlock, outLinkBlock)))
+    }, true)
+    val inLinks = links.mapValues(_._1)
+    val outLinks = links.mapValues(_._2)
+    inLinks.persist(StorageLevel.MEMORY_AND_DISK)
+    outLinks.persist(StorageLevel.MEMORY_AND_DISK)
+    (inLinks, outLinks)
+  }
+
 }
 
+/*
 object LDA extends Logging {
 
   def train(
@@ -167,3 +291,4 @@ object LDA extends Logging {
     println(s"final mode perplexity is $pp")
   }
 }
+*/

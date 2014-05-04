@@ -133,7 +133,7 @@ object LDASuite {
       model: Array[BDV[Double]],
       numDocs: Int,
       numTerms: Int,
-      numTopics: Int): Array[Document] = {
+      numTopics: Int): Array[TermInDoc] = {
     (0 until numDocs).map { i =>
       val rand = new Random()
       val numTermsPerDoc = Poisson.distribution(expectedDocLength).sample()
@@ -142,7 +142,7 @@ object LDASuite {
       (0 until numTopicsPerDoc).foreach { _ =>
         topicDist(rand.nextInt(numTopics)) += 1
       }
-      Document(i, ldaSampler(model, topicDist, numTermsPerDoc))
+      TermInDoc(i, ldaSampler(model, topicDist, numTermsPerDoc))
     }.toArray
   }
 }

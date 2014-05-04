@@ -30,7 +30,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.util.random.BernoulliSampler
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.mllib.clustering.Document
+import org.apache.spark.mllib.clustering.TermInDoc
 
 /**
  * Helper methods to load, save and pre-process data used in ML Lib.
@@ -249,7 +249,7 @@ object MLUtils {
       dir: String,
       minSplits: Int,
       dirStopWords: String = ""):
-  (RDD[Document], Index[String], Index[String]) = {
+  (RDD[TermInDoc], Index[String], Index[String]) = {
 
     // Containers and indexers for terms and documents
     val termMap = Index[String]()
@@ -286,7 +286,7 @@ object MLUtils {
     val data = almostData.map { case (fileName, tokens) =>
       val fileId = broadcastDocMap.value.index(fileName)
       val translatedContent = tokens.map(broadcastWordMap.value.index)
-      Document(fileId, translatedContent)
+      TermInDoc(fileId, translatedContent)
     }.cache()
 
     (data, termMap, docMap)
