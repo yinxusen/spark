@@ -27,11 +27,6 @@ class LocalLDAModel private (
     dts, tts)
   }
 
-  def setNumTopics(nt: Int): this.type = {
-    numTopics = nt
-    this
-  }
-
   override def clone(): LocalLDAModel = {
     new LocalLDAModel(numTopics, BDV.zeros[Double](docCounts.length), BDV.zeros[Double](topicCounts.length),
     Array.range(0, docTopicCounts.length).map(_ => BDV.zeros[Double](numTopics)),

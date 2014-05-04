@@ -25,7 +25,7 @@ import org.apache.spark.mllib.clustering.LocalLDAModel
 
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.mllib.clustering.{TermInDoc, LDAParams}
+import org.apache.spark.mllib.clustering.TermInDoc
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
 object GibbsSampling extends Logging {

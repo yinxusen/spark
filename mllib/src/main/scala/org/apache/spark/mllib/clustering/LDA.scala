@@ -32,86 +32,6 @@ import org.apache.spark.SparkContext._
 import scala.collection.mutable
 import org.apache.spark.storage.StorageLevel
 
-
-case class LDAParams (
-    docCounts: Vector,
-    topicCounts: Vector,
-    docTopicCounts: Array[Vector],
-    topicTermCounts: Array[Vector])
-  extends Serializable {
-
-  def update(docId: Int, term: Int, topic: Int, inc: Int) = {
-    docCounts.toBreeze(docId) += inc
-    topicCounts.toBreeze(topic) += inc
-    docTopicCounts(docId).toBreeze(topic) += inc
-    topicTermCounts(topic).toBreeze(term) += inc
-    this
-  }
-
-  def merge(other: LDAParams) = {
-    docCounts.toBreeze += other.docCounts.toBreeze
-    topicCounts.toBreeze += other.topicCounts.toBreeze
-
-    var i = 0
-    while (i < docTopicCounts.length) {
-      docTopicCounts(i).toBreeze += other.docTopicCounts(i).toBreeze
-      i += 1
-    }
-
-    i = 0
-    while (i < topicTermCounts.length) {
-      topicTermCounts(i).toBreeze += other.topicTermCounts(i).toBreeze
-      i += 1
-    }
-    this
-  }
-
-  /**
-   * This function used for computing the new distribution after drop one from current document,
-   * which is a really essential part of Gibbs sampling for LDA, you can refer to the paper:
-   * <I>Parameter estimation for text analysis</I>
-   */
-  def dropOneDistSampler(
-      docTopicSmoothing: Double,
-      topicTermSmoothing: Double,
-      termId: Int,
-      docId: Int,
-      rand: Random): Int = {
-    val (numTopics, numTerms) = (topicCounts.size, topicTermCounts.head.size)
-    val topicThisTerm = BDV.zeros[Double](numTopics)
-    var i = 0
-    while (i < numTopics) {
-      topicThisTerm(i) =
-        ((topicTermCounts(i)(termId) + topicTermSmoothing)
-          / (topicCounts(i) + (numTerms * topicTermSmoothing))
-        ) + (docTopicCounts(docId)(i) + docTopicSmoothing)
-      i += 1
-    }
-    GibbsSampling.multinomialDistSampler(rand, topicThisTerm)
-  }
-}
-
-object LDAParams {
-  implicit val ldaParamsAP = new LDAParamsAccumulableParam
-
-  def apply(numDocs: Int, numTopics: Int, numTerms: Int) = new LDAParams(
-    Vectors.fromBreeze(BDV.zeros[Double](numDocs)),
-    Vectors.fromBreeze(BDV.zeros[Double](numTopics)),
-    Array(0 until numDocs: _*).map(_ => Vectors.fromBreeze(BDV.zeros[Double](numTopics))),
-    Array(0 until numTopics: _*).map(_ => Vectors.fromBreeze(BDV.zeros[Double](numTerms))))
-}
-
-class LDAParamsAccumulableParam extends AccumulableParam[LDAParams, (Int, Int, Int, Int)] {
-  def addAccumulator(r: LDAParams, t: (Int, Int, Int, Int)) = {
-    val (docId, term, topic, inc) = t
-    r.update(docId, term, topic, inc)
-  }
-
-  def addInPlace(r1: LDAParams, r2: LDAParams): LDAParams = r1.merge(r2)
-
-  def zero(initialValue: LDAParams): LDAParams = initialValue
-}
-
 private[clustering] case class OutLinkBlock(elementIds: Array[Int], shouldSend: Array[mutable.BitSet])
 
 private[clustering] case class InLinkBlock(elementIds: Array[Int], termsInBlock: Array[Array[TermsAndCountsPerDoc]])
@@ -130,7 +50,7 @@ class LDA private (
     var seed: Long = System.nanoTime())
   extends Serializable with Logging {
 
-  def run(documents: RDD[TermInDoc]): LDAModel = {
+  def run(documents: RDD[TermInDoc]): LocalLDAModel = {
 
     val numBlocks = if (this.numBlocks == -1) {
       math.max(sc.defaultParallelism, documents.partitions.size / 2)
@@ -289,10 +209,19 @@ class LDA private (
   // here is a local gibbs sampling
   def updateBlock(
       docTopics: Array[BDV[Double]],
-      termTopics: Iterable[(Int, Array[Int], Array[BDV[Double]])],
+      manyTermTopics: Iterable[(Int, Array[Int], Array[BDV[Double]])],
       data: InLinkBlock,
       topicAssign: TopicAssign): (Array[Array[Double]], Array[(Int, Array[Int], Array[BDV[Double]])], TopicAssign) = {
+    val nDocs = data.elementIds.length
+    val (blockTermIds, blockTermTopics) = manyTermTopics.toSeq.sortBy(_._1).map(x => (x._2, x._3)).unzip
+    val numBlocks = blockTermIds.length
+    val termIds = blockTermIds.flatMap(x => x).toArray
+    val termTopics = blockTermTopics.flatMap(x => x).toArray
+    val nTerms = termIds.length
+    val localLDA = new LocalLDAModel(nDocs, nTerms, numTopics, docTopicSmoothing, topicTermSmoothing)
+    for (block <- 0 until numBlocks) {
 
+    }
     ???
   }
 }
