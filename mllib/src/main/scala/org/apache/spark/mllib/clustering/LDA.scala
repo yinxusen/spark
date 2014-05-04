@@ -116,6 +116,8 @@ private[clustering] case class OutLinkBlock(elementIds: Array[Int], shouldSend: 
 
 private[clustering] case class InLinkBlock(elementIds: Array[Int], termsInBlock: Array[Array[(Array[Int], Array[Int])]])
 
+private[clustering] case class TopicAssign(elementIds: Array[Int], topicsInBlock: Array[Array[(Array[Int], Array[BDV[Double]])]])
+
 class LDA private (
     var numTopics: Int,
     var docTopicSmoothing: Double,
@@ -127,18 +129,6 @@ class LDA private (
     val sc: SparkContext,
     var seed: Long = System.nanoTime())
   extends Serializable with Logging {
-
-  // topic assign is termId, Array[(docId, termTimes, assign vector)]
-  def updateBlock(
-      termTopics: Array[(Int, Array[Double])],
-      docTopics: Array[(Int, Array[Double])],
-      topicAssign: Array[(Int, Array[(Int, Int, BDV[Int])])]):
-  Iterator[(
-    Array[(Int, Array[Double])],
-    Array[(Int, Array[Double])],
-    Array[(Int, Array[(Int, Int, BDV[Int])])])] = {
-    ???
-  }
 
   def run(documents: RDD[TermInDoc]): LDAModel = {
 
@@ -176,33 +166,22 @@ class LDA private (
       }
     }
 
+    // maybe there is a better way to house topic assignment
+    var topicAssignment = docInLinks.mapPartitions { itr =>
+      itr.map { case (x, y) =>
+        (x, TopicAssign(y.elementIds, y.termsInBlock.map { _.map { case (termIds, counts) =>
+          (termIds, counts.map(BDV.zeros[Double]))
+        }}))
+      }
+    }
+
     var termTopics = termOutLinks.mapPartitionsWithIndex { (index, itr) =>
       itr.map { case (x, y) =>
         (x, y.elementIds.map(_ => BDV.zeros[Double](numTopics)))
       }
     }
 
-    // keep the same partition
-    val docTopicCounts = input.map { case (docId, terms) => (docId, BDV.zeros[Double](numTopics)) }
 
-    val termTopicCounts = sc.parallelize((0 until numTerms).map((_, BDV.zeros[Double](numTopics))))
-
-    val a = input.join(docTopicCounts).mapPartitions { iter =>
-      iter.flatMap { case (docId, ((terms, topicAssigns), termCounts)) =>
-        terms.activeIterator.zipWithIndex.flatMap { case ((termId, times), id) =>
-          (0 until times).map { i =>
-            (termId, (docId, topicAssigns, id * times + i))
-          }
-        }
-      }
-    }
-
-    // partition w.r.t. term frequency here
-    // and compute according to terms
-
-    a.groupByKey(new HashPartitioner(1)).join(termTopicCounts).mapPartitions { iter =>
-
-    }
     ???
   }
 
@@ -281,7 +260,9 @@ class LDA private (
    * It returns an RDD of new feature vectors for each user block.
    */
   private def updateFeatures (
+      docTopics: RDD[(Int, Array[Array[Double]])],
       termTopics: RDD[(Int, Array[Array[Double]])],
+      topicAssignment: RDD[(Int, TopicAssign)],
       termOutLinks: RDD[(Int, OutLinkBlock)],
       docInLinks: RDD[(Int, InLinkBlock)],
       partitioner: Partitioner): RDD[(Int, Array[Array[Double]])] = {
@@ -295,10 +276,24 @@ class LDA private (
         }
         toSend.zipWithIndex.map{ case (buf, idx) => (idx, (bid, buf.toArray)) }
     }.groupByKey(partitioner)
-     .join(docInLinks)
-     .mapValues{ case (messages, inLinkBlock) =>
-        updateBlock(messages, inLinkBlock, rank, lambda, alpha, YtY)
+     .join(docInLinks.join(topicAssignment).join(docTopics))
+     .mapValues{ case (termTopicMessages, ((inLinkBlock, topicAssign), docTopicMessages)) =>
+        updateBlock(docTopicMessages, termTopicMessages, inLinkBlock, topicAssign)
       }
+     ???
+  }
+
+  // topic assign is termId, Array[(docId, termTimes, assign vector)]
+  def updateBlock(
+      docTopics: Array[Array[Double]],
+      termTopics: Iterable[(Int, Array[Array[Double]])],
+      data: InLinkBlock,
+      topicAssign: TopicAssign):
+  Iterator[(
+    Array[(Int, Array[Double])],
+    Array[(Int, Array[Double])],
+    Array[(Int, Array[(Int, Int, BDV[Int])])])] = {
+    ???
   }
 }
 
