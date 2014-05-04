@@ -285,16 +285,14 @@ class LDA private (
      ???
   }
 
-  // topic assign is termId, Array[(docId, termTimes, assign vector)]
+  // return value is (docTopics, termTopics, topicAssigns)
+  // here is a local gibbs sampling
   def updateBlock(
       docTopics: Array[BDV[Double]],
       termTopics: Iterable[(Int, Array[Int], Array[BDV[Double]])],
       data: InLinkBlock,
-      topicAssign: TopicAssign):
-  Iterator[(
-    Array[(Int, Array[Double])],
-    Array[(Int, Array[Double])],
-    Array[(Int, Array[(Int, Int, BDV[Int])])])] = {
+      topicAssign: TopicAssign): (Array[Array[Double]], Array[(Int, Array[Int], Array[BDV[Double]])], TopicAssign) = {
+
     ???
   }
 }

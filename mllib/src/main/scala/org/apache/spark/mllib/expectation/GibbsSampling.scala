@@ -21,86 +21,50 @@ import java.util.Random
 
 import breeze.linalg.{DenseVector => BDV, sum}
 
+import org.apache.spark.mllib.clustering.LocalLDAModel
+
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.mllib.clustering.{TermInDoc, LDAParams}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
-/**
- * Gibbs sampling from a given dataset and org.apache.spark.mllib.model.
- * @param data Dataset, such as corpus.
- * @param numOuterIterations Number of outer iteration.
- * @param numInnerIterations Number of inner iteration, used in each partition.
- * @param docTopicSmoothing Document-topic smoothing.
- * @param topicTermSmoothing Topic-term smoothing.
- */
-class GibbsSampling(
-    data: RDD[TermInDoc],
-    numOuterIterations: Int,
-    numInnerIterations: Int,
-    docTopicSmoothing: Double,
-    topicTermSmoothing: Double)
-  extends Logging with Serializable {
+object GibbsSampling extends Logging {
 
-  import GibbsSampling._
-
-  /**
+   /**
    * Main function of running a Gibbs sampling method. It contains two phases of total Gibbs
    * sampling: first is initialization, second is real sampling.
    */
-  def runGibbsSampling(
-      initParams: LDAParams,
-      data: RDD[TermInDoc] = data,
-      numOuterIterations: Int = numOuterIterations,
-      numInnerIterations: Int = numInnerIterations,
-      docTopicSmoothing: Double = docTopicSmoothing,
-      topicTermSmoothing: Double = topicTermSmoothing): LDAParams = {
+  def runGibbsSampling(markovChain: Array[Array[Int]], initParams: LocalLDAModel, numIterations: Int): LocalLDAModel = {
 
-    val numTerms = initParams.topicTermCounts.head.size
-    val numDocs = initParams.docCounts.size
-    val numTopics = initParams.topicCounts.size
-
-    // Construct topic assignment RDD
     logInfo("Start initialization")
 
-    val cpInterval = System.getProperty("spark.gibbsSampling.checkPointInterval", "10").toInt
-    val sc = data.context
-    val (initialParams, initialChosenTopics) = sampleTermAssignment(initParams, data)
+    val (initialParams, initialChosenTopics) = sampleTermAssignment(markovChain, initParams)
 
     // Gibbs sampling
-    val (params, _, _) = Iterator.iterate((sc.accumulable(initialParams), initialChosenTopics, 0)) {
+    val (params, _, _) = Iterator.iterate((initialParams, initialChosenTopics, 0)) {
       case (lastParams, lastChosenTopics, i) =>
         logInfo("Start Gibbs sampling")
 
         val rand = new Random(42 + i * i)
-        val params = sc.accumulable(LDAParams(numDocs, numTopics, numTerms))
-        val chosenTopics = data.zip(lastChosenTopics).map {
-          case (TermInDoc(docId, content), topics) =>
+        val params = lastParams.clone()
+        val chosenTopics = markovChain.zipWithIndex.zip(lastChosenTopics).map {
+          case ((content, docId), topics) =>
             content.zip(topics).map { case (term, topic) =>
-              lastParams += (docId, term, topic, -1)
+              lastParams.update(docId, term, topic, -1)
 
-              val chosenTopic = lastParams.localValue.dropOneDistSampler(
-                docTopicSmoothing, topicTermSmoothing, term, docId, rand)
+              val chosenTopic = lastParams.dropOneDistSampler(term, docId, rand)
 
-              lastParams += (docId, term, chosenTopic, 1)
-              params += (docId, term, chosenTopic, 1)
+              lastParams.update(docId, term, chosenTopic, 1)
+              params.update(docId, term, chosenTopic, 1)
 
               chosenTopic
             }
-        }.cache()
-
-        if (i + 1 % cpInterval == 0) {
-          chosenTopics.checkpoint()
         }
 
-        // Trigger a job to collect accumulable LDA parameters.
-        chosenTopics.count()
-        lastChosenTopics.unpersist()
-
         (params, chosenTopics, i + 1)
-    }.drop(1 + numOuterIterations).next()
+    }.drop(1 + numIterations).next()
 
-    params.value
+    params
   }
 
   /**
@@ -133,41 +97,31 @@ class GibbsSampling(
     (topicTermCount.map(vec => Vectors.fromBreeze(vec)),
       docTopicCount.map(vec => Vectors.fromBreeze(vec)))
   }
-}
-
-object GibbsSampling extends Logging {
 
   /**
    * Initial step of Gibbs sampling, which supports incremental LDA.
    */
-  private def sampleTermAssignment(
-      params: LDAParams,
-      data: RDD[TermInDoc]): (LDAParams, RDD[Iterable[Int]]) = {
-
-    val sc = data.context
-    val initialParams = sc.accumulable(params)
+  private def sampleTermAssignment(markovChain: Array[Array[Int]], params: LocalLDAModel): (LocalLDAModel, Array[Array[Int]]) = {
+    val newParams = params.clone()
     val rand = new Random(42)
-    val initialChosenTopics = data.map { case TermInDoc(docId, content) =>
+    val initialChosenTopics = markovChain.zipWithIndex.map { case (content, docId) =>
       val docTopics = params.docTopicCounts(docId)
-      if (docTopics.toBreeze.norm(2) == 0) {
+      if (docTopics.norm(2) == 0) {
         content.map { term =>
           val topic = uniformDistSampler(rand, params.topicCounts.size)
-          initialParams += (docId, term, topic, 1)
+          newParams.update(docId, term, topic, 1)
           topic
         }
       } else {
         content.map { term =>
-          val topicTerms = Vectors.dense(params.topicTermCounts.map(_(term))).toBreeze
-          val dist = docTopics.toBreeze :* topicTerms
-          multinomialDistSampler(rand, dist.asInstanceOf[BDV[Double]])
+          val topicTerms = new BDV[Double](params.topicTermCounts.map(_(term)))
+          val dist = docTopics :* topicTerms
+          multinomialDistSampler(rand, dist)
         }
       }
-    }.cache()
+    }
 
-    // Trigger a job to collect accumulable LDA parameters.
-    initialChosenTopics.count()
-
-    (initialParams.value, initialChosenTopics)
+    (newParams, initialChosenTopics)
   }
 
   /**
