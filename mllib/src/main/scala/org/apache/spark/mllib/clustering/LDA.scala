@@ -61,6 +61,14 @@ class LDA private (
 
     val partitioner = new HashPartitioner(numBlocks)
 
+    val docCounts = documents.map { case TermInDoc(docId, termId, counts) =>
+      (docId, counts)
+    }.groupByKey(partitioner).mapValues(_.sum).collect().toMap
+
+    val bDocCounts = sc.broadcast(bDocCounts)
+
+    var topicCounts = BDV.zeros[Int](numTopics)
+
     val documentsByUserBlock = documents.map{ doc => (doc.docId % numBlocks, doc) }
     val documentsByProductBlock = documents.map{ doc =>
       (doc.termId % numBlocks, TermInDoc(doc.termId, doc.docId, doc.counts))
@@ -105,7 +113,6 @@ class LDA private (
         (x, y.elementIds.map(_ => BDV.zeros[Double](numTopics)))
       }
     }
-
 
     ???
   }
@@ -222,9 +229,14 @@ class LDA private (
     val termIds = blockTermIds.flatMap(x => x).toArray
     val termTopics = blockTermTopics.flatMap(x => x).toArray
     val nTerms = termIds.length
-    val localLDA = new LocalLDAModel(nDocs, nTerms, numTopics, docTopicSmoothing, topicTermSmoothing)
     for (block <- 0 until numBlocks) {
+      for (term <- 0 until blockTermTopics(block).length) {
+        val currentTermTopic = blockTermTopics(block)(term)
+        val TermsAndCountsPerDoc(currentDocIds, currentCounts) = data.termsInBlock(block)(term)
+        val TermsAndTopicAssignsPerDoc(_, currentTopicAssigns) = topicAssign.topicsInBlock(block)(term)
+        // gibbs sampling for this subset of docs and terms
 
+      }
     }
     ???
   }

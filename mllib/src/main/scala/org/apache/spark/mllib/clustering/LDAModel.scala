@@ -41,26 +41,4 @@ class LocalLDAModel private (
     topicTermCounts(topic)(term) += inc
     this
   }
-
-  /**
-   * This function used for computing the new distribution after drop one from current document,
-   * which is a really essential part of Gibbs sampling for LDA, you can refer to the paper:
-   * <I>Parameter estimation for text analysis</I>
-   */
-  def dropOneDistSampler(
-      termId: Int,
-      docId: Int,
-      rand: Random): Int = {
-    val (numTopics, numTerms) = (topicCounts.size, topicTermCounts.head.size)
-    val topicThisTerm = BDV.zeros[Double](numTopics)
-    var i = 0
-    while (i < numTopics) {
-      topicThisTerm(i) =
-        ((topicTermCounts(i)(termId) + topicTermSmoothing)
-          / (topicCounts(i) + (numTerms * topicTermSmoothing))
-        ) + (docTopicCounts(docId)(i) + docTopicSmoothing)
-      i += 1
-    }
-    GibbsSampling.multinomialDistSampler(rand, topicThisTerm)
-  }
 }

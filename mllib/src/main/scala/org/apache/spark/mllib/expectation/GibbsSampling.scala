@@ -34,37 +34,76 @@ object GibbsSampling extends Logging {
    * Main function of running a Gibbs sampling method. It contains two phases of total Gibbs
    * sampling: first is initialization, second is real sampling.
    */
-  def runGibbsSampling(markovChain: Array[Array[Int]], initParams: LocalLDAModel, numIterations: Int): LocalLDAModel = {
-
-    logInfo("Start initialization")
-
-    val (initialParams, initialChosenTopics) = sampleTermAssignment(markovChain, initParams)
-
-    // Gibbs sampling
-    val (params, _, _) = Iterator.iterate((initialParams, initialChosenTopics, 0)) {
-      case (lastParams, lastChosenTopics, i) =>
-        logInfo("Start Gibbs sampling")
-
-        val rand = new Random(42 + i * i)
-        val params = lastParams.clone()
-        val chosenTopics = markovChain.zipWithIndex.zip(lastChosenTopics).map {
-          case ((content, docId), topics) =>
-            content.zip(topics).map { case (term, topic) =>
-              lastParams.update(docId, term, topic, -1)
-
-              val chosenTopic = lastParams.dropOneDistSampler(term, docId, rand)
-
-              lastParams.update(docId, term, chosenTopic, 1)
-              params.update(docId, term, chosenTopic, 1)
-
-              chosenTopic
-            }
+  def runGibbsSampling(
+      docCounts: Map[Int, Int],
+      topicCounts: BDV[Int],
+      docTopics: Array[BDV[Int]],
+      termTopic: BDV[Int],
+      topicAssigns: Array[BDV[Int]],
+      elementIds: Array[Int],
+      counts: Array[Int],
+      docTopicSmoothing: Double,
+      topicTermSmoothing: Double,
+      numTerms: Int,
+      numIterations: Int): Unit = {
+    val numDocs = counts.length
+    var i = 0
+    var doc = 0
+    var term = 0
+    while (i < numIterations) {
+      doc = 0
+      while (doc < numDocs) {
+        val currentDocCount = counts(doc)
+        term = 0
+        while (term < currentDocCount) {
+          val lastTopic = topicAssigns(doc)(term)
+          docTopics(doc)(lastTopic) -= 1
+          termTopic(lastTopic) -= 1
+          topicCounts(lastTopic) -= 1
+          val chosenTopic = dropOneDistSampler(
+            docTopics(doc),
+            termTopic,
+            docCounts(elementIds(doc)),
+            topicCounts(lastTopic),
+            topicTermSmoothing,
+            docTopicSmoothing,
+            numTerms,
+            new Random())
+          docTopics(doc)(chosenTopic) += 1
+          termTopic(chosenTopic) += 1
+          topicCounts(chosenTopic) += 1
+          topicAssigns(doc)(term) = chosenTopic
+          term += 1
         }
+        doc += 1
+      }
+      i += 1
+    }
+  }
 
-        (params, chosenTopics, i + 1)
-    }.drop(1 + numIterations).next()
-
-    params
+  /**
+   * This function used for computing the new distribution after drop one from current document,
+   * which is a really essential part of Gibbs sampling for LDA, you can refer to the paper:
+   * <I>Parameter estimation for text analysis</I>
+   */
+  def dropOneDistSampler(
+      docTopic: BDV[Int],
+      termTopic: BDV[Int],
+      docCount: Int,
+      topicCount: Int,
+      topicTermSmoothing: Double,
+      docTopicSmoothing: Double,
+      numTerms: Int,
+      rand: Random): Int = {
+    val numTopics = docTopic.size
+    val topicThisTerm = BDV.zeros[Double](numTopics)
+    var i = 0
+    while (i < numTopics) {
+      topicThisTerm(i) = ((termTopic(i) + topicTermSmoothing) / (topicCount + (numTerms * topicTermSmoothing))) *
+          ((docTopic(i) + docTopicSmoothing) / (docCount + (numTopics * docTopicSmoothing) - 1))
+      i += 1
+    }
+    GibbsSampling.multinomialDistSampler(rand, topicThisTerm)
   }
 
   /**
