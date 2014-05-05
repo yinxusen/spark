@@ -21,12 +21,7 @@ import java.util.Random
 
 import breeze.linalg.{DenseVector => BDV, sum}
 
-import org.apache.spark.mllib.clustering.LocalLDAModel
-
 import org.apache.spark.Logging
-import org.apache.spark.rdd.RDD
-import org.apache.spark.mllib.clustering.TermInDoc
-import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
 object GibbsSampling extends Logging {
 
@@ -107,68 +102,6 @@ object GibbsSampling extends Logging {
   }
 
   /**
-   * Model matrix Phi and Theta are inferred via LDAParams.
-   */
-  def solvePhiAndTheta(
-      params: LDAParams,
-      docTopicSmoothing: Double = docTopicSmoothing,
-      topicTermSmoothing: Double = topicTermSmoothing): (Array[Vector], Array[Vector]) = {
-    val numTopics = params.topicCounts.size
-    val numTerms = params.topicTermCounts.head.size
-
-    val docCount = params.docCounts.toBreeze :+ (docTopicSmoothing * numTopics)
-    val topicCount = params.topicCounts.toBreeze :+ (topicTermSmoothing * numTerms)
-    val docTopicCount = params.docTopicCounts.map(vec => vec.toBreeze :+ docTopicSmoothing)
-    val topicTermCount = params.topicTermCounts.map(vec => vec.toBreeze :+ topicTermSmoothing)
-
-    var i = 0
-    while (i < numTopics) {
-      topicTermCount(i) :/= topicCount(i)
-      i += 1
-    }
-
-    i = 0
-    while (i < docCount.length) {
-      docTopicCount(i) :/= docCount(i)
-      i += 1
-    }
-
-    (topicTermCount.map(vec => Vectors.fromBreeze(vec)),
-      docTopicCount.map(vec => Vectors.fromBreeze(vec)))
-  }
-
-  /**
-   * Initial step of Gibbs sampling, which supports incremental LDA.
-   */
-  private def sampleTermAssignment(markovChain: Array[Array[Int]], params: LocalLDAModel): (LocalLDAModel, Array[Array[Int]]) = {
-    val newParams = params.clone()
-    val rand = new Random(42)
-    val initialChosenTopics = markovChain.zipWithIndex.map { case (content, docId) =>
-      val docTopics = params.docTopicCounts(docId)
-      if (docTopics.norm(2) == 0) {
-        content.map { term =>
-          val topic = uniformDistSampler(rand, params.topicCounts.size)
-          newParams.update(docId, term, topic, 1)
-          topic
-        }
-      } else {
-        content.map { term =>
-          val topicTerms = new BDV[Double](params.topicTermCounts.map(_(term)))
-          val dist = docTopics :* topicTerms
-          multinomialDistSampler(rand, dist)
-        }
-      }
-    }
-
-    (newParams, initialChosenTopics)
-  }
-
-  /**
-   * A uniform distribution sampler, which is only used for initialization.
-   */
-  private def uniformDistSampler(rand: Random, dimension: Int): Int = rand.nextInt(dimension)
-
-  /**
    * A multinomial distribution sampler, using roulette method to sample an Int back.
    */
   def multinomialDistSampler(rand: Random, dist: BDV[Double]): Int = {
@@ -183,30 +116,5 @@ object GibbsSampling extends Logging {
     }
 
     loop(0, 0.0)
-  }
-
-  /**
-   * Perplexity is a kind of evaluation method of LDA. Usually it is used on unseen data. But here
-   * we use it for current documents, which is also OK. If using it on unseen data, you must do an
-   * iteration of Gibbs sampling before calling this. Small perplexity means good result.
-   */
-  def perplexity(data: RDD[TermInDoc], phi: Array[Vector], theta: Array[Vector]): Double = {
-    val (termProb, totalNum) = data.flatMap { case TermInDoc(docId, content) =>
-      val currentTheta = BDV.zeros[Double](phi.head.size)
-      var col = 0
-      var row = 0
-      while (col < phi.head.size) {
-        row = 0
-        while (row < phi.length) {
-          currentTheta(col) += phi(row)(col) * theta(docId)(row)
-          row += 1
-        }
-        col += 1
-      }
-      content.map(x => (math.log(currentTheta(x)), 1))
-    }.reduce { (lhs, rhs) =>
-      (lhs._1 + rhs._1, lhs._2 + rhs._2)
-    }
-    math.exp(-1 * termProb / totalNum)
   }
 }

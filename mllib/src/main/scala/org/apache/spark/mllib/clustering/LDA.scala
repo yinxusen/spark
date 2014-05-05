@@ -30,11 +30,17 @@ import scala.collection.mutable
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.broadcast.Broadcast
 
-private[clustering] case class OutLinkBlock(elementIds: Array[Int], shouldSend: Array[mutable.BitSet])
+private[clustering] case class OutLinkBlock(
+    elementIds: Array[Int],
+    shouldSend: Array[mutable.BitSet])
 
-private[clustering] case class InLinkBlock(elementIds: Array[Int], termsInBlock: Array[Array[TermsAndCountsPerDoc]])
+private[clustering] case class InLinkBlock(
+    elementIds: Array[Int],
+    termsInBlock: Array[Array[TermsAndCountsPerDoc]])
 
-private[clustering] case class TopicAssign(elementIds: Array[Int], topicsInBlock: Array[Array[TermsAndTopicAssignsPerDoc]])
+private[clustering] case class TopicAssign(
+    elementIds: Array[Int],
+    topicsInBlock: Array[Array[TermsAndTopicAssignsPerDoc]])
 
 class LDA private (
     var numTopics: Int,
@@ -48,7 +54,7 @@ class LDA private (
     var seed: Long = System.nanoTime())
   extends Serializable with Logging {
 
-  def run(documents: RDD[TermInDoc]): LocalLDAModel = {
+  def run(documents: RDD[TermInDoc]) {
 
     val numBlocks = if (this.numBlocks == -1) {
       math.max(sc.defaultParallelism, documents.partitions.size / 2)
@@ -79,9 +85,16 @@ class LDA private (
     // gibbs sampling
     for (i <- 0 until numIteration) {
       (topicCounts, docTopics, termTopics, topicAssignment) =
-        updateFeatures(bDocCounts, topicCounts, docTopics, termTopics, topicAssignment, termOutLinks, docInLinks, partitioner)
+        updateFeatures(
+          bDocCounts,
+          topicCounts,
+          docTopics,
+          termTopics,
+          topicAssignment,
+          termOutLinks,
+          docInLinks,
+          partitioner)
     }
-    ???
   }
 
   private def initialization(
@@ -118,7 +131,9 @@ class LDA private (
       itr.map { case (x, y) =>
         (x, TopicAssign(y.elementIds, y.termsInBlock.map { _.map {
           case TermsAndCountsPerDoc(termIds, counts) =>
-            TermsAndTopicAssignsPerDoc(termIds, counts.map(dimension => randomTopicAssign(dimension, numTopics, rand)))
+            TermsAndTopicAssignsPerDoc(
+              termIds,
+              counts.map(dimension => randomTopicAssign(dimension, numTopics, rand)))
         }}))
       }
     }
@@ -168,7 +183,9 @@ class LDA private (
       }
       Sorting.quickSort(groupedDocuments)(ordering)
       documentsForBlock(termBlock) = groupedDocuments.map { case (_, docs) =>
-        TermsAndCountsPerDoc(docs.view.map(d => docIdToPos(d.docId)).toArray, docs.view.map(_.counts).toArray)
+        TermsAndCountsPerDoc(
+          docs.view.map(d => docIdToPos(d.docId)).toArray,
+          docs.view.map(_.counts).toArray)
       }
     }
 
@@ -212,7 +229,8 @@ class LDA private (
       topicAssignment: RDD[(Int, TopicAssign)],
       termOutLinks: RDD[(Int, OutLinkBlock)],
       docInLinks: RDD[(Int, InLinkBlock)],
-      partitioner: Partitioner): (BDV[Int], RDD[(Int, Array[BDV[Int]])], RDD[(Int, Array[BDV[Int]])], RDD[(Int, TopicAssign)]) = {
+      partitioner: Partitioner):
+   (BDV[Int], RDD[(Int, Array[BDV[Int]])], RDD[(Int, Array[BDV[Int]])], RDD[(Int, TopicAssign)]) = {
     val numBlocks = termTopics.partitions.size
     val ret = termOutLinks.join(termTopics).flatMap { case (bid, (outLinkBlock, factors)) =>
       val toSend = Array.fill(numBlocks)((new ArrayBuffer[Int], new ArrayBuffer[BDV[Int]]))
@@ -226,25 +244,38 @@ class LDA private (
     }.groupByKey(partitioner)
       .join(docInLinks.join(topicAssignment).join(docTopics))
       .mapValues { case (termTopicMessages, ((inLinkBlock, topicAssign), docTopicMessages)) =>
-      updateBlock(bDocCounts.getValue(), topicCounts, docTopicMessages, termTopicMessages.toSeq.sortBy(_._1), inLinkBlock, topicAssign)
+      updateBlock(
+        bDocCounts.getValue(),
+        topicCounts,
+        docTopicMessages,
+        termTopicMessages.toSeq.sortBy(_._1),
+        inLinkBlock,
+        topicAssign)
     }
-    val newTopicCounts = ret.map(_._2._1).fold(BDV.zeros[Int](numTopics))(_ + _) - (topicCounts :* (numBlocks - 1))
+    val newTopicCounts =
+      ret.map(_._2._1).fold(BDV.zeros[Int](numTopics))(_ + _) - (topicCounts :* (numBlocks - 1))
     val newDocTopics = ret.map(x => (x._1, x._2._2))
     val newTopicAssignment = ret.map(x => (x._1, x._2._4))
-    val newTermTopics = ret.map(_._2._3).flatMap(x => x.seq).groupByKey(partitioner).join(termTopics).map { case (block, (itr, mat)) =>
-      val tmp = itr.flatMap { case (ids, vectors) => for (i <- 0 until ids.length) yield (ids(i), vectors(i))}.groupBy(_._1).map { case (id, vectors) =>
-        val numVectors = vectors.size
-        (id, (numVectors, vectors.reduce(_._2 + _._2)))
-      }
-      for ((id, (numVectors, vector)) <- tmp) {
-        var i = 0
-        while (i < vector.length) {
-          mat(id)(i) = vector(i) - (mat(id)(i) * (numVectors - 1))
-          i += 1
+    val newTermTopics = ret.map(_._2._3)
+      .flatMap(x => x.seq)
+      .groupByKey(partitioner)
+      .join(termTopics)
+      .map { case (block, (itr, mat)) =>
+        val tmp = itr.flatMap { case (ids, vectors) =>
+          for (i <- 0 until ids.length) yield (ids(i), vectors(i))
+        }.groupBy(_._1).map { case (id, vectors) =>
+          val numVectors = vectors.size
+          (id, (numVectors, vectors.reduce(_._2 + _._2)))
         }
+        for ((id, (numVectors, vector)) <- tmp) {
+          var i = 0
+          while (i < vector.length) {
+            mat(id)(i) = vector(i) - (mat(id)(i) * (numVectors - 1))
+            i += 1
+          }
+        }
+        (block, mat)
       }
-      (block, mat)
-    }
     (newTopicCounts.asInstanceOf[BDV[Int]], newDocTopics, newTermTopics, newTopicAssignment)
   }
 
@@ -266,7 +297,8 @@ class LDA private (
       for (term <- 0 until blockTermTopics(block).length) {
         val currentTermTopic = blockTermTopics(block)(term)
         val TermsAndCountsPerDoc(_, currentCounts) = data.termsInBlock(block)(term)
-        val TermsAndTopicAssignsPerDoc(_, currentTopicAssigns) = topicAssign.topicsInBlock(block)(term)
+        val TermsAndTopicAssignsPerDoc(_, currentTopicAssigns) =
+          topicAssign.topicsInBlock(block)(term)
         // gibbs sampling for this subset of docs and terms
         GibbsSampling.runGibbsSampling(
           docCounts,
