@@ -9,7 +9,7 @@ case class TermInDoc(docId: Int, termId: Int, counts: Int)
 
 case class TermsAndCountsPerDoc(termIds: Array[Int], counts: Array[Int])
 
-case class TermsAndTopicAssignsPerDoc(termIds: Array[Int], topicAssigns: Array[BDV[Double]])
+case class TermsAndTopicAssignsPerDoc(termIds: Array[Int], topicAssigns: Array[BDV[Int]])
 
 class LocalLDAModel private (
     var numTopics: Int,

@@ -219,23 +219,32 @@ class LDA private (
   // return value is (docTopics, termTopics, topicAssigns)
   // here is a local gibbs sampling
   def updateBlock(
-      docTopics: Array[BDV[Double]],
-      manyTermTopics: Iterable[(Int, Array[Int], Array[BDV[Double]])],
+      docCounts: Map[Int, Int],
+      topicCounts: BDV[Int],
+      docTopics: Array[BDV[Int]],
+      manyTermTopics: Iterable[(Int, Array[Int], Array[BDV[Int]])],
       data: InLinkBlock,
-      topicAssign: TopicAssign): (Array[Array[Double]], Array[(Int, Array[Int], Array[BDV[Double]])], TopicAssign) = {
-    val nDocs = data.elementIds.length
+      topicAssign: TopicAssign): (Array[Array[Int]], Array[(Int, Array[Int], Array[BDV[Int]])], TopicAssign) = {
     val (blockTermIds, blockTermTopics) = manyTermTopics.toSeq.sortBy(_._1).map(x => (x._2, x._3)).unzip
     val numBlocks = blockTermIds.length
-    val termIds = blockTermIds.flatMap(x => x).toArray
-    val termTopics = blockTermTopics.flatMap(x => x).toArray
-    val nTerms = termIds.length
     for (block <- 0 until numBlocks) {
       for (term <- 0 until blockTermTopics(block).length) {
         val currentTermTopic = blockTermTopics(block)(term)
-        val TermsAndCountsPerDoc(currentDocIds, currentCounts) = data.termsInBlock(block)(term)
+        val TermsAndCountsPerDoc(_, currentCounts) = data.termsInBlock(block)(term)
         val TermsAndTopicAssignsPerDoc(_, currentTopicAssigns) = topicAssign.topicsInBlock(block)(term)
         // gibbs sampling for this subset of docs and terms
-
+        GibbsSampling.runGibbsSampling(
+          docCounts,
+          topicCounts,
+          docTopics,
+          currentTermTopic,
+          currentTopicAssigns,
+          data.elementIds,
+          currentCounts,
+          docTopicSmoothing,
+          topicTermSmoothing,
+          numTerms,
+          1)
       }
     }
     ???
