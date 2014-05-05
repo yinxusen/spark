@@ -32,6 +32,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext._
 import scala.collection.mutable
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.broadcast.Broadcast
 
 private[clustering] case class OutLinkBlock(elementIds: Array[Int], shouldSend: Array[mutable.BitSet])
 
@@ -65,7 +66,7 @@ class LDA private (
       (docId, counts)
     }.groupByKey(partitioner).mapValues(_.sum).collect().toMap
 
-    val bDocCounts = sc.broadcast(bDocCounts)
+    val bDocCounts = sc.broadcast(docCounts)
 
     var topicCounts = BDV.zeros[Int](numTopics)
 
@@ -91,7 +92,7 @@ class LDA private (
 
     var docTopics = docOutLinks.mapPartitionsWithIndex { (index, itr) =>
       itr.map { case (x, y) =>
-        (x, y.elementIds.map(_ => BDV.zeros[Double](numTopics)))
+        (x, y.elementIds.map(_ => BDV.zeros[Int](numTopics)))
       }
     }
 
@@ -110,10 +111,16 @@ class LDA private (
 
     var termTopics = termOutLinks.mapPartitionsWithIndex { (index, itr) =>
       itr.map { case (x, y) =>
-        (x, y.elementIds.map(_ => BDV.zeros[Double](numTopics)))
+        (x, y.elementIds.map(_ => BDV.zeros[Int](numTopics)))
       }
     }
 
+    // initialization
+
+    // gibbs sampling
+    for (i <- 0 until numIteration) {
+      updateFeatures(bDocCounts, topicCounts, docTopics, termTopics, topicAssignment, termOutLinks, docInLinks, partitioner)
+    }
     ???
   }
 
@@ -192,15 +199,17 @@ class LDA private (
    * It returns an RDD of new feature vectors for each user block.
    */
   private def updateFeatures (
-      docTopics: RDD[(Int, Array[BDV[Double]])],
-      termTopics: RDD[(Int, Array[BDV[Double]])],
+      bDocCounts: Broadcast[Map[Int, Int]],
+      topicCounts: BDV[Int],
+      docTopics: RDD[(Int, Array[BDV[Int]])],
+      termTopics: RDD[(Int, Array[BDV[Int]])],
       topicAssignment: RDD[(Int, TopicAssign)],
       termOutLinks: RDD[(Int, OutLinkBlock)],
       docInLinks: RDD[(Int, InLinkBlock)],
       partitioner: Partitioner): RDD[(Int, Array[Array[Double]])] = {
     val numBlocks = termTopics.partitions.size
     termOutLinks.join(termTopics).flatMap { case (bid, (outLinkBlock, factors)) =>
-      val toSend = Array.fill(numBlocks)((new ArrayBuffer[Int], new ArrayBuffer[BDV[Double]]))
+      val toSend = Array.fill(numBlocks)((new ArrayBuffer[Int], new ArrayBuffer[BDV[Int]]))
       for (t <- 0 until outLinkBlock.elementIds.length; docBlock <- 0 until numBlocks) {
         if (outLinkBlock.shouldSend(t)(docBlock)) {
           toSend(docBlock)._1 += t
@@ -209,16 +218,16 @@ class LDA private (
       }
       toSend.zipWithIndex.map{ case (buf, idx) => (idx, (bid, buf._1.toArray, buf._2.toArray)) }
     }.groupByKey(partitioner)
-     .join(docInLinks.join(topicAssignment).join(docTopics))
-     .mapValues { case (termTopicMessages, ((inLinkBlock, topicAssign), docTopicMessages)) =>
-        updateBlock(docTopicMessages, termTopicMessages, inLinkBlock, topicAssign)
-      }
-     ???
+      .join(docInLinks.join(topicAssignment).join(docTopics))
+      .mapValues { case (termTopicMessages, ((inLinkBlock, topicAssign), docTopicMessages)) =>
+      updateBlock(bDocCounts.getValue(), topicCounts, docTopicMessages, termTopicMessages, inLinkBlock, topicAssign)
+    }
+    ???
   }
 
   // return value is (docTopics, termTopics, topicAssigns)
   // here is a local gibbs sampling
-  def updateBlock(
+  private def updateBlock(
       docCounts: Map[Int, Int],
       topicCounts: BDV[Int],
       docTopics: Array[BDV[Int]],
@@ -253,13 +262,13 @@ class LDA private (
   /**
    * Make a random factor vector with the given random.
    */
-  private def randomTopicAssign(numTopics: Int, rand: Random): BDV[Double] = {
+  private def randomTopicAssign(numTopics: Int, rand: Random): BDV[Int] = {
     // Choose a unit vector uniformly at random from the unit sphere, but from the
     // "first quadrant" where all elements are nonnegative. This can be done by choosing
     // elements distributed as Normal(0,1) and taking the absolute value, and then normalizing.
     // This appears to create factorizations that have a slightly better reconstruction
     // (<1%) compared picking elements uniformly at random in [0,1].
-    val factor = BDV.fill[Double](numTopics)(abs(rand.nextGaussian()))
+    val factor = BDV.fill[Int](numTopics)(abs(rand.nextGaussian()))
     normalize(factor)
   }
 }
