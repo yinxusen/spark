@@ -19,15 +19,11 @@ package org.apache.spark.mllib.clustering
 
 import java.util.Random
 
-import breeze.linalg.{DenseVector => BDV, SparseVector => BSV}
-import breeze.linalg.normalize
-import scala.collection.mutable.{ArrayBuffer, BitSet}
+import breeze.linalg.{DenseVector => BDV}
+import scala.collection.mutable.ArrayBuffer
 import scala.util.Sorting
-import scala.math.{abs, sqrt}
 import org.apache.spark._
 import org.apache.spark.mllib.expectation.GibbsSampling
-import org.apache.spark.mllib.linalg.{Vector, Vectors}
-import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext._
 import scala.collection.mutable
@@ -74,7 +70,7 @@ class LDA private (
     }
 
     val (docInLinks, docOutLinks) = makeLinkRDDs(numBlocks, documentsByUserBlock)
-    val (termInLinks, termOutLinks) = makeLinkRDDs(numBlocks, documentsByProductBlock)
+    val (_, termOutLinks) = makeLinkRDDs(numBlocks, documentsByProductBlock)
 
     // initialization
     var (topicCounts, docTopics, termTopics, topicAssignment) =
@@ -82,7 +78,8 @@ class LDA private (
 
     // gibbs sampling
     for (i <- 0 until numIteration) {
-      updateFeatures(bDocCounts, topicCounts, docTopics, termTopics, topicAssignment, termOutLinks, docInLinks, partitioner)
+      (topicCounts, docTopics, termTopics, topicAssignment) =
+        updateFeatures(bDocCounts, topicCounts, docTopics, termTopics, topicAssignment, termOutLinks, docInLinks, partitioner)
     }
     ???
   }
@@ -97,7 +94,6 @@ class LDA private (
     // Initialize user and product factors randomly, but use a deterministic seed for each
     // partition so that fault recovery works
     val seedGen = new Random(seed)
-    val seed1 = seedGen.nextInt()
     val seed2 = seedGen.nextInt()
 
     // Hash an integer to propagate random bits at all positions, similar to java.util.HashTable
@@ -216,7 +212,7 @@ class LDA private (
       topicAssignment: RDD[(Int, TopicAssign)],
       termOutLinks: RDD[(Int, OutLinkBlock)],
       docInLinks: RDD[(Int, InLinkBlock)],
-      partitioner: Partitioner): RDD[(Int, Array[Array[Double]])] = {
+      partitioner: Partitioner): (BDV[Int], RDD[(Int, Array[BDV[Int]])], RDD[(Int, Array[BDV[Int]])], RDD[(Int, TopicAssign)]) = {
     val numBlocks = termTopics.partitions.size
     val ret = termOutLinks.join(termTopics).flatMap { case (bid, (outLinkBlock, factors)) =>
       val toSend = Array.fill(numBlocks)((new ArrayBuffer[Int], new ArrayBuffer[BDV[Int]]))
@@ -232,7 +228,24 @@ class LDA private (
       .mapValues { case (termTopicMessages, ((inLinkBlock, topicAssign), docTopicMessages)) =>
       updateBlock(bDocCounts.getValue(), topicCounts, docTopicMessages, termTopicMessages.toSeq.sortBy(_._1), inLinkBlock, topicAssign)
     }
-    ???
+    val newTopicCounts = ret.map(_._2._1).fold(BDV.zeros[Int](numTopics))(_ + _) - (topicCounts :* (numBlocks - 1))
+    val newDocTopics = ret.map(x => (x._1, x._2._2))
+    val newTopicAssignment = ret.map(x => (x._1, x._2._4))
+    val newTermTopics = ret.map(_._2._3).flatMap(x => x.seq).groupByKey(partitioner).join(termTopics).map { case (block, (itr, mat)) =>
+      val tmp = itr.flatMap { case (ids, vectors) => for (i <- 0 until ids.length) yield (ids(i), vectors(i))}.groupBy(_._1).map { case (id, vectors) =>
+        val numVectors = vectors.size
+        (id, (numVectors, vectors.reduce(_._2 + _._2)))
+      }
+      for ((id, (numVectors, vector)) <- tmp) {
+        var i = 0
+        while (i < vector.length) {
+          mat(id)(i) = vector(i) - (mat(id)(i) * (numVectors - 1))
+          i += 1
+        }
+      }
+      (block, mat)
+    }
+    (newTopicCounts.asInstanceOf[BDV[Int]], newDocTopics, newTermTopics, newTopicAssignment)
   }
 
   // return value is (docTopics, termTopics, topicAssigns)
