@@ -218,7 +218,7 @@ class LDA private (
       docInLinks: RDD[(Int, InLinkBlock)],
       partitioner: Partitioner): RDD[(Int, Array[Array[Double]])] = {
     val numBlocks = termTopics.partitions.size
-    termOutLinks.join(termTopics).flatMap { case (bid, (outLinkBlock, factors)) =>
+    val ret = termOutLinks.join(termTopics).flatMap { case (bid, (outLinkBlock, factors)) =>
       val toSend = Array.fill(numBlocks)((new ArrayBuffer[Int], new ArrayBuffer[BDV[Int]]))
       for (t <- 0 until outLinkBlock.elementIds.length; docBlock <- 0 until numBlocks) {
         if (outLinkBlock.shouldSend(t)(docBlock)) {
@@ -230,7 +230,7 @@ class LDA private (
     }.groupByKey(partitioner)
       .join(docInLinks.join(topicAssignment).join(docTopics))
       .mapValues { case (termTopicMessages, ((inLinkBlock, topicAssign), docTopicMessages)) =>
-      updateBlock(bDocCounts.getValue(), topicCounts, docTopicMessages, termTopicMessages, inLinkBlock, topicAssign)
+      updateBlock(bDocCounts.getValue(), topicCounts, docTopicMessages, termTopicMessages.toSeq.sortBy(_._1), inLinkBlock, topicAssign)
     }
     ???
   }
@@ -241,10 +241,13 @@ class LDA private (
       docCounts: Map[Int, Int],
       topicCounts: BDV[Int],
       docTopics: Array[BDV[Int]],
-      manyTermTopics: Iterable[(Int, Array[Int], Array[BDV[Int]])],
+      manyTermTopics: Seq[(Int, Array[Int], Array[BDV[Int]])],
       data: InLinkBlock,
-      topicAssign: TopicAssign): (Array[Array[Int]], Array[(Int, Array[Int], Array[BDV[Int]])], TopicAssign) = {
-    val (blockTermIds, blockTermTopics) = manyTermTopics.toSeq.sortBy(_._1).map(x => (x._2, x._3)).unzip
+      topicAssign: TopicAssign):
+  (BDV[Int], Array[BDV[Int]], Seq[(Int, (Array[Int], Array[BDV[Int]]))], TopicAssign) = {
+    val from = manyTermTopics.map(_._1)
+    val blockTermIds = manyTermTopics.map(_._2)
+    val blockTermTopics = manyTermTopics.map(_._3)
     val numBlocks = blockTermIds.length
     for (block <- 0 until numBlocks) {
       for (term <- 0 until blockTermTopics(block).length) {
@@ -266,7 +269,10 @@ class LDA private (
           1)
       }
     }
-    ???
+
+    val termTopicsRetMessage = from.zip(blockTermIds.zip(blockTermTopics))
+    // topic counts, doc topics, term topics, topic assigns.
+    (topicCounts, docTopics, termTopicsRetMessage, topicAssign)
   }
 
   /**
