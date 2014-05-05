@@ -20,9 +20,10 @@ package org.apache.spark.mllib.clustering
 import java.util.Random
 
 import breeze.linalg.{DenseVector => BDV, SparseVector => BSV}
+import breeze.linalg.normalize
 import scala.collection.mutable.{ArrayBuffer, BitSet}
 import scala.util.Sorting
-
+import scala.math.{abs, sqrt}
 import org.apache.spark._
 import org.apache.spark.mllib.expectation.GibbsSampling
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
@@ -87,11 +88,14 @@ class LDA private (
     }
 
     // maybe there is a better way to house topic assignment
-    var topicAssignment = docInLinks.mapPartitions { itr =>
+    // and there should other ways to setup the topic assignment
+    // say, new randomTopicAssign with some incremental parameters.
+    var topicAssignment = docInLinks.mapPartitionsWithIndex { (index, itr) =>
+      val rand = new Random(hash(seed2 ^ index))
       itr.map { case (x, y) =>
         (x, TopicAssign(y.elementIds, y.termsInBlock.map { _.map {
           case TermsAndCountsPerDoc(termIds, counts) =>
-            TermsAndTopicAssignsPerDoc(termIds, counts.map(BDV.zeros[Double]))
+            TermsAndTopicAssignsPerDoc(termIds, counts.map(_ => randomTopicAssign(numTopics, rand)))
         }}))
       }
     }
@@ -199,7 +203,7 @@ class LDA private (
       toSend.zipWithIndex.map{ case (buf, idx) => (idx, (bid, buf._1.toArray, buf._2.toArray)) }
     }.groupByKey(partitioner)
      .join(docInLinks.join(topicAssignment).join(docTopics))
-     .mapValues{ case (termTopicMessages, ((inLinkBlock, topicAssign), docTopicMessages)) =>
+     .mapValues { case (termTopicMessages, ((inLinkBlock, topicAssign), docTopicMessages)) =>
         updateBlock(docTopicMessages, termTopicMessages, inLinkBlock, topicAssign)
       }
      ???
@@ -223,6 +227,19 @@ class LDA private (
 
     }
     ???
+  }
+
+  /**
+   * Make a random factor vector with the given random.
+   */
+  private def randomTopicAssign(numTopics: Int, rand: Random): BDV[Double] = {
+    // Choose a unit vector uniformly at random from the unit sphere, but from the
+    // "first quadrant" where all elements are nonnegative. This can be done by choosing
+    // elements distributed as Normal(0,1) and taking the absolute value, and then normalizing.
+    // This appears to create factorizations that have a slightly better reconstruction
+    // (<1%) compared picking elements uniformly at random in [0,1].
+    val factor = BDV.fill[Double](numTopics)(abs(rand.nextGaussian()))
+    normalize(factor)
   }
 }
 
