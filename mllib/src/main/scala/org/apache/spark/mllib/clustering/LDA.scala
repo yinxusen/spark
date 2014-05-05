@@ -68,8 +68,6 @@ class LDA private (
 
     val bDocCounts = sc.broadcast(docCounts)
 
-    var topicCounts = BDV.zeros[Int](numTopics)
-
     val documentsByUserBlock = documents.map{ doc => (doc.docId % numBlocks, doc) }
     val documentsByProductBlock = documents.map{ doc =>
       (doc.termId % numBlocks, TermInDoc(doc.termId, doc.docId, doc.counts))
@@ -77,6 +75,24 @@ class LDA private (
 
     val (docInLinks, docOutLinks) = makeLinkRDDs(numBlocks, documentsByUserBlock)
     val (termInLinks, termOutLinks) = makeLinkRDDs(numBlocks, documentsByProductBlock)
+
+    // initialization
+    var (topicCounts, docTopics, termTopics, topicAssignment) =
+      initialization(numTopics, docOutLinks, docInLinks, termOutLinks)
+
+    // gibbs sampling
+    for (i <- 0 until numIteration) {
+      updateFeatures(bDocCounts, topicCounts, docTopics, termTopics, topicAssignment, termOutLinks, docInLinks, partitioner)
+    }
+    ???
+  }
+
+  private def initialization(
+      numTopics: Int,
+      docOutLinks: RDD[(Int, OutLinkBlock)],
+      docInLinks: RDD[(Int, InLinkBlock)],
+      termOutLinks: RDD[(Int, OutLinkBlock)]):
+  (BDV[Int], RDD[(Int, Array[BDV[Int]])], RDD[(Int, Array[BDV[Int]])], RDD[(Int, TopicAssign)]) = {
 
     // Initialize user and product factors randomly, but use a deterministic seed for each
     // partition so that fault recovery works
@@ -90,7 +106,9 @@ class LDA private (
       r ^ (r >>> 7) ^ (r >>> 4)
     }
 
-    var docTopics = docOutLinks.mapPartitionsWithIndex { (index, itr) =>
+    val topicCounts = BDV.zeros[Int](numTopics)
+
+    val docTopics = docOutLinks.mapPartitionsWithIndex { (index, itr) =>
       itr.map { case (x, y) =>
         (x, y.elementIds.map(_ => BDV.zeros[Int](numTopics)))
       }
@@ -99,31 +117,23 @@ class LDA private (
     // maybe there is a better way to house topic assignment
     // and there should other ways to setup the topic assignment
     // say, new randomTopicAssign with some incremental parameters.
-    var topicAssignment = docInLinks.mapPartitionsWithIndex { (index, itr) =>
+    val topicAssignment = docInLinks.mapPartitionsWithIndex { (index, itr) =>
       val rand = new Random(hash(seed2 ^ index))
       itr.map { case (x, y) =>
         (x, TopicAssign(y.elementIds, y.termsInBlock.map { _.map {
           case TermsAndCountsPerDoc(termIds, counts) =>
-            TermsAndTopicAssignsPerDoc(termIds, counts.map(_ => randomTopicAssign(numTopics, rand)))
+            TermsAndTopicAssignsPerDoc(termIds, counts.map(dimension => randomTopicAssign(dimension, numTopics, rand)))
         }}))
       }
     }
 
-    var termTopics = termOutLinks.mapPartitionsWithIndex { (index, itr) =>
+    val termTopics = termOutLinks.mapPartitionsWithIndex { (index, itr) =>
       itr.map { case (x, y) =>
         (x, y.elementIds.map(_ => BDV.zeros[Int](numTopics)))
       }
     }
-
-    // initialization
-
-    // gibbs sampling
-    for (i <- 0 until numIteration) {
-      updateFeatures(bDocCounts, topicCounts, docTopics, termTopics, topicAssignment, termOutLinks, docInLinks, partitioner)
-    }
-    ???
+    (topicCounts, docTopics, termTopics, topicAssignment)
   }
-
   /**
    * Make the out-links table for a block of the users (or termTopics) dataset given the list of
    * (user, product, rating) values for the users in that block (or the opposite for termTopics).
@@ -262,14 +272,8 @@ class LDA private (
   /**
    * Make a random factor vector with the given random.
    */
-  private def randomTopicAssign(numTopics: Int, rand: Random): BDV[Int] = {
-    // Choose a unit vector uniformly at random from the unit sphere, but from the
-    // "first quadrant" where all elements are nonnegative. This can be done by choosing
-    // elements distributed as Normal(0,1) and taking the absolute value, and then normalizing.
-    // This appears to create factorizations that have a slightly better reconstruction
-    // (<1%) compared picking elements uniformly at random in [0,1].
-    val factor = BDV.fill[Int](numTopics)(abs(rand.nextGaussian()))
-    normalize(factor)
+  private def randomTopicAssign(dimension: Int, numTopics: Int, rand: Random): BDV[Int] = {
+    BDV.fill[Int](dimension)(rand.nextInt(numTopics))
   }
 }
 
