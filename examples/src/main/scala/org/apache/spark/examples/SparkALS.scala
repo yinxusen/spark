@@ -104,7 +104,7 @@ object SparkALS {
         System.exit(1)
     }
     printf("Running with M=%d, U=%d, F=%d, iters=%d\n", M, U, F, ITERATIONS)
-    val sparkConf = new SparkConf().setAppName("SparkALS")
+    val sparkConf = new SparkConf().setAppName("SparkALS").setMaster("spark://127.0.0.1:7077")
     val sc = new SparkContext(sparkConf)
 
     val R = generateR()
