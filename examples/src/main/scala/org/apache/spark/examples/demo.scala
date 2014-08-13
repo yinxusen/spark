@@ -1,7 +1,7 @@
 package org.apache.spark.mllib
 
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
-import org.apache.spark.SparkContext
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.{SchemaRDD, SQLContext, Row}
 import breeze.linalg.norm
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
@@ -16,7 +16,8 @@ class demo {
 }
 
 object demo {
-  val sc = new SparkContext()
+  val conf = new SparkConf().setAppName("recommendation system demo").setMaster("local[4]")
+  val sc = new SparkContext(conf)
   val sqlContext = new SQLContext(sc)
   import sqlContext._
 
@@ -85,6 +86,10 @@ object demo {
   val svd = mat.computeSVD(mat.numCols().toInt)
   def modelBasedCF(user: Int, movie: Int): Double = {
     ???
+  }
+
+  def main(args: Array[String]) {
+    println(memoryBasedCF(1711859, 1))
   }
 
 }
