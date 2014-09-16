@@ -46,12 +46,6 @@ object FastUnfolding {
     edgeRdd
   }
 
-  def initialization(file: String, partitionNum: Int, sc: SparkContext):Graph[Long,Int] = {
-    val edgeRdd = loadEdgeRdd(file, partitionNum, sc)
-    val graph = Graph.fromEdgeTuples(edgeRdd, 1L)
-    graph
-  }
-
   def generateRandomArray[T:ClassTag](oriArray: Array[T]): Array[T] = {
     val size = oriArray.size
     val result = new Array[T](size)
@@ -99,23 +93,22 @@ object FastUnfolding {
     edgeRdd
   }
 
-  def generateNeighCommRdd[VD: ClassTag, ED: ClassTag](nodeRdd: RDD[(Long, Long)],
+  def generateNeighCommRdd[VD: ClassTag, ED: ClassTag](node: Long,
                                                        graph: Graph[VD,ED],
                                                        n2cRdd: RDD[(Long, Long)],
                                                        sc: SparkContext): RDD[(Long,Long)] = {
     val edgeRdd = loadMultiEdgeRdd(graph)
-
     // 邻居所属的comm
     val nodeCommRdd = edgeRdd.distinct()
-      .join(nodeRdd)
-      .map(e => (e._2._1, 1))
+      .filter(e => e._1 == node)
+      .map(e => (e._2, 1))
       .leftOuterJoin(n2cRdd)
       .map(e => (e._1, e._2._2.getOrElse(0L)))
 
-    val curCommRdd = nodeRdd.join(n2cRdd).map(e => (e._2._2, 0L))
+    val curCommRdd = n2cRdd.filter(e => e._1 == node).map(e => (e._2, 0L))
 
-    val neighCommRdd = edgeRdd.join(nodeRdd)
-      .map(e => (e._2._1, e._1))
+    val neighCommRdd = edgeRdd.filter(e => e._1 == node)
+      .map(e => (e._2, e._1))
       .groupBy(e => e._1)
       .map(e => (e._1, e._2.size))
       .join(nodeCommRdd)
@@ -150,6 +143,89 @@ object FastUnfolding {
     return bestComm
   }
 
+  def removeNode(totRdd: RDD[(Long, Long)],
+                 inRdd: RDD[(Long, Long)],
+                 n2cRdd: RDD[(Long, Long)],
+                 neighCommRdd: RDD[(Long, Long)],
+                 selfLoopRdd: RDD[(Long, Long)],
+                 node: Long,
+                 degree: Long,
+                 sc: SparkContext)
+  : (RDD[(Long, Long)], RDD[(Long, Long)], RDD[(Long, Long)]) = {
+    // update tot
+    val nodeDegreeRdd = changeIntoRdd(node, degree, sc)
+    val commDegreeRdd = n2cRdd.filter(e => e._1 == node)
+      .join(nodeDegreeRdd)
+      .map(e => (e._2._1, e._2._2.toLong))
+
+    val totRddUpdate = totRdd.leftOuterJoin(commDegreeRdd).map{
+      e => (e._1, e._2._1 - e._2._2.getOrElse(0L))
+    }
+
+    // update in
+    // 记录这个comm的weight总值
+    val commNeighRdd = n2cRdd.filter(e => e._1 == node)
+      .map(e => (e._2, e._1))
+      .join(neighCommRdd)
+      .map(e => (e._1, e._2._2))
+    val commSelfLoopRdd = selfLoopRdd.filter(e => e._1 == node)
+      .join(n2cRdd)
+      .map(e => (e._2._2, e._2._1))
+    val inRddUpdate = inRdd.leftOuterJoin(commNeighRdd).map{
+      e => (e._1, (e._2._1 - 2 * e._2._2.getOrElse(0L)))
+    }.leftOuterJoin(commSelfLoopRdd).map{
+      e => (e._1, (e._2._1 - e._2._2.getOrElse(0L)))
+    }
+
+    // update n2c
+    val nodeRdd = changeIntoRdd(node, node, sc)
+    val n2cRddUpdate = n2cRdd.leftOuterJoin(nodeRdd).map{
+      e =>
+        if (e._2._2.getOrElse(-1L) != -1L)
+          (e._1, -1L)
+        else
+          (e._1, e._2._1)
+    }
+
+    (totRddUpdate, inRddUpdate, n2cRddUpdate)
+  }
+
+  def insertNode(totRdd: RDD[(Long, Long)],
+                 inRdd: RDD[(Long, Long)],
+                 n2cRdd: RDD[(Long, Long)],
+                 selfLoopRdd: RDD[(Long, Long)],
+                 neighCommRdd: RDD[(Long, Long)],
+                 bestComm: Long,
+                 node: Long,
+                 degree: Long,
+                 sc: SparkContext)
+  : (RDD[(Long, Long)], RDD[(Long, Long)], RDD[(Long, Long)]) = {
+    // update tot
+    val totInsertRdd = changeIntoRdd(bestComm, degree, sc)
+    val totRddUpdate = totRdd.leftOuterJoin(totInsertRdd).map{
+      e => (e._1, e._2._1 + e._2._2.getOrElse(0L))
+    }
+    // update in
+    val selfLoop = selfLoopRdd.filter(e => e._1 == node).map(e => e._2).collect()(0)
+    val bestCommWeigh = neighCommRdd.filter(e => e._1 == bestComm).collect()(0)._2
+    val inChangeValue = 2 * bestCommWeigh + selfLoop
+    val inInsertRdd = changeIntoRdd(bestComm, inChangeValue, sc)
+    val inRddUpdate = inRdd.leftOuterJoin(inInsertRdd).map{
+      e => (e._1, e._2._1 + e._2._2.getOrElse(0L))
+    }
+    // update n2c
+    val nodeRdd = changeIntoRdd(node, node, sc)
+    val n2cRddUpdate = n2cRdd.leftOuterJoin(nodeRdd).map{
+      e =>
+        if (e._2._2.getOrElse(-1L) != -1L)
+          (e._1, bestComm)
+        else
+          (e._1, e._2._1)
+    }
+
+    (totRddUpdate, inRddUpdate, n2cRddUpdate)
+  }
+
   def reCommunity[VD: ClassTag, ED: ClassTag](graph: Graph[VD, ED],
                                               sc: SparkContext,
                                               maxTimes: Int = Int.MaxValue,
@@ -158,7 +234,7 @@ object FastUnfolding {
     var n2cRdd = graph.degrees.map(e => (e._1.toLong, e._1.toLong))
     val selfLoopRdd = generateSelfLoopRdd(graph).cache()
     var inRdd = selfLoopRdd
-    // TODO degree的定义，需要再考虑，需不需要减去后面的部分
+    // TODO degree的定义，需要再考虑
     //    var totRdd = graph.degrees.join(selfLoopRdd).map(e => (e._1.toLong, e._2._1.toLong - e._2._2))
     var totRdd = graph.degrees.map(e => (e._1.toLong, e._2.toLong))
     val totalDegree = graph.degrees.map(e => e._2).reduce(_+_)
@@ -166,89 +242,41 @@ object FastUnfolding {
     var newModularity = curModularity
     val vertexArray = graph.vertices.map(e => e._1.toLong).collect()
     val randomArray = generateRandomArray(vertexArray)
-
     var times = 0
 
     do{
       movement = 0
       curModularity = newModularity
-
       for (i <- 0 until randomArray.size) {
         val node = randomArray(i)
-        val nodeRdd = changeIntoRdd(node, node, sc).cache()
-        val oriComm = (nodeRdd.join(n2cRdd).collect())(0)._2._2
+        val oriComm = (n2cRdd.filter(e => e._1 == node).collect())(0)._2
+        val degree = (graph.degrees.filter(e => e._1.toLong == node).map(e => e._2).collect())(0).toLong
+        val totRddOri = totRdd
+        val inRddOri = inRdd
+        val n2cRddOri = n2cRdd
 
-        // update tot
-        val commDegreeRdd = nodeRdd.join(n2cRdd)
-          .join(graph.degrees)
-          .map(e => (e._2._1._2, e._2._2.toLong))
-
-        totRdd = totRdd.leftOuterJoin(commDegreeRdd).map{
-          e => (e._1, e._2._1 - e._2._2.getOrElse(0L))
-        }
-        // update in
-        val n2cRddTmp = n2cRdd.cache()
         // 记录每个neighbor所属的community
-        val neighCommRdd = generateNeighCommRdd(nodeRdd, graph, n2cRddTmp, sc).cache()
-        // 记录这个comm的weight总值
-        val commNeighRdd = nodeRdd.join(n2cRdd)
-          .map(e => (e._2._2, e._1))
-          .join(neighCommRdd)
-          .map(e => (e._1, e._2._2))
-        val commSelfLoopRdd = nodeRdd.join(selfLoopRdd)
-          .join(n2cRdd)
-          .map(e => (e._2._2, e._2._1._2))
-        inRdd = inRdd.leftOuterJoin(commNeighRdd).map{
-          e => (e._1, (e._2._1 - 2 * e._2._2.getOrElse(0L)))
-        }.leftOuterJoin(commSelfLoopRdd).map{
-          e => (e._1, (e._2._1 - e._2._2.getOrElse(0L)))
-        }
+        val neighCommRdd = generateNeighCommRdd(node, graph, n2cRddOri, sc).cache()
 
-        // update n2c
-        n2cRdd = n2cRdd.leftOuterJoin(nodeRdd).map{
-          e =>
-            if (e._2._2.getOrElse(-1L) != -1L)
-              (e._1, -1)
-            else
-              (e._1, e._2._1)
-        }
+        val (totRddRemove, inRddRemove, n2cRddRemove) = removeNode(totRddOri, inRddOri, n2cRddOri,
+                                                          neighCommRdd, selfLoopRdd, node, degree, sc)
 
-        val totRddTmp = totRdd
-        val nodeDegree = (nodeRdd.join(graph.degrees).collect())(0)._2._2.toLong
-        val bestComm = modularityGain(totRddTmp, neighCommRdd, oriComm, nodeDegree, totalDegree)
+        val bestComm = modularityGain(totRddRemove, neighCommRdd, oriComm, degree, totalDegree)
 
-        // update tot
-        val totInsertRdd = changeIntoRdd(bestComm, nodeDegree, sc)
-        totRdd = totRdd.leftOuterJoin(totInsertRdd).map{
-          e => (e._1, e._2._1 + e._2._2.getOrElse(0L))
-        }
-        // update in
-        val selfLoop = nodeRdd.join(selfLoopRdd).map(e => e._2._2).collect()(0)
-        val bestCommWeigh = neighCommRdd.filter(e => e._1 == bestComm).collect()(0)._2
-        val inChangeValue = 2 * bestCommWeigh + selfLoop
-        val inInsertRdd = changeIntoRdd(bestComm, inChangeValue, sc)
-        inRdd = inRdd.leftOuterJoin(inInsertRdd).map{
-          e => (e._1, e._2._1 + e._2._2.getOrElse(0L))
-        }
-        // update n2c
-        n2cRdd = n2cRdd.leftOuterJoin(nodeRdd).map{
-          e =>
-            if (e._2._2.getOrElse(-1L) != -1L)
-              (e._1, bestComm)
-            else
-              (e._1, e._2._1)
-        }
+        val (totRddInsert, inRddInsert, n2cRddInsert) = insertNode(totRddRemove, inRddRemove, n2cRddRemove,
+                                                            selfLoopRdd, neighCommRdd, bestComm, node, degree, sc)
+        totRdd = totRddInsert
+        inRdd = inRddInsert
+        n2cRdd = n2cRddInsert
 
         if (bestComm != oriComm) {
           movement += 1
         }
 
-        val tmpModularity = calcModularity(inRdd, totRdd, totalDegree)
-        println("change in modularity is " + (tmpModularity - curModularity)
-                + "\ttmp is " + tmpModularity + "\tcur is " + curModularity)
+        newModularity = calcModularity(inRdd, totRdd, totalDegree)
+        println("change in modularity is " + (newModularity - curModularity)
+          + "\tnew is " + newModularity + "\tcur is " + curModularity)
 
-        nodeRdd.unpersist()
-        n2cRddTmp.persist()
         neighCommRdd.unpersist()
       }
 
@@ -258,11 +286,9 @@ object FastUnfolding {
         improvement = true
 
       times += 1
-
     } while(movement > 0 && (newModularity - curModularity) > minChange && times < maxTimes)
 
     selfLoopRdd.unpersist()
-
     reGraphEdges(graph, n2cRdd)
   }
 
@@ -297,37 +323,23 @@ object FastUnfolding {
     return q
   }
 
-  def process[VD: ClassTag, ED: ClassTag](oriGraph: Graph[VD, ED],
-                                          sc: SparkContext,
-                                          maxTimes: Int = Integer.MAX_VALUE,
-                                          minChange: Double = 0.001,
-                                          maxIter: Int = Integer.MAX_VALUE) {
-
-    var edgeRdd = reCommunity(oriGraph, sc, maxTimes, minChange)
-
+  def process(edgeFile: String, partitionNum: Int, sc: SparkContext,
+              maxTimes: Int = Integer.MAX_VALUE,
+              minChange: Double = 0.001,
+              maxIter: Int = Integer.MAX_VALUE) {
     var current = 0
-    while(improvement && current < maxIter) {
-      val graph = Graph.fromEdgeTuples(edgeRdd, 1L).cache()
+    var edgeRdd = loadEdgeRdd(edgeFile, partitionNum, sc)
+
+    do{
+      val newEdgeRdd = edgeRdd.cache()
+      val graph = Graph.fromEdgeTuples(newEdgeRdd, 1L).cache()
       edgeRdd = reCommunity(graph, sc, maxTimes, minChange)
+      newEdgeRdd.unpersist()
+      graph.unpersistVertices()
       graph.edges.unpersist()
-      graph.vertices.unpersist()
       current += 1
-    }
-
-    /*
-        var current = 0
-        var graph = oriGraph.cache()
-        do{
-          val edgeRdd = reCommunity(graph, sc, maxTimes, minChange)
-          graph.vertices.unpersist()
-          graph.edges.unpersist()
-          graph = Graph.fromEdgeTuples(edgeRdd, 1L)
-    //      graph.cache()
-          current += 1
-        } while(improvement && current < maxTimes)
-    */
+    } while(improvement && current < maxTimes)
   }
-
 
   def main(args: Array[String]) {
     if (args.size < 3) {
@@ -342,8 +354,7 @@ object FastUnfolding {
     val partitionNum = args(2).toInt  // partition number
     val sc = new SparkContext(mode, "FastUnfolding")
 
-    val graph = initialization(input, partitionNum, sc)
-    process(graph, sc, 1, 0.001, 1)
+    process(input, partitionNum, sc, 1, 0.001, 1)
 
     println("FastUnfolding ends...")
   }
