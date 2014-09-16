@@ -25,10 +25,13 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.util.Random
 import scala.Array
+import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.conf.Configuration
 
 object FastUnfolding {
 
   var improvement = false
+  var communityRdd: RDD[(Long, Long)] = null
 
   def loadEdgeRdd(edgeFile: String, partitionNum: Int, sc: SparkContext): RDD[(Long, Long)] = {
     val edgeRdd = sc.textFile(edgeFile, partitionNum).flatMap {
@@ -269,6 +272,8 @@ object FastUnfolding {
         inRdd = inRddInsert
         n2cRdd = n2cRddInsert
 
+        updateCommunity(n2cRddInsert)
+
         if (bestComm != oriComm) {
           movement += 1
         }
@@ -323,6 +328,28 @@ object FastUnfolding {
     return q
   }
 
+  def updateCommunity(n2cRdd: RDD[(Long, Long)]) {
+    if (null == communityRdd) {
+      communityRdd = n2cRdd.cache()
+    } else {
+      val oldCommunityRdd = communityRdd
+      communityRdd = communityRdd.map(e => (e._2, e._1))
+        .join(n2cRdd)
+        .map(e => (e._2._1, e._2._2)).cache()
+      oldCommunityRdd.unpersist()
+    }
+  }
+
+  def outputCommunity(file: String) {
+    if (null == communityRdd) {
+      println("Community Rdd is empty.")
+      return
+    }
+    communityRdd.map{
+      e => (e._1 + "," + e._2)
+    }.saveAsTextFile(file)
+  }
+
   def process(edgeFile: String, partitionNum: Int, sc: SparkContext,
               maxTimes: Int = Integer.MAX_VALUE,
               minChange: Double = 0.001,
@@ -342,7 +369,7 @@ object FastUnfolding {
   }
 
   def main(args: Array[String]) {
-    if (args.size < 3) {
+    if (args.size < 4) {
       println("ERROR INPUT!")
       return
     }
@@ -352,10 +379,18 @@ object FastUnfolding {
     val mode = args(0)  // "local" or yarn-standalone
     val input = args(1) // input file of edge information
     val partitionNum = args(2).toInt  // partition number
+    val output = args(3)  // output file path
+
+    val fs = FileSystem.get(new Configuration())
+    if (fs.exists(new Path(args(3)))) fs.delete(new Path(args(3)), true)
+
     val sc = new SparkContext(mode, "FastUnfolding")
 
     process(input, partitionNum, sc, 1, 0.001, 1)
 
+    outputCommunity(output)
+
     println("FastUnfolding ends...")
   }
 }
+
