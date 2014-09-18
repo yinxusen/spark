@@ -25,6 +25,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import org.apache.hadoop.fs.{Path, FileSystem}
 import org.apache.hadoop.conf.Configuration
+import org.apache.log4j.{Level, Logger}
 
 object FastUnfolding {
 
@@ -74,9 +75,13 @@ object FastUnfolding {
    * Calculate the self loop numbers for every vertex in graph.
    */
   def generateSelfLoopRdd[VD: ClassTag, ED: ClassTag](graph: Graph[VD, ED]): RDD[(Long, Long)] = {
-    graph.edges
+    val firstPart = graph.edges
       .map(e => if (e.srcId == e.dstId) (e.srcId, 1L) else (e.srcId, 0L))
-      .reduceByKey(_ + _)
+
+    val secondPart = graph.edges
+      .map(e => if (e.srcId == e.dstId) (e.srcId, 0L) else (e.dstId, 0L))
+
+    (firstPart ++ secondPart).reduceByKey(_ + _)
   }
 
   /**
@@ -356,7 +361,7 @@ object FastUnfolding {
         }
 
         newModularity = calcModularity(inRdd, totRdd, totalDegree)
-        println("change in modularity is " + (newModularity - curModularity)
+        println("times: " + times + "\ti: " + i + "\tchange in modularity is " + (newModularity - curModularity)
           + "\tnew is " + newModularity + "\tcur is " + curModularity)
 
         neighCommRdd.unpersist()
@@ -491,6 +496,8 @@ object FastUnfolding {
     println("FastUnfolding begins...")
 
     val mode = args(0)  // "local" or yarn-standalone
+    if(mode.startsWith("local"))
+      Logger.getRootLogger.setLevel(Level.OFF)
     val input = args(1) // input file of edge information
     val partitionNum = args(2).toInt  // partition number
     val output = args(3)  // output file path
@@ -500,7 +507,7 @@ object FastUnfolding {
 
     val sc = new SparkContext(mode, "FastUnfolding")
 
-    process(input, partitionNum, sc, 1, 0.001, 1)
+    process(input, partitionNum, sc, 3, 0.001, 3)
 
     outputCommunity(output)
 
