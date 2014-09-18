@@ -32,13 +32,13 @@ object FastUnfolding {
   var communityRdd: RDD[(Long, Long)] = null
 
   /**
-   * Comments on every function to illustrate the functionality.
+   * Load edges from file.
    */
   def loadEdgeRdd(edgeFile: String, partitionNum: Int, sc: SparkContext): RDD[(Long, Long)] = {
     val edgeRdd = sc.textFile(edgeFile, partitionNum).flatMap {
       case (line) =>
         val arr = ArrayBuffer[(Long, Long)]()
-        val regex = ","
+        val regex = " "
         val ss = line.split(regex)
         if (ss.size >= 2) {
           val src = ss(0).toLong
@@ -50,6 +50,9 @@ object FastUnfolding {
     edgeRdd
   }
 
+  /**
+   * Generate a random array from the original vertex array.
+   */
   def generateRandomArray[T:ClassTag](oriArray: Array[T]): Array[T] = {
     val size = oriArray.size
     val result = new Array[T](size)
@@ -67,12 +70,22 @@ object FastUnfolding {
     result
   }
 
+  /**
+   * Calculate the self loop numbers for every vertex in graph.
+   */
   def generateSelfLoopRdd[VD: ClassTag, ED: ClassTag](graph: Graph[VD, ED]): RDD[(Long, Long)] = {
     graph.edges
       .map(e => if (e.srcId == e.dstId) (e.srcId, 1L) else (e.srcId, 0L))
       .reduceByKey(_ + _)
   }
 
+  /**
+   * Generate an one row RDD with a number pair <value1, value2>.
+   * @param value1 the first value of the row in the RDD
+   * @param value2 the second value of the row in the RDD
+   * @param sc current Spark context
+   * @return
+   */
   def changeIntoRdd(
       value1: Long,
       value2: Long,
@@ -82,6 +95,11 @@ object FastUnfolding {
     resultRdd
   }
 
+  /**
+   * Generate an multi-edge RDD from a graph.
+   * For example, original edge contains (a,b), this function will return
+   * two pairs (a,b),(b,a).
+   */
   def loadMultiEdgeRdd[VD: ClassTag, ED: ClassTag](graph: Graph[VD,ED]): RDD[(Long, Long)] = {
     val edgeRdd = graph.edges
       .filter(e => e.srcId != e.dstId)
@@ -90,6 +108,20 @@ object FastUnfolding {
     edgeRdd
   }
 
+  /**
+   * Calculate the total degree for a specified node's all neighbor communities.
+   * The first value in the RDD represents a neighbor community's id,
+   * and the second value represents the total degree for this community.
+   * @param node the specified node id
+   * @param graph the original graph
+   * @param n2cRdd the RDD represensts current community of each node.
+   *               The first value represents node id,
+   *               and the second value represents its community id.
+   * @param sc current Spark context
+   * @tparam VD
+   * @tparam ED
+   * @return
+   */
   def generateNeighCommRdd[VD: ClassTag, ED: ClassTag](
       node: Long,
       graph: Graph[VD,ED],
@@ -118,15 +150,25 @@ object FastUnfolding {
     neighCommRdd
   }
 
+  /**
+   * Calculate the modularity change after we add a node to
+   * a specified community.
+   * @param totRdd the sum of degrees of links incident to each node in its community
+   * @param neighCommRdd the sum of degrees of current node's every neighbor community
+   * @param comm we will add current node to this community
+   * @param nodeDegree degree of current node
+   * @param totalDegree total degree of the graph
+   * @return
+   */
   def modularityGain(
       totRdd: RDD[(Long, Long)],
       neighCommRdd: RDD[(Long, Long)],
-      oriComm: Long,
+      comm: Long,
       nodeDegree: Long,
       totalDegree: Double): Long = {
 
     var bestIncrease = 0.0
-    var bestComm = oriComm
+    var bestComm = comm
 
     val commWeighTotArray = neighCommRdd.join(totRdd).collect()
 
@@ -144,6 +186,18 @@ object FastUnfolding {
     bestComm
   }
 
+  /**
+   * Remove a node from its current community.
+   * @param totRdd the sum of degrees of links incident to each node in its community
+   * @param inRdd the sum of the degrees of links inside each community
+   * @param n2cRdd it represensts current community of each node
+   * @param neighCommRdd the sum of degrees of current node's every neighbor community
+   * @param selfLoopRdd the number of each node's self loop
+   * @param node id of the specified node
+   * @param degree degree of the specified node
+   * @param sc current Spark context
+   * @return
+   */
   def removeNode(
       totRdd: RDD[(Long, Long)],
       inRdd: RDD[(Long, Long)],
@@ -164,7 +218,6 @@ object FastUnfolding {
     }
 
     // update in
-    // 记录这个comm的weight总值
     val commNeighRdd = n2cRdd.filter(e => e._1 == node)
       .map(e => (e._2, e._1))
       .join(neighCommRdd)
@@ -191,6 +244,19 @@ object FastUnfolding {
     (totRddUpdate, inRddUpdate, n2cRddUpdate)
   }
 
+  /**
+   * Insert a node into a specified community.
+   * @param totRdd the sum of degrees of links incident to each node in its community
+   * @param inRdd the sum of the degrees of links inside each community
+   * @param n2cRdd it represents current community of each node
+   * @param selfLoopRdd the number of each node's self loop
+   * @param neighCommRdd the sum of degrees of current node's every neighbor community
+   * @param bestComm the specified community to insert current node
+   * @param node id of the specified node
+   * @param degree degree of the specified node
+   * @param sc current Spark context
+   * @return
+   */
   def insertNode(
       totRdd: RDD[(Long, Long)],
       inRdd: RDD[(Long, Long)],
@@ -227,6 +293,16 @@ object FastUnfolding {
     (totRddUpdate, inRddUpdate, n2cRddUpdate)
   }
 
+  /**
+   * Try to reassign each node to its neighbor community.
+   * @param graph the original graph
+   * @param sc current Spark context
+   * @param maxTimes maximum times for total iterations
+   * @param minChange minimum change, iterations stops if change less than this value
+   * @tparam VD
+   * @tparam ED
+   * @return
+   */
   def reCommunity[VD: ClassTag, ED: ClassTag](
        graph: Graph[VD, ED],
        sc: SparkContext,
@@ -258,7 +334,6 @@ object FastUnfolding {
         val inRddOri = inRdd
         val n2cRddOri = n2cRdd
 
-        // 记录每个neighbor所属的community
         val neighCommRdd = generateNeighCommRdd(node, graph, n2cRddOri, sc).cache()
 
         val (totRddRemove, inRddRemove, n2cRddRemove) =
@@ -299,6 +374,14 @@ object FastUnfolding {
     reGraphEdges(graph, n2cRdd)
   }
 
+  /**
+   * Generate a new edge rdd, according to graph.
+   * @param graph the original graph
+   * @param n2cRdd it represents current community of each node
+   * @tparam VD
+   * @tparam ED
+   * @return
+   */
   def reGraphEdges[VD: ClassTag, ED: ClassTag](
       graph: Graph[VD,ED],
       n2cRdd: RDD[(Long, Long)]): RDD[(Long, Long)] = {
@@ -318,6 +401,13 @@ object FastUnfolding {
     newEdgeRdd
   }
 
+  /**
+   * Calculate modularity of current community assignment.
+   * @param inRdd the sum of the degrees of links inside each community
+   * @param totRdd the sum of degrees of links incident to each node in its community
+   * @param totalDegree total degree of the graph
+   * @return
+   */
   def calcModularity(
       inRdd: RDD[(Long, Long)],
       totRdd: RDD[(Long, Long)],
@@ -331,6 +421,10 @@ object FastUnfolding {
       }.reduce(_ + _)
   }
 
+  /**
+   * Update each node's community information.
+   * @param n2cRdd it represents current community of each node
+   */
   def updateCommunity(n2cRdd: RDD[(Long, Long)]) {
     if (null == communityRdd) {
       communityRdd = n2cRdd.cache()
@@ -343,6 +437,10 @@ object FastUnfolding {
     }
   }
 
+  /**
+   * Output the community assignment into file.
+   * @param file output file
+   */
   def outputCommunity(file: String) {
     if (null == communityRdd) {
       println("Community Rdd is empty.")
@@ -353,6 +451,15 @@ object FastUnfolding {
     }.saveAsTextFile(file)
   }
 
+  /**
+   * Construct graph from input edge file, and finish the community assignment task.
+   * @param edgeFile source file of edge information
+   * @param partitionNum partition number
+   * @param sc current Spark context
+   * @param maxTimes maximum times for total iterations
+   * @param minChange minimum change, iterations stops if change less than this value
+   * @param maxIter maximum times for "pass"
+   */
   def process(
       edgeFile: String,
       partitionNum: Int,
