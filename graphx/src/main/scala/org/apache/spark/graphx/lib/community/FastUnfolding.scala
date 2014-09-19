@@ -31,8 +31,17 @@ object FastUnfolding {
 
   var improvement = false
   var communityRdd: RDD[(Long, Long)] = null
+  /**
+   * the sum of degrees of links incident to each node in its community
+   */
   var totRdd: RDD[(Long, Long)] = null
+  /**
+   * the sum of the degrees of links inside each community
+   */
   var inRdd: RDD[(Long, Long)] = null
+  /**
+   * represents current community of each node
+   */
   var n2cRdd: RDD[(Long, Long)] = null
 
   /**
@@ -122,9 +131,6 @@ object FastUnfolding {
    * and the second value represents the total degree for this community.
    * @param node the specified node id
    * @param graph the original graph
-   * @param n2cRdd the RDD represensts current community of each node.
-   *               The first value represents node id,
-   *               and the second value represents its community id.
    * @param sc current Spark context
    * @tparam VD
    * @tparam ED
@@ -133,7 +139,6 @@ object FastUnfolding {
   def generateNeighCommRdd[VD: ClassTag, ED: ClassTag](
       node: Long,
       graph: Graph[VD,ED],
-      n2cRdd: RDD[(Long, Long)],
       sc: SparkContext): RDD[(Long,Long)] = {
 
     val edgeRdd = loadMultiEdgeRdd(graph)
@@ -168,7 +173,6 @@ object FastUnfolding {
    * @return
    */
   def modularityGain(
-      totRdd: RDD[(Long, Long)],
       neighCommRdd: RDD[(Long, Long)],
       comm: Long,
       nodeDegree: Long,
@@ -219,7 +223,6 @@ object FastUnfolding {
 
   /**
    * In remove step, update inRdd
-   * @return
    */
   def removeNodeIn(neighCommRdd: RDD[(Long, Long)],selfLoopRdd: RDD[(Long, Long)], node: Long) = {
     val commNeighRdd = n2cRdd.filter(e => e._1 == node)
@@ -291,10 +294,6 @@ object FastUnfolding {
 
   /**
    * In insert step, update totRdd
-   * @param bestComm
-   * @param degree
-   * @param sc
-   * @return
    */
   def insertNodeTot(
       bestComm: Long,
@@ -443,10 +442,10 @@ object FastUnfolding {
    * @return
    */
   def reCommunity[VD: ClassTag, ED: ClassTag](
-                                               graph: Graph[VD, ED],
-                                               sc: SparkContext,
-                                               maxIters: Int = Int.MaxValue,
-                                               minChange: Double = 0.01): RDD[(Long,Long)] = {
+      graph: Graph[VD, ED],
+      sc: SparkContext,
+      maxIters: Int = Int.MaxValue,
+      minChange: Double = 0.01): RDD[(Long,Long)] = {
 
     n2cRdd = graph.vertices.map(e => (e._1.toLong, e._1.toLong))
     val selfLoopRdd = generateSelfLoopRdd(graph).cache()
@@ -566,7 +565,7 @@ object FastUnfolding {
   }
 
   /**
-   * Calculation current modulairty
+   * Calculation of current modularity
    */
   def calcCurrentModularity(edgeRdd: RDD[(Long, Long)]): Double = {
     if (null == communityRdd)
