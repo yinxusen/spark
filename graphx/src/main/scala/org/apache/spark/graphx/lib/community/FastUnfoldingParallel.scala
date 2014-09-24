@@ -64,6 +64,9 @@ object FastUnfoldingParallel {
   var improvement = false
   var communityResult: RDD[(Long, Long)] = null
   var graphEdges: RDD[(Long, Long)] = null
+  var graphEdgesWeight: RDD[((Long, Long), Int)] = null
+  var graphDegrees: RDD[(Long, Int)] = null
+  var totalDegree: Double = 0.0
   val rand: Random = new Random()
 
   /**
@@ -137,9 +140,8 @@ object FastUnfoldingParallel {
     val degree = array(0).degree
     val oriCommunity = array(0).neighCommunity
 
-    if (rand.nextDouble() > 0.2)
+    if (rand.nextDouble() > 0.8)
       return oriCommunity
-
 
     val insideWeightMap = new mutable.HashMap[Long, Long]
     val outsideWeightMap = new mutable.HashMap[Long, Long]
@@ -147,7 +149,7 @@ object FastUnfoldingParallel {
       val vertexData = array(i)
       val community = vertexData.community
       val preValue = insideWeightMap.getOrElse(community, 0L)
-      // TODO 这里的计算方式不一样，paper里面的表述，和源码里的描述不一样
+      // TODO 这里的计算方式不一样，paper里面的表述和源码里的描述不一样
       insideWeightMap.put(community, preValue + 1L)
       outsideWeightMap.put(community, vertexData.communityWeight)
     }
@@ -174,22 +176,6 @@ object FastUnfoldingParallel {
     }
 
     bestCommunity
-  }
-
-  /**
-   * Calculate modularity of current community assignment.
-   * @param totalDegree total degree of the graph
-   * @return
-   */
-  def calcModularity(totalDegree: Double): Double = {
-    //    inRdd.join(totRdd)
-    //      .filter(e => e._2._2 > 0)
-    //      .map{ e =>
-    //      val inValue = e._2._1.toDouble
-    //      val totValue = e._2._2.toDouble
-    //      inValue / totalDegree - Math.pow(totValue / totalDegree, 2)
-    //    }.reduce(_ + _)
-    0.0
   }
 
   def edgeMapFunc[ED: ClassTag](et: EdgeTriplet[VertexData, ED]): Iterator[(VertexId, Array[VertexData])] = {
@@ -221,22 +207,23 @@ object FastUnfoldingParallel {
    * @return
    */
   def reCommunityParallel[VD: ClassTag, ED: ClassTag](
-      graph: Graph[VD, ED],
-      sc: SparkContext,
-      maxIters: Int = Int.MaxValue,
-      minChange: Double = 0.01): RDD[(Long,Long)] = {
+                                                       graph: Graph[VD, ED],
+                                                       sc: SparkContext,
+                                                       maxIters: Int = Int.MaxValue,
+                                                       minChange: Double = 0.01): RDD[(Long,Long)] = {
 
     println("reCommunityParallel...")
     var iters = 0
     val totalDegree = graph.degrees.map(_._2).sum()
 
     var newGraph = generateInitGraph(graph).cache()
-    var curModularity = calcModularity(totalDegree)
-    var newModularity = curModularity
+    // TODO 这两个变量应该用在迭代终止条件上
+    //    var curModularity = calcModularity(totalDegree)
+    //    var newModularity = curModularity
     var currentCommunity: RDD[(Long, Long)] = null
 
     do {
-      curModularity = newModularity
+      //      curModularity = newModularity
 
       val vertexRdd = newGraph.mapReduceTriplets[Array[VertexData]](edgeMapFunc, _ ++ _)
 
@@ -276,8 +263,12 @@ object FastUnfoldingParallel {
       }
       currentCommunity = idCommunity.map(e => (e._1.toLong, e._2)).cache()
       println("---iters: " + iters + "currentCommunity count" + currentCommunity.count())
+
       iters += 1
 
+      idCommunity.unpersist()
+
+      // TODO 算法终止条件需要再考虑
       //    } while((newModularity - curModularity) > minChange && iters < maxIters)
     } while(iters < maxIters)
 
@@ -332,8 +323,6 @@ object FastUnfoldingParallel {
     }.saveAsTextFile(file)
   }
 
-
-
   /**
    * Generate a new edge rdd, according to graph.
    * @param graph the original graph
@@ -364,19 +353,20 @@ object FastUnfoldingParallel {
   }
 
   /**
-   * Calculation of current modularity
+   * Calculation of current modularity (original version, not capable for large network)
    */
-  def calcCurrentModularity(): Double = {
+  def calcCurrentModularityOri(): Double = {
     if (null == communityResult || null == graphEdges)
       return 0.0
 
-    println("calcCurrentModularity... communityResult " + communityResult.count())
+    val reverseRdd = communityResult.map(e => (e._2, e._1)).cache()
 
-    val reverseCommunityRdd = communityResult.map(e => (e._2, e._1)).cache()
+    println("calcCurrentModularity... reverseCommunityRdd " + reverseRdd.count())
 
-    println("calcCurrentModularity... reverseCommunityRdd " + reverseCommunityRdd.count())
+    val commEdgeRawRdd = reverseRdd.join(reverseRdd).cache()
+    println("calcCurrentModularity... commEdgeRawRdd " + commEdgeRawRdd.count())
 
-    val commEdgeRdd = reverseCommunityRdd.join(reverseCommunityRdd).map{
+    val commEdgeRdd = commEdgeRawRdd.map{
       case(community, (srcId, dstId)) =>
         if (srcId < dstId)
           ((srcId, dstId), community)
@@ -386,8 +376,9 @@ object FastUnfoldingParallel {
 
     println("calcCurrentModularity... commEdgeRdd " + commEdgeRdd.count())
 
-    val edgeCountRdd = graphEdges.map(e => (e, 1)).reduceByKey(_ + _).cache()
+    commEdgeRawRdd.unpersist()
 
+    val edgeCountRdd = graphEdges.map(e => (e, 1)).reduceByKey(_ + _).cache()
 
     println("calcCurrentModularity... edgeCountRdd " + edgeCountRdd.count())
 
@@ -401,39 +392,190 @@ object FastUnfoldingParallel {
     edgeCountRdd.unpersist()
     commEdgeRdd.unpersist()
 
-    if (commEdgeWeightRddCount == 0)
+    var result = 0.0
+
+    if (commEdgeWeightRddCount != 0) {
+
+      val partResult = commEdgeWeightRdd.join(graphEdgesWeight)
+        .map{
+        case (edge, (weight, degree)) => weight.toDouble - degree.toDouble / totalDegree
+      }
+        .reduce(_ + _)
+      result += partResult
+      println("calcCurrentModularity... result " + result + "\tpart " + partResult + "\ttotaldegree " + totalDegree)
+    }
+    commEdgeWeightRdd.unpersist()
+    reverseRdd.unpersist()
+
+    result / totalDegree
+  }
+
+  /**
+   * Calculation of current modularity (updated version)
+   */
+  def calcCurrentModularity(): Double = {
+    if (null == communityResult || null == graphEdges)
       return 0.0
 
+    val partEdgeWithCommunity = graphEdges.join(communityResult).map{
+      case (srcId, (dstId, srcComm)) => (dstId, srcComm)
+    }
 
+    val icEdgeCount = partEdgeWithCommunity.join(communityResult).filter{
+      case (dstId, (srcComm, dstComm)) => srcComm == dstComm
+    }.map{
+      case (dstId, (srcComm, dstComm)) => (srcComm, 1)
+    }
+
+    val icEdge = icEdgeCount.groupBy(e => e._1).map(e => (e._1, e._2.size)).cache()
+
+    println("calcCurrentModularity... icEdge " + icEdge.count())
+
+    val dcDegree = graphDegrees.join(communityResult).map{
+      case (vid, (degree, community)) => (community, degree)
+    }.reduceByKey(_ + _).cache()
+
+    println("calcCurrentModularity... dcDegree " + dcDegree.count())
+
+    val resultRdd = icEdge.join(dcDegree).cache()
+
+    println("calcCurrentModularity... resultRdd " + resultRdd.count())
+
+    val currentDegree = totalDegree
+
+    val result = resultRdd.map{
+      case (community, (ic, dc)) => 2 * ic.toDouble / currentDegree - Math.pow(dc.toDouble / currentDegree, 2)
+    }.sum()
+
+    println("calcCurrentModularity... result " + result)
+
+    resultRdd.unpersist()
+    dcDegree.unpersist()
+    icEdge.unpersist()
+
+    result
+  }
+
+  /**
+   * Calculation of current modularity (step-by-step of original version)
+   */
+  def calcCurrentModularityStepByStep(): Double = {
+    if (null == communityResult || null == graphEdges)
+      return 0.0
+
+    println("calcCurrentModularity... communityResult " + communityResult.count())
+
+    val reverseRdd = communityResult.map(e => (e._2, e._1)).cache()
+
+    println("calcCurrentModularity... reverseCommunityRdd " + reverseRdd.count())
+
+    val partition = 100
+    var result = 0.0
+
+    for (i <- 0 to partition) {
+
+      println("******* iter : " + i)
+
+      val partReverseRdd = reverseRdd.filter(e => e._1 % partition == i).cache()
+
+      val partCount = partReverseRdd.count()
+      println("calcCurrentModularity... partReverseRdd " + partCount)
+
+      if (partCount == 0) {
+        partReverseRdd.unpersist()
+      } else {
+
+        val commEdgeRawRdd = partReverseRdd.join(partReverseRdd).cache()
+        println("calcCurrentModularity... commEdgeRawRdd " + commEdgeRawRdd.count())
+
+        partReverseRdd.unpersist()
+
+        val commEdgeRdd = commEdgeRawRdd.map{
+          case(community, (srcId, dstId)) =>
+            if (srcId < dstId)
+              ((srcId, dstId), community)
+            else
+              ((dstId, srcId), community)
+        }.distinct().cache()
+
+        println("calcCurrentModularity... commEdgeRdd " + commEdgeRdd.count())
+
+        commEdgeRawRdd.unpersist()
+
+        val edgeCountRdd = graphEdges.map(e => (e, 1)).reduceByKey(_ + _).cache()
+
+        println("calcCurrentModularity... edgeCountRdd " + edgeCountRdd.count())
+
+        val commEdgeWeightRdd = commEdgeRdd.join(edgeCountRdd).map{
+          case (edge, (community, count)) => (edge, count)
+        }.cache()
+
+        val commEdgeWeightRddCount = commEdgeWeightRdd.count()
+        println("calcCurrentModularity... commEdgeWeightRdd " + commEdgeWeightRddCount)
+
+        edgeCountRdd.unpersist()
+        commEdgeRdd.unpersist()
+
+        if (commEdgeWeightRddCount != 0) {
+
+          val partResult = commEdgeWeightRdd.join(graphEdgesWeight)
+            .map{
+            case (edge, (weight, degree)) => weight.toDouble - degree.toDouble / totalDegree
+          }
+            .reduce(_ + _)
+
+          result += partResult
+
+          println("calcCurrentModularity... result " + result + "\tpart " + partResult + "\ttotaldegree " + totalDegree)
+        }
+        commEdgeWeightRdd.unpersist()
+      }
+
+    }
+
+    reverseRdd.unpersist()
+
+    result / totalDegree
+  }
+
+  /**
+   * Initialization for graphDegree,graphEdges and graphEdgesWeight
+   * @param edgeFile
+   * @param partitionNum
+   * @param sc
+   */
+  def initialization(
+                      edgeFile: String,
+                      partitionNum: Int,
+                      sc: SparkContext) {
+
+    graphEdges = loadEdgeRdd(edgeFile, partitionNum, sc).cache()
+    println("graphEdges count " + graphEdges.count())
     val graph = Graph.fromEdgeTuples(graphEdges, 1L)
-    val degreeRdd = graph.degrees.map(e => (e._1.toLong, e._2.toLong))
-    val totalDegree = graph.degrees.map(e => e._2).sum()
+    graphDegrees = graph.degrees.cache()
+    graphDegrees.count()
+    totalDegree = graphDegrees.map(e => e._2).sum()
 
-    val edgeWeightRdd = graphEdges.distinct()
-      .join(degreeRdd)
+    val graphEgdesWithDegree = graphEdges.distinct()
+      .join(graphDegrees)
       .map{
       case (srcId, (dstId, srcDegree)) => (dstId, (srcId, srcDegree))
-    }
-      .join(degreeRdd)
+    }.cache()
+
+    graphEgdesWithDegree.count()
+
+    graphEdgesWeight = graphEgdesWithDegree.join(graphDegrees)
       .map{
       case (dstId, ((srcId, srcDegree), dstDegree)) =>
         if (dstId < srcId)
           ((dstId, srcId), srcDegree * dstDegree)
         else
           ((srcId, dstId), srcDegree * dstDegree)
-    }
+    }.cache()
 
-    val result = commEdgeWeightRdd.join(edgeWeightRdd)
-      .map{
-      case (edge, (weight, degree)) => weight.toDouble - degree.toDouble / totalDegree
-    }
-      .reduce(_ + _)
+    println("graphEdgesWeight count" + graphEdgesWeight.count())
 
-    println("calcCurrentModularity... result " + result + "\ttotaldegree " + totalDegree)
-
-    commEdgeWeightRdd.unpersist()
-
-    result / totalDegree
+    graphEgdesWithDegree.unpersist()
   }
 
   /**
@@ -453,8 +595,9 @@ object FastUnfoldingParallel {
                minChange: Double = 0.001,
                maxIters: Int = Integer.MAX_VALUE) {
 
+    initialization(edgeFile, partitionNum, sc)
+
     var current = 0
-    graphEdges = loadEdgeRdd(edgeFile, partitionNum, sc).cache()
     var edgeRdd = loadEdgeRdd(edgeFile, partitionNum, sc)
 
     do{
@@ -473,5 +616,7 @@ object FastUnfoldingParallel {
     } while(improvement && current < maxProcessTimes)
 
     graphEdges.unpersist()
+    graphEdgesWeight.unpersist()
+    graphDegrees.unpersist()
   }
 }
