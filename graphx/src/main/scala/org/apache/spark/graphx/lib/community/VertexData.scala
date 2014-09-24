@@ -19,10 +19,9 @@ package org.apache.spark.graphx.lib.community
 
 class VertexData() extends Serializable{
   var degree: Long = 0
-  var selfLoop: Long = 0
   var community: Long = 0
   var communityWeight: Long =  -1
-  var neighDegree: Long = 0;
+  var neighDegree: Long = 0
   var neighCommunity: Long = -1
   var neighCommunityWeight: Long = -1
 
@@ -34,7 +33,6 @@ class VertexData() extends Serializable{
   def this(other: VertexData) {
     this()
     degree = other.degree
-    selfLoop = other.selfLoop
     community = other.community
     communityWeight = other.communityWeight
     neighDegree = other.neighDegree
@@ -45,24 +43,19 @@ class VertexData() extends Serializable{
   def setDegreeAndCommWeight(degreeValue: Long): VertexData = {
     degree = degreeValue
     communityWeight = degreeValue
-    this
+    new VertexData(this)
   }
 
   def setCommAndCommWeight(commValue: Long, commWeightValue: Long): VertexData = {
     community = commValue
     communityWeight = commWeightValue
-    this
+    new VertexData(this)
   }
 
   def setNeighbor(degreeValue: Long, commValue: Long, commWeightValue: Long): VertexData = {
     neighDegree = degreeValue
     neighCommunity = commValue
     neighCommunityWeight = commWeightValue
-    this
-  }
-
-  def setSelfLoop(selfLoopValue: Long): VertexData = {
-    selfLoop = selfLoopValue
-    this
+    new VertexData(this)
   }
 }

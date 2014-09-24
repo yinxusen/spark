@@ -93,19 +93,6 @@ object FastUnfoldingParallel {
   }
 
   /**
-   * Calculate the self loop numbers for every vertex in graph.
-   */
-  def generateSelfLoopRdd[VD: ClassTag, ED: ClassTag](graph: Graph[VD, ED]): RDD[(Long, Long)] = {
-    val firstPart = graph.edges
-      .map(e => if (e.srcId == e.dstId) (e.srcId, 1L) else (e.srcId, 0L))
-
-    val secondPart = graph.edges
-      .map(e => if (e.srcId == e.dstId) (e.srcId, 0L) else (e.dstId, 0L))
-
-    (firstPart ++ secondPart).reduceByKey(_ + _)
-  }
-
-  /**
    * Generate a new graph with VertexData
    * @param graph original graph
    * @tparam VD
@@ -114,13 +101,9 @@ object FastUnfoldingParallel {
    */
   def generateInitGraph[VD: ClassTag, ED: ClassTag](graph: Graph[VD, ED]): Graph[VertexData, ED] = {
 
-    val selfLoopRdd = generateSelfLoopRdd(graph)
-
     val newGraph = graph.mapVertices[VertexData]((vid, vd) => new VertexData(vid.toLong))
       .joinVertices(graph.degrees){
       case (vid, vertexData, degree) => vertexData.setDegreeAndCommWeight(degree)
-    }.joinVertices(selfLoopRdd){
-      case (vid, vertexData, selfLoop) => vertexData.setSelfLoop(selfLoop)
     }
 
     newGraph
@@ -168,7 +151,7 @@ object FastUnfoldingParallel {
       val key = iter.next()
       val insideWeight = insideWeightMap.get(key).getOrElse(0L).toDouble
       val outsideWeight = outsideWeightMap.get(key).getOrElse(0L).toDouble
-      val gain = insideWeight - degree * outsideWeight / totalDegree
+      val gain = insideWeight - 2 * degree * outsideWeight / totalDegree
       if (gain > bestGain) {
         bestGain = gain
         bestCommunity = key
@@ -214,7 +197,7 @@ object FastUnfoldingParallel {
 
     println("reCommunityParallel...")
     var iters = 0
-    val totalDegree = graph.degrees.map(_._2).sum()
+    val curDegree = totalDegree
 
     var newGraph = generateInitGraph(graph).cache()
     // TODO 这两个变量应该用在迭代终止条件上
@@ -225,10 +208,12 @@ object FastUnfoldingParallel {
     do {
       //      curModularity = newModularity
 
-      val vertexRdd = newGraph.mapReduceTriplets[Array[VertexData]](edgeMapFunc, _ ++ _)
+      val vertexRdd = newGraph.mapReduceTriplets[Array[VertexData]](edgeMapFunc, _ ++ _).cache()
+
+      println("vertexRdd count " + vertexRdd.count())
 
       val idCommunity = vertexRdd.map{
-        case (vid, vdArray) => (vid, getBestCommunity(vdArray, totalDegree))
+        case (vid, vdArray) => (vid, getBestCommunity(vdArray, curDegree))
       }.cache()
 
       println("---iters: " + iters + "idcommunity count" + idCommunity.count())
@@ -266,6 +251,7 @@ object FastUnfoldingParallel {
 
       iters += 1
 
+      vertexRdd.unpersist()
       idCommunity.unpersist()
 
       // TODO 算法终止条件需要再考虑
@@ -544,10 +530,9 @@ object FastUnfoldingParallel {
    * @param partitionNum
    * @param sc
    */
-  def initialization(
-                      edgeFile: String,
-                      partitionNum: Int,
-                      sc: SparkContext) {
+  def initialization(edgeFile: String,
+                     partitionNum: Int,
+                     sc: SparkContext) {
 
     graphEdges = loadEdgeRdd(edgeFile, partitionNum, sc).cache()
     println("graphEdges count " + graphEdges.count())
