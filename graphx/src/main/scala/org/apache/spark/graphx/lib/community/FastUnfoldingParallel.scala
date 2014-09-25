@@ -54,9 +54,9 @@ object FastUnfoldingParallel {
 
     val sc = new SparkContext(mode, "FastUnfolding")
 
-    process(input, partitionNum, sc, maxProcessTimes, minChange, maxIters)
+    val result = process(input, partitionNum, sc, maxProcessTimes, minChange, maxIters)
 
-    outputCommunity(output)
+    outputCommunity(output, result)
 
     println("FastUnfolding ends...")
   }
@@ -68,6 +68,7 @@ object FastUnfoldingParallel {
   var graphDegrees: RDD[(Long, Int)] = null
   var totalDegree: Double = 0.0
   val rand: Random = new Random()
+  var bestModularity: Double = 0.0
 
   /**
    * Load edges from file.
@@ -123,8 +124,8 @@ object FastUnfoldingParallel {
     val degree = array(0).degree
     val oriCommunity = array(0).neighCommunity
 
-    if (rand.nextDouble() > 0.8)
-      return oriCommunity
+    //    if (rand.nextDouble() > 0.8)
+    //      return oriCommunity
 
     val insideWeightMap = new mutable.HashMap[Long, Long]
     val outsideWeightMap = new mutable.HashMap[Long, Long]
@@ -200,34 +201,33 @@ object FastUnfoldingParallel {
     val curDegree = totalDegree
 
     var newGraph = generateInitGraph(graph).cache()
-    // TODO 这两个变量应该用在迭代终止条件上
-    //    var curModularity = calcModularity(totalDegree)
-    //    var newModularity = curModularity
     var currentCommunity: RDD[(Long, Long)] = null
 
     do {
-      //      curModularity = newModularity
-
       val vertexRdd = newGraph.mapReduceTriplets[Array[VertexData]](edgeMapFunc, _ ++ _).cache()
 
-      println("vertexRdd count " + vertexRdd.count())
+      println("---iters: " + iters + "\tvertexRdd count:" + vertexRdd.count())
 
       val idCommunity = vertexRdd.map{
         case (vid, vdArray) => (vid, getBestCommunity(vdArray, curDegree))
       }.cache()
 
-      println("---iters: " + iters + "idcommunity count" + idCommunity.count())
+      println("---iters: " + iters + "\tidcommunity count:" + idCommunity.count())
 
       val commWeightTmp = idCommunity.join(newGraph.degrees).map{
         case (vid, (community, degree)) => (community, degree.toLong)
       }
 
-      val commWeight = commWeightTmp.reduceByKey(_ + _)
+      val commWeight = commWeightTmp.reduceByKey(_ + _).cache()
+      println("---iters: " + iters + "\tcommWeight count:" + commWeight.count())
 
       val reverseIdCommunity = idCommunity.map(e => (e._2, e._1))
       val updateMessage = reverseIdCommunity.leftOuterJoin(commWeight).map{
         case (community, (vid, weight)) => (vid, (community, weight.getOrElse(0L)))
-      }
+      }.cache()
+
+
+      println("---iters: " + iters + "\tupdateMessage count:" + updateMessage.count())
 
       val preGraph = newGraph
       newGraph = newGraph.joinVertices(updateMessage){
@@ -237,22 +237,24 @@ object FastUnfoldingParallel {
           newVertexData.setCommAndCommWeight(community, weight)
       }.cache()
 
-      preGraph.unpersistVertices()
-      preGraph.edges.unpersist()
 
-      newGraph.vertices.count()
-      newGraph.edges.count()
+      println("---iters: " + iters + "\tnewGraph edges count:" +  newGraph.edges.count()
+        + "\tnewGraph vertex count:" +  newGraph.vertices.count())
 
       if (null != currentCommunity) {
         currentCommunity.unpersist()
       }
-      currentCommunity = idCommunity.map(e => (e._1.toLong, e._2)).cache()
-      println("---iters: " + iters + "currentCommunity count" + currentCommunity.count())
+
+      currentCommunity = idCommunity
+      println("---iters: " + iters + "\tcurrentCommunity count" + currentCommunity.count())
 
       iters += 1
 
+      preGraph.unpersistVertices()
+      preGraph.edges.unpersist()
       vertexRdd.unpersist()
-      idCommunity.unpersist()
+      commWeight.unpersist()
+      updateMessage.unpersist()
 
       // TODO 算法终止条件需要再考虑
       //    } while((newModularity - curModularity) > minChange && iters < maxIters)
@@ -261,15 +263,9 @@ object FastUnfoldingParallel {
     newGraph.unpersistVertices()
     newGraph.edges.unpersist()
 
-    val current = currentCommunity
-    if (current.filter(e => e._1 != e._2).count() > 0) {
-      improvement = true
-      updateCommunity(current)
-    } else {
-      improvement = false
-    }
+    val result = currentCommunity
 
-    reGraphEdges(graph, current)
+    result
   }
 
   /**
@@ -298,13 +294,13 @@ object FastUnfoldingParallel {
    * Output the community assignment into file.
    * @param file output file
    */
-  def outputCommunity(file: String) {
-    if (null == communityResult) {
-      println("Community Rdd is empty.")
+  def outputCommunity(file: String, result: RDD[(Long, Long)]) {
+    if (null == result) {
+      println("Community Result Rdd Is Empty.")
       return
     }
 
-    communityResult.map{
+    result.map{
       e => e._1 + "," + e._2
     }.saveAsTextFile(file)
   }
@@ -578,23 +574,42 @@ object FastUnfoldingParallel {
                sc: SparkContext,
                maxProcessTimes: Int = Integer.MAX_VALUE,
                minChange: Double = 0.001,
-               maxIters: Int = Integer.MAX_VALUE) {
+               maxIters: Int = Integer.MAX_VALUE): RDD[(Long, Long)] = {
 
     initialization(edgeFile, partitionNum, sc)
 
+    var preModularity = Double.MinValue
+    var bestResult: RDD[(Long, Long)] = null
     var current = 0
-    var edgeRdd = loadEdgeRdd(edgeFile, partitionNum, sc)
+    var edgeRdd = loadEdgeRdd(edgeFile, partitionNum, sc).cache()
+    println("In the beginning edgeRdd count " + edgeRdd.count())
 
     do{
-      val newEdgeRdd = edgeRdd.cache()
+      val newEdgeRdd = edgeRdd
       val graph = Graph.fromEdgeTuples(newEdgeRdd, 1L).cache()
 
-      edgeRdd = reCommunityParallel(graph, sc, maxIters, minChange)
+      val curResult = reCommunityParallel(graph, sc, maxIters, minChange).cache()
+      println("################ times: " + current + "\tcurResult is: " + curResult.count())
+
+      updateCommunity(curResult)
 
       val modularity = calcCurrentModularity()
       println("################ times: " + current + "\tmodularity is: " + modularity)
 
-      newEdgeRdd.unpersist()
+      edgeRdd.unpersist()
+      if (modularity - preModularity > minChange) {
+        improvement = true
+        preModularity = modularity
+        bestModularity = modularity
+        bestResult = communityResult
+        edgeRdd = reGraphEdges(graph, curResult).cache()
+        println("################ times: " + current + "\tupdate! edgeRdd is: " + edgeRdd.count())
+      } else {
+        improvement = false
+        println("################ times: " + current + "\tnot update!")
+      }
+
+      curResult.unpersist()
       graph.unpersistVertices()
       graph.edges.unpersist()
       current += 1
@@ -603,5 +618,7 @@ object FastUnfoldingParallel {
     graphEdges.unpersist()
     graphEdgesWeight.unpersist()
     graphDegrees.unpersist()
+
+    bestResult
   }
 }
