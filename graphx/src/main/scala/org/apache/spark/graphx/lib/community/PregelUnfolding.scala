@@ -32,29 +32,36 @@ object PregelUnfolding {
       def gainMod(a: Long, b: Long): Boolean = ???
       def modGained(a: Long, b: Long): Long = ???
 
-      def sendMessage(e: EdgeTriplet[VertexId, ED]) = {
 
-        if (gainMod(e.srcId, e.dstId)) {
-          Iterator((e.dstId, e.srcAttr))
-        } else {
-          Iterator()
-        }
-      }
+      val initialMessage = List[Long]()
 
-      def mergeMessage(neighbor1: Long, neighbor2: Long): List[Long] = List(neighbor1) ++ List(neighbor2)
+      ufWorkGraph = Pregel(ufWorkGraph, initialMessage, activeDirection = EdgeDirection.Either)(
+        (vid, attr, message) => message.maxBy(x => modGained(vid, x)),
 
-      def vertexProgram(vid: VertexId, attr: Long, message: List[Long]) = {
-        message.maxBy(x => modGained(vid, x))
-      }
+        e =>
+          if (gainMod(e.srcId, e.dstId) && e.srcId < e.dstId) {
+            Iterator((e.dstId, e.srcAttr))
+          } else if (gainMod(e.srcId, e.dstId) && e.dstId < e.srcId) {
+            Iterator(e.srcId, e.dstAttr)
+          } else {
+            Iterator()
 
-      val initialMessage = Long()
-      Pregel(ufWorkGraph, initialMessage)(
+          },
+        (neighbor1, neighbor2) => (List(neighbor1) ++ List(neighbor2)).flatten
+      )
+
+      def sendMessage(e: EdgeTriplet[VertexId, ED]) = ???
+
+
+
+      def mergeMessage(neighbor1: Long, neighbor2: Long): List[Long] = ???
+
+      def vertexProgram(vid: VertexId, attr: Long, message: List[Long]) = ???
+
+      ufWorkGraph = Pregel(ufWorkGraph, initialMessage, activeDirection = EdgeDirection.Either)(
         vprog = vertexProgram,
         sendMsg = sendMessage,
         mergeMsg = mergeMessage)
     }
-
-    
-
   }
 }
