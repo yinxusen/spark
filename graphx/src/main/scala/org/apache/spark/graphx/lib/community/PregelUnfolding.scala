@@ -13,10 +13,11 @@ import org.apache.hadoop.fs.{Path, FileSystem}
 import org.apache.hadoop.conf.Configuration
 
 object PregelUnfolding {
+
   def run[VD, ED: ClassTag](graph: Graph[VD, ED], maxIter: Int): Graph[VertexId, ED] = {
 
     //each node belongs to its own community
-    var ufGraph = graph.mapVertices((vid, _) => List[Long]())
+    var ufGraph = graph
 
     var ufWorkGraph = graph.mapVertices((vid, _) => Set(vid))
 
@@ -27,13 +28,6 @@ object PregelUnfolding {
 
       //Recording which community each vertex belongs to in this iteration
       ufGraph = ufGraph.joinVertices(ufWorkGraph.vertices)((vid, attr, cid) => cid :: attr :: Nil
-
-
-      def gainMod(a: Set, b: Set): Boolean = ???
-      def modGained(a: Set, b: Set): Long = ???
-
-
-      val initialMessage = List[Set]()
 
       /*ufWorkGraph = Pregel(ufWorkGraph, initialMessage, activeDirection = EdgeDirection.Either)(
         (vid, attr, message) => message.maxBy(x => modGained(vid, x)),
@@ -49,6 +43,7 @@ object PregelUnfolding {
           },
         (neighbor1, neighbor2) => (List(neighbor1) ++ List(neighbor2)).flatten
       )*/
+      /*
 
       def sendMessage(e: EdgeTriplet[VertexId, ED]) = {
         if(gainMod(e.dstAttr, e.srcAttr)) {
@@ -60,16 +55,41 @@ object PregelUnfolding {
         }
       }
 
-      def mergeMessage(neighbor1: Set, neighbor2: Set): List[Set] =
+      def mergeMessage(neighbor1: Set[VertexId], neighbor2: Set[VertexId]): List[Set[VertexId]] =
         List(neighbor1) ++ List(neighbor2)
 
-      def vertexProgram(vid: VertexId, attr: Set, message: List[Set]) =
+      def vertexProgram(vid: VertexId, attr: Set[VertexId], message: List[Set[VertexId]]) =
         message.maxBy(x => modGained(attr, x))
+        */
 
+
+
+      def modGained(neigh1: Set[VertexId], neigh2: Set[VertexId]): Long = ???
+
+      def gainMod(a: Set[VertexId], b: Set[VertexId]): Boolean = if (modGained(a, b) > 0) true else false
+
+
+
+      val initialMessage = List[Set[VertexId]]()
       ufWorkGraph = Pregel(ufWorkGraph, initialMessage, activeDirection = EdgeDirection.Either)(
-        vprog = vertexProgram,
-        sendMsg = sendMessage,
-        mergeMsg = mergeMessage)
+        //need to return the attr if x is empty, do it in "modGained"
+        (vid, attr, message) => message.maxBy(x => modGained(attr, x)),
+
+        e => {
+          if (gainMod(e.dstAttr, e.srcAttr)) {
+            Iterator((e.dstId, List(e.srcAttr.union(e.dstAttr))),
+              (e.srcId, List(e.srcAttr.union(e.dstAttr))))
+          }
+          else {
+            Iterator()
+          }
+        },
+
+        (neighbor1, neighbor2) => neighbor1 ++ neighbor2
+      )
+
+
     }
   }
 }
+
