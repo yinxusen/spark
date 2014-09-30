@@ -14,7 +14,7 @@ import org.apache.hadoop.conf.Configuration
 
 object PregelUnfolding {
 
-  def run[VD, ED: ClassTag](graph: Graph[VD, ED], maxIter: Int): Graph[VertexId, ED] = {
+  def run[VD: ClassTag, ED: ClassTag](graph: Graph[VD, ED], maxIter: Int): Graph[Set[VertexId], ED] = {
 
     //each node belongs to its own community
     var ufGraph = graph
@@ -101,7 +101,7 @@ object PregelUnfolding {
       val initialMessage = List[Set[VertexId]]()
       ufWorkGraph = Pregel(ufWorkGraph, initialMessage, activeDirection = EdgeDirection.Either)(
         //need to return the attr if x is empty, do it in "modGained"
-        (vid, attr, message) => message.maxBy(x => modGained(attr, x)),
+        (vid, attr, message) => if (message.isEmpty) attr else message.maxBy(x => modGained(attr, x)),
 
         e => {
           if (gainMod(e.dstAttr, e.srcAttr)) {
@@ -118,6 +118,7 @@ object PregelUnfolding {
 
 
     }
+    ufWorkGraph
   }
 }
 
