@@ -24,6 +24,7 @@ class VertexData() extends Serializable{
   var neighDegree: Long = 0
   var neighCommunity: Long = -1
   var neighCommunityWeight: Long = -1
+  var edgeAttr: Long = -1
 
   def this(communityValue: Long) {
     this()
@@ -38,6 +39,7 @@ class VertexData() extends Serializable{
     neighDegree = other.neighDegree
     neighCommunity = other.neighCommunity
     neighCommunityWeight = other.neighCommunityWeight
+    edgeAttr = other.edgeAttr
   }
 
   def setDegreeAndCommWeight(degreeValue: Long): VertexData = {
@@ -52,10 +54,15 @@ class VertexData() extends Serializable{
     new VertexData(this)
   }
 
-  def setNeighbor(degreeValue: Long, commValue: Long, commWeightValue: Long): VertexData = {
+  def setNeighbor(
+                   degreeValue: Long,
+                   commValue: Long,
+                   commWeightValue: Long,
+                   edgeAttrValue: Long): VertexData = {
     neighDegree = degreeValue
     neighCommunity = commValue
     neighCommunityWeight = commWeightValue
+    edgeAttr = edgeAttrValue
     new VertexData(this)
   }
 }

@@ -17,7 +17,7 @@
 
 package org.apache.spark.graphx.lib.community
 
-import org.apache.spark.graphx.{EdgeTriplet, VertexId, Graph}
+import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
@@ -28,7 +28,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.log4j.{Level, Logger}
 import scala.Array
 import scala.collection.mutable
-import scala.util.Random
+import scala.Some
 
 object FastUnfoldingParallel {
   def main(args: Array[String]) {
@@ -37,7 +37,7 @@ object FastUnfoldingParallel {
       return
     }
 
-    println("FastUnfolding begins...")
+    println("FastUnfoldingParallel Begins...")
 
     val mode = args(0)  // "local" or yarn-standalone
     if(mode.startsWith("local"))
@@ -58,7 +58,7 @@ object FastUnfoldingParallel {
 
     outputCommunity(output, result)
 
-    println("FastUnfolding ends...")
+    println("FastUnfoldingParallel Ends...")
   }
 
   var improvement = false
@@ -67,14 +67,15 @@ object FastUnfoldingParallel {
   var graphEdgesWeight: RDD[((Long, Long), Int)] = null
   var graphDegrees: RDD[(Long, Int)] = null
   var totalDegree: Double = 0.0
-  val rand: Random = new Random()
   var bestModularity: Double = 0.0
 
   /**
    * Load edges from file.
    */
-  def loadEdgeRdd(edgeFile: String, partitionNum: Int, sc: SparkContext): RDD[(Long, Long)] = {
-    val edgeRdd = sc.textFile(edgeFile, partitionNum).flatMap {
+  def loadRawEdge(edgeFile: String, partitionNum: Int, sc: SparkContext): RDD[(Long, Long)] = {
+    println("Get in LoadRawEdge. File Is: " + edgeFile)
+
+    val edgeRdd = sc.textFile(edgeFile, partitionNum).repartition(partitionNum).flatMap {
       case (line) =>
         val arr = ArrayBuffer[(Long, Long)]()
         val regex = ","
@@ -93,17 +94,22 @@ object FastUnfoldingParallel {
     edgeRdd
   }
 
+  def getEdgeRdd(rawEdges: RDD[(Long, Long)]): RDD[Edge[Long]] = {
+    rawEdges.groupBy(e => e).map{
+      case ((srcComm, dstComm), arrays) => new Edge[Long](srcComm, dstComm, arrays.size)
+    }
+  }
+
   /**
    * Generate a new graph with VertexData
    * @param graph original graph
    * @tparam VD
-   * @tparam ED
    * @return
    */
-  def generateInitGraph[VD: ClassTag, ED: ClassTag](graph: Graph[VD, ED]): Graph[VertexData, ED] = {
+  def generateInitGraph[VD: ClassTag](graph: Graph[VD, Long], vertexTotalWeight: RDD[(Long, Long)]): Graph[VertexData, Long] = {
 
     val newGraph = graph.mapVertices[VertexData]((vid, vd) => new VertexData(vid.toLong))
-      .joinVertices(graph.degrees){
+      .joinVertices(vertexTotalWeight){
       case (vid, vertexData, degree) => vertexData.setDegreeAndCommWeight(degree)
     }
 
@@ -121,7 +127,7 @@ object FastUnfoldingParallel {
       return 0L
     }
 
-    val degree = array(0).degree
+    val degree = array(0).neighDegree
     val oriCommunity = array(0).neighCommunity
 
     //    if (rand.nextDouble() > 0.8)
@@ -132,9 +138,9 @@ object FastUnfoldingParallel {
     for(i <- 0 until array.size) {
       val vertexData = array(i)
       val community = vertexData.community
+      val edgeAttr = vertexData.edgeAttr
       val preValue = insideWeightMap.getOrElse(community, 0L)
-      // TODO 这里的计算方式不一样，paper里面的表述和源码里的描述不一样
-      insideWeightMap.put(community, preValue + 1L)
+      insideWeightMap.put(community, preValue + edgeAttr)
       outsideWeightMap.put(community, vertexData.communityWeight)
     }
 
@@ -162,22 +168,114 @@ object FastUnfoldingParallel {
     bestCommunity
   }
 
-  def edgeMapFunc[ED: ClassTag](et: EdgeTriplet[VertexData, ED]): Iterator[(VertexId, Array[VertexData])] = {
+  def edgeMapFunc(et: EdgeTriplet[VertexData, Long]): Iterator[(VertexId, Array[VertexData])] = {
     if (et.srcId != et.dstId) {
+      val edgeAttr = et.attr
+
       val srcDegree = et.srcAttr.degree
       val srcComm = et.srcAttr.community
       val srcCommWeight = et.srcAttr.communityWeight
-      val dstVertexData = et.dstAttr.setNeighbor(srcDegree, srcComm, srcCommWeight)
+      val dstVertexData = et.dstAttr.setNeighbor(srcDegree, srcComm, srcCommWeight, edgeAttr)
 
       val dstDegree = et.dstAttr.degree
       val dstComm = et.dstAttr.community
       val dstCommWeight = et.dstAttr.communityWeight
-      val srcVertexData = et.srcAttr.setNeighbor(dstDegree, dstComm, dstCommWeight)
-
+      val srcVertexData = et.srcAttr.setNeighbor(dstDegree, dstComm, dstCommWeight, edgeAttr)
       Iterator((et.srcId, Array(dstVertexData)), (et.dstId, Array(srcVertexData)))
     } else {
       Iterator.empty
     }
+  }
+
+  def calcChangeRate(preRdd: RDD[(Long, Long)], curRdd: RDD[(Long, Long)]): Double = {
+    if (null == preRdd)
+      return Double.MaxValue
+
+    val preCount = preRdd.count()
+    val curCount = curRdd.count()
+
+    if (preCount != curCount) {
+      println("Count Not Right! Pre Is " + preCount + "\tCur Is " + curCount)
+      return -1
+    }
+
+    val changeNum = preRdd.join(curRdd)
+      .filter{case (vid, (preComm, curComm)) => preComm != curComm}
+      .count()
+
+    changeNum.toDouble / preCount.toDouble
+  }
+
+  def mergeCommunity(oriRdd: RDD[(Long, Long)]): RDD[(Long, Long)] = {
+
+    println("begin mergeCommunity")
+
+    val rawG = Graph.fromEdgeTuples(oriRdd, 1L)
+      .mapVertices {
+      case (vid, _) => vid.toLong
+    }.cache()
+    var messages = rawG.mapReduceTriplets(mcSendMsg, mcMergeMsg).cache()
+    var activeMessages = messages.count()
+    println("messages count " + messages.count())
+    var i = 0
+    var g = rawG.mapVertices((idx, vd) => vd).cache()
+    val maxiter = 30
+    while (i < maxiter && activeMessages > 0) {
+
+      i = i + 1
+      val newVerts = g.vertices.innerJoin(messages)((id, data, update)
+      => mcVprog(id, data, Some(update))).cache()
+
+      val prevG = g
+      g = g.outerJoinVertices(newVerts) {
+        (vid, oldV, optNewV) => optNewV.getOrElse(oldV)
+      }.cache()
+
+      val oldMessage = messages
+      messages = g.mapReduceTriplets(mcSendMsg, mcMergeMsg, Some((newVerts, EdgeDirection.Either))).cache()
+      activeMessages = messages.count()
+
+      newVerts.unpersist()
+      prevG.unpersistVertices()
+      prevG.edges.unpersist()
+      oldMessage.unpersist()
+    }
+
+    rawG.unpersistVertices()
+    rawG.edges.unpersist()
+    messages.unpersist()
+
+    val result = g.vertices.map(e => (e._1.toLong, e._2)).cache()
+
+    result.count()
+
+    g.unpersistVertices()
+    g.edges.unpersist()
+
+    result
+  }
+
+  def mcVprog(vid: Long, vert: Long, aggMsg: Option[Long]): Long = {
+    var newvert = vert
+    aggMsg match {
+      case Some(msg) => newvert = math.max(newvert, msg)
+      case None => newvert = newvert
+    }
+    newvert
+  }
+
+  def mcSendMsg[ED: ClassTag](edge: EdgeTriplet[VertexId, ED]) = {
+    if (edge.srcAttr > edge.dstAttr) {
+      Iterator((edge.dstId, edge.srcAttr))
+    } else if (edge.srcAttr < edge.dstAttr) {
+      Iterator((edge.srcId, edge.dstAttr))
+    } else {
+      Iterator.empty
+    }
+  }
+
+  def mcMergeMsg(a:Long, b:Long): Long = {
+    math.max(a, b)
   }
 
   /**
@@ -187,25 +285,33 @@ object FastUnfoldingParallel {
    * @param maxIters maximum times for total iterations
    * @param minChange minimum change, iterations stops if change less than this value
    * @tparam VD
-   * @tparam ED
    * @return
    */
-  def reCommunityParallel[VD: ClassTag, ED: ClassTag](
-                                                       graph: Graph[VD, ED],
-                                                       sc: SparkContext,
-                                                       maxIters: Int = Int.MaxValue,
-                                                       minChange: Double = 0.01): RDD[(Long,Long)] = {
+  def reCommunityParallel[VD: ClassTag](
+                                         graph: Graph[VD, Long],
+                                         sc: SparkContext,
+                                         maxIters: Int = Int.MaxValue,
+                                         minChange: Double = 0.01): RDD[(Long,Long)] = {
 
     println("reCommunityParallel...")
     var iters = 0
     val curDegree = totalDegree
 
-    var newGraph = generateInitGraph(graph).cache()
+    val vertexTotalWeight = graph.edges.flatMap{
+      case (edge) =>
+        val array = ArrayBuffer[(VertexId, Long)]()
+        array += ((edge.srcId, edge.attr))
+        array += ((edge.dstId, edge.attr))
+        array
+    }.reduceByKey(_ + _).cache()
+    println("vertexTotalWeight " + vertexTotalWeight.count())
+
+    var newGraph = generateInitGraph(graph, vertexTotalWeight).cache()
     var currentCommunity: RDD[(Long, Long)] = null
+    var changeRate = 0.0
 
     do {
       val vertexRdd = newGraph.mapReduceTriplets[Array[VertexData]](edgeMapFunc, _ ++ _).cache()
-
       println("---iters: " + iters + "\tvertexRdd count:" + vertexRdd.count())
 
       val idCommunity = vertexRdd.map{
@@ -214,7 +320,7 @@ object FastUnfoldingParallel {
 
       println("---iters: " + iters + "\tidcommunity count:" + idCommunity.count())
 
-      val commWeightTmp = idCommunity.join(newGraph.degrees).map{
+      val commWeightTmp = idCommunity.join(vertexTotalWeight).map{
         case (vid, (community, degree)) => (community, degree.toLong)
       }
 
@@ -226,7 +332,6 @@ object FastUnfoldingParallel {
         case (community, (vid, weight)) => (vid, (community, weight.getOrElse(0L)))
       }.cache()
 
-
       println("---iters: " + iters + "\tupdateMessage count:" + updateMessage.count())
 
       val preGraph = newGraph
@@ -237,16 +342,22 @@ object FastUnfoldingParallel {
           newVertexData.setCommAndCommWeight(community, weight)
       }.cache()
 
-
       println("---iters: " + iters + "\tnewGraph edges count:" +  newGraph.edges.count()
         + "\tnewGraph vertex count:" +  newGraph.vertices.count())
+
+      val preCurrentCommunity = currentCommunity
+
+      val mergedCommunity = mergeCommunity(idCommunity)
+
+      changeRate = calcChangeRate(preCurrentCommunity, mergedCommunity)
+      println("---iters: " + iters + "\tchangeRate:" + changeRate)
 
       if (null != currentCommunity) {
         currentCommunity.unpersist()
       }
 
-      currentCommunity = idCommunity
-      println("---iters: " + iters + "\tcurrentCommunity count" + currentCommunity.count())
+      currentCommunity = mergedCommunity
+      println("---iters: " + iters + "\tcurrentCommunity count:" + currentCommunity.count())
 
       iters += 1
 
@@ -255,6 +366,7 @@ object FastUnfoldingParallel {
       vertexRdd.unpersist()
       commWeight.unpersist()
       updateMessage.unpersist()
+      idCommunity.unpersist()
 
       // TODO 算法终止条件需要再考虑
       //    } while((newModularity - curModularity) > minChange && iters < maxIters)
@@ -262,6 +374,7 @@ object FastUnfoldingParallel {
 
     newGraph.unpersistVertices()
     newGraph.edges.unpersist()
+    vertexTotalWeight.unpersist()
 
     val result = currentCommunity
 
@@ -277,16 +390,18 @@ object FastUnfoldingParallel {
       communityResult = null
     } else if (null == communityResult) {
       communityResult = currentResult.cache()
-      communityResult.count()
+      println("communityResult.count() is " + communityResult.count())
     } else {
       val preRdd = communityResult
-      communityResult = communityResult.map(e => (e._2, e._1))
-        .join(currentResult)
-        .map{
+      println("top 10")
+      preRdd.top(10).foreach(println)
+      println("begin.. " + preRdd.count())
+      communityResult = preRdd.map(e => (e._2, e._1)).join(currentResult).map{
         case (oldCommunity, (vid, curCommunity)) => (vid, curCommunity)
       }.cache()
-      communityResult.count()
+      println("end.. " + communityResult.count())
       preRdd.unpersist()
+      currentResult.unpersist()
     }
   }
 
@@ -309,29 +424,34 @@ object FastUnfoldingParallel {
    * Generate a new edge rdd, according to graph.
    * @param graph the original graph
    * @tparam VD
-   * @tparam ED
    * @return
    */
-  def reGraphEdges[VD: ClassTag, ED: ClassTag](graph: Graph[VD,ED], result: RDD[(Long, Long)]): RDD[(Long, Long)] = {
+  def reGraphEdges[VD: ClassTag](graph: Graph[VD,Long], result: RDD[(Long, Long)]): RDD[Edge[Long]] = {
 
-    println("reGraphEdges... " + graph.vertices.count())
     val edgeRdd = graph.edges.flatMap{
       case(e) =>
         val arr = ArrayBuffer[(Long, Long)]()
-        arr += ((e.srcId, e.dstId))
+        val weight = e.attr.toInt
+        for (i <- 0 until weight) {
+          arr += ((e.srcId, e.dstId))
+        }
         arr
     }
 
-    if (null != result) {
-      val newEdgeRdd = edgeRdd.leftOuterJoin(result)
-        .map(e => (e._2._1, e._2._2.getOrElse(0L)))
-        .leftOuterJoin(result)
-        .map(e => (e._2._1, e._2._2.getOrElse(0L)))
-
-      newEdgeRdd
-    }else{
-      edgeRdd
+    val newEdgeRdd = edgeRdd.leftOuterJoin(result)
+      .map{ case (srcId, (dstId, srcComm)) => (dstId, srcComm.getOrElse(0L)) }
+      .leftOuterJoin(result)
+      .map{
+      case (dstId, (srcComm, dstComm)) =>
+        if (srcComm > dstComm.getOrElse(0L))
+          (dstComm.getOrElse(0L), srcComm)
+        else
+          (srcComm, dstComm.getOrElse(0L))
     }
+
+    val resultEdgeRdd = getEdgeRdd(newEdgeRdd)
+
+    resultEdgeRdd
   }
 
   /**
@@ -530,10 +650,11 @@ object FastUnfoldingParallel {
                      partitionNum: Int,
                      sc: SparkContext) {
 
-    graphEdges = loadEdgeRdd(edgeFile, partitionNum, sc).cache()
+    graphEdges = loadRawEdge(edgeFile, partitionNum, sc).cache()
     println("graphEdges count " + graphEdges.count())
     val graph = Graph.fromEdgeTuples(graphEdges, 1L)
     graphDegrees = graph.degrees.cache()
+    println("graphDegrees count " + graphDegrees.count())
     graphDegrees.count()
     totalDegree = graphDegrees.map(e => e._2).sum()
 
@@ -581,15 +702,15 @@ object FastUnfoldingParallel {
     var preModularity = Double.MinValue
     var bestResult: RDD[(Long, Long)] = null
     var current = 0
-    var edgeRdd = loadEdgeRdd(edgeFile, partitionNum, sc).cache()
+    var edgeRdd = getEdgeRdd(graphEdges).cache()
     println("In the beginning edgeRdd count " + edgeRdd.count())
 
     do{
       val newEdgeRdd = edgeRdd
-      val graph = Graph.fromEdgeTuples(newEdgeRdd, 1L).cache()
+      val graph = Graph.fromEdges(newEdgeRdd, 1L).cache()
 
-      val curResult = reCommunityParallel(graph, sc, maxIters, minChange).cache()
-      println("################ times: " + current + "\tcurResult is: " + curResult.count())
+      val curResult = reCommunityParallel(graph, sc, maxIters, minChange)
+      //      println("################ times: " + current + "\tcurResult is: " + curResult.count())
 
       updateCommunity(curResult)
 
@@ -609,12 +730,12 @@ object FastUnfoldingParallel {
         println("################ times: " + current + "\tnot update!")
       }
 
-      curResult.unpersist()
       graph.unpersistVertices()
       graph.edges.unpersist()
       current += 1
     } while(improvement && current < maxProcessTimes)
 
+    edgeRdd.unpersist()
     graphEdges.unpersist()
     graphEdgesWeight.unpersist()
     graphDegrees.unpersist()
