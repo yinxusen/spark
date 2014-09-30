@@ -18,6 +18,8 @@ object PregelUnfolding {
 
     //each node belongs to its own community
     var ufGraph = graph
+    // m is the sum of all links in the graph
+    val m = graph.degrees.reduce{case (a, b) => (a._1, a._2 + b._2)}._2
 
     var ufWorkGraph = graph.mapVertices((vid, _) => Set(vid))
 
@@ -27,7 +29,7 @@ object PregelUnfolding {
       iter += 1
 
       //Recording which community each vertex belongs to in this iteration
-      ufGraph = ufGraph.joinVertices(ufWorkGraph.vertices)((vid, attr, cid) => cid :: attr :: Nil
+      //ufGraph = ufGraph.joinVertices(ufWorkGraph.vertices)((vid, attr, cid) => cid :: attr :: Nil
 
       /*ufWorkGraph = Pregel(ufWorkGraph, initialMessage, activeDirection = EdgeDirection.Either)(
         (vid, attr, message) => message.maxBy(x => modGained(vid, x)),
@@ -62,9 +64,35 @@ object PregelUnfolding {
         message.maxBy(x => modGained(attr, x))
         */
 
+      def countInside(com: Set[VertexId]): Long = ufWorkGraph.subgraph(vpred = (id, attr) => com.subsetOf(attr)).degrees
+        .reduce{case (a, b) => (a._1, a._2 + b._2)}._2
 
+      def countOutside(com: Set[VertexId]): Long = ufWorkGraph.subgraph(vpred = (id, attr) => !com.subsetOf(attr)).degrees
+        .reduce{case (a, b) => (a._1, a._2 + b._2)}._2
 
-      def modGained(neigh1: Set[VertexId], neigh2: Set[VertexId]): Long = ???
+      def countSumInside(com1: Set[VertexId], com2: Set[VertexId]): Long = ufWorkGraph.subgraph(vpred = (id, attr)
+      => com1.subsetOf(attr) || com2.subsetOf(attr)).degrees.reduce{case (a, b) => (a._1, a._2 + b._2)}._2
+
+      //the modularity gained by moving neigh1 into neigh2
+      def modGained(neigh1: Set[VertexId], neigh2: Set[VertexId]): Long = {
+        // the sum of links inside neigh1-related community
+        val inside1 = countInside(neigh1)
+        //the sum of links inside rest of the vertex except neigh1-related community
+        val outside1 = countOutside(neigh1)
+
+        val inside2 = countInside(neigh2)
+
+        val outside2 = countOutside(neigh2)
+
+        val connect12 = countSumInside(neigh1, neigh2) - inside1 - inside2
+
+        val connect2out = m - inside2 - outside2
+
+        val connect1out = m - inside1 - outside1
+
+        connect12 / (2 * m) - (connect2out + connect1out) /(2 * m * m)
+
+      }
 
       def gainMod(a: Set[VertexId], b: Set[VertexId]): Boolean = if (modGained(a, b) > 0) true else false
 
