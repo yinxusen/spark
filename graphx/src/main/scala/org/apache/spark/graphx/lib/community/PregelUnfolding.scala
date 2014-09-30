@@ -19,7 +19,7 @@ object PregelUnfolding {
     //each node belongs to its own community
     var ufGraph = graph
     // m is the sum of all links in the graph
-    val m = graph.degrees.reduce{case (a, b) => (a._1, a._2 + b._2)}._2
+    val m = graph.degrees.map(_._2).fold(0)(_ + _)
 
     var ufWorkGraph = graph.mapVertices((vid, _) => Set(vid))
 
@@ -65,13 +65,13 @@ object PregelUnfolding {
         */
 
       def countInside(com: Set[VertexId]): Long = ufWorkGraph.subgraph(vpred = (id, attr) => com.subsetOf(attr)).degrees
-        .reduce{case (a, b) => (a._1, a._2 + b._2)}._2
+        .map(_._2).fold(0)(_ + _)
 
       def countOutside(com: Set[VertexId]): Long = ufWorkGraph.subgraph(vpred = (id, attr) => !com.subsetOf(attr)).degrees
-        .reduce{case (a, b) => (a._1, a._2 + b._2)}._2
+        .map(_._2).fold(0)(_ + _)
 
       def countSumInside(com1: Set[VertexId], com2: Set[VertexId]): Long = ufWorkGraph.subgraph(vpred = (id, attr)
-      => com1.subsetOf(attr) || com2.subsetOf(attr)).degrees.reduce{case (a, b) => (a._1, a._2 + b._2)}._2
+      => com1.subsetOf(attr) || com2.subsetOf(attr)).degrees.map(_._2).fold(0)(_ + _)
 
       //the modularity gained by moving neigh1 into neigh2
       def modGained(neigh1: Set[VertexId], neigh2: Set[VertexId]): Long = {
