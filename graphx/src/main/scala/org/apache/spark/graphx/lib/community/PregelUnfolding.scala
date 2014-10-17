@@ -99,31 +99,43 @@ object PregelUnfolding {
       if (modularityGain(lhsComm, rhsComm) > 0) true else false
     }
 
-    var ufWorkGraph = graph.mapVertices((vid, _) => Set(vid))
+
+    var ufWorkGraph = graph.mapVertices((vid, _) => Set[VertexId]())
 
     var iter = 0
 
     while (iter < maxIter) {
       iter += 1
 
-      val initialMessage = List[Set[VertexId]]()
+      val initialMessage = Set[VertexId]()
+
+      //generate a graph with vertex property as neighbor vertex' indexes
       ufWorkGraph = Pregel(ufWorkGraph, initialMessage, activeDirection = EdgeDirection.Either)(
-        (vid, attr, message) =>
-          if (message.isEmpty) {
-            attr
-          } else {
-            message.maxBy(x => modularityGain(attr, x))
-          },
+        (vid, attr, message) => message,
+
+        e => Iterator((e.dstId, Set(e.srcId)),(e.srcId, Set(e.dstId))),
+
+        (neighbor1, neighbor2) => neighbor1 ++ neighbor2
+      )
+
+      //generate a graph with four elements as its vertex properties, including
+      //1. neighbor vertex's indexes;
+      //2. its community's members' indexes;
+      //3. the links incidents to its community;
+      //4. the links inside its community
+      //the 2,3,4 are all for the first pass in fastunfolding
+
+
+      val firstPassGraph = ufWorkGraph.mapVertices((vid, attr) => (attr, Set(vid), 0, 0))
+      val InitialMessage = List()
+      firstPassGraph = Pregel(firstPassGraph, InitialMessage, activeDirection = EdgeDirection.Either)(
+        (vid, attr, message) => ,
 
         e => {
-          if (isModularityGained(e.dstAttr, e.srcAttr)) {
-            Iterator(
-              (e.dstId, List(e.srcAttr.union(e.dstAttr))),
-              (e.srcId, List(e.srcAttr.union(e.dstAttr)))
-            )
-          }
-          else {
-            Iterator.empty
+          if (e.srcAttr._2.size == 1) {
+            Iterator((e.dstId, e.srcAttr._1))
+          } else {
+            Iterator()
           }
         },
 
@@ -131,6 +143,8 @@ object PregelUnfolding {
       )
     }
     ufWorkGraph
+
+
   }
 }
 
