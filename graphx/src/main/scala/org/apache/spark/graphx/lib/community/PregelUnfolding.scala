@@ -27,10 +27,11 @@ object PregelUnfolding {
    */
   def run[VD: ClassTag, ED: ClassTag](
       graph: Graph[VD, ED],
-      maxIter: Int): Graph[Set[VertexId], ED] = {
+      maxIter: Int): Graph[(Array[VertexId], Set[VertexId], Int, Int), ED] = {
 
     graph.cache()
     val numGraphEdges = graph.degrees.map(_._2).fold(0)(_ + _) / 2
+    /**
 
     /**
     * Count the number of edges of a sub-graph, given a vertex predication.
@@ -98,9 +99,19 @@ object PregelUnfolding {
         rhsComm: Set[VertexId]): Boolean = {
       if (modularityGain(lhsComm, rhsComm) > 0) true else false
     }
+    */
 
+    /**
+     * start all over again from here
+     */
 
-    var ufWorkGraph = graph.mapVertices((vid, _) => Set[VertexId]())
+    /**
+     * generate a graph with vertex property as neighbor vertex' indexes
+     */
+    val neighID = graph.collectNeighborIds(EdgeDirection.Either)
+    val ufWorkGraph = graph.outerJoinVertices(neighID)((vid, _, neighOpt) =>
+      neighOpt.getOrElse(Array[VertexId]()))
+    val firstPassGraph = ufWorkGraph.mapVertices((vid, attr) => (attr, Set(vid), attr.size, 0))
 
     var iter = 0
 
@@ -108,7 +119,7 @@ object PregelUnfolding {
       iter += 1
 
       val initialMessage = Set[VertexId]()
-
+      /**
       //generate a graph with vertex property as neighbor vertex' indexes
       ufWorkGraph = Pregel(ufWorkGraph, initialMessage, activeDirection = EdgeDirection.Either)(
         (vid, attr, message) => message,
@@ -117,6 +128,7 @@ object PregelUnfolding {
 
         (neighbor1, neighbor2) => neighbor1 ++ neighbor2
       )
+      */
 
       //generate a graph with four elements as its vertex properties, including
       //1. neighbor vertex's indexes;
@@ -125,15 +137,24 @@ object PregelUnfolding {
       //4. the links inside its community
       //the 2,3,4 are all for the first pass in fastunfolding
 
+      val InitialMessage: List[(Long, Array[VertexId], Int)]  //how to define initial message
 
-      val firstPassGraph = ufWorkGraph.mapVertices((vid, attr) => (attr, Set(vid), 0, 0))
-      val InitialMessage = List()
       firstPassGraph = Pregel(firstPassGraph, InitialMessage, activeDirection = EdgeDirection.Either)(
-        (vid, attr, message) => ,
+        (vid, attr, message) => {
+          def Kiin(a: Array[VertexId], b: Set[VertexId]) =
+            a.map{x => if ((x: VertexId) => b.contains(x)) 1 else 0}.reduce(_ + _)
+
+          val largestMes = message.maxBy(a => Kiin(a._2, attr._2) / 2 * numGraphEdges - attr._3 * a._3)
+          val largestGain = Kiin(largestMes._2, attr._2)  / 2 * numGraphEdges - attr._3 * largestMes._3
+
+            if (largestGain <= 0 ) attr else
+            (attr._1, attr._2 + largestMes._1, attr._3 + largestMes._3 - 2, attr._4 + Kiin(largestMes._2, attr._2))
+
+        } ,
 
         e => {
           if (e.srcAttr._2.size == 1) {
-            Iterator((e.dstId, e.srcAttr._1))
+            Iterator((e.dstId, (e.srcId, e.srcAttr._1, e.srcAttr._3)))
           } else {
             Iterator()
           }
@@ -142,9 +163,7 @@ object PregelUnfolding {
         (neighbor1, neighbor2) => neighbor1 ++ neighbor2
       )
     }
-    ufWorkGraph
-
-
+    firstPassGraph
   }
 }
 
