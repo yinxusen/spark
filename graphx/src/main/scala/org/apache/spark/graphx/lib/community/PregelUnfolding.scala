@@ -20,8 +20,11 @@ package org.apache.spark.graphx.lib.community
 import org.apache.spark.graphx._
 import scala.reflect.ClassTag
 
-case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myLinkCount: Int)
-case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int, innerLinkCount: Int, largestGain: Double)
+case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myCommunity: Set[VertexId],
+                     myOuterLinkCount: Int)
+
+case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int,
+                    innerLinkCount: Int, largestGain: Double)
 
 object PregelUnfolding {
 
@@ -141,35 +144,90 @@ object PregelUnfolding {
 
       val InitialMessage: List[UnfoldMsg] = Nil  //how to define initial message
 
-      firstPassGraph = Pregel(firstPassGraph, InitialMessage, maxIterations = 2, activeDirection = EdgeDirection.Either)(
-        (vid, attr, message) => {
+      /**
+       * case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myCommunity: Set[VertexId],
+                     myOuterLinkCount: Int)
+
+         case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int,
+                    innerLinkCount: Int, largestGain: Double)
+       */
+
+      firstPassGraph = Pregel(firstPassGraph, InitialMessage, maxIterations = 1, activeDirection = EdgeDirection.Either)(
+        vprog = (vid, attr, message) => {
+
+          val messageReborn = message.map(msg => UnfoldMsg(msg.myId, msg.myNeighbors,
+            Set(msg.myId), msg.myNeighbors.size))
+
+          val attrReborn = new NodeAttr(attr.neighbors, Set(vid), attr.neighbors.size, 0, 0)
+
           def kiin(a: Array[VertexId], b: Set[VertexId]) = a.map(x => if (b.contains(x)) 1 else 0).reduce(_ + _)
 
-          def modGain(msg: UnfoldMsg): Double = kiin(msg.myNeighbors, attr.community) / (2 * numGraphEdges) - attr.outerLinkCount * msg.myLinkCount / (2 * numGraphEdges * numGraphEdges)
+          def modGain(msg: UnfoldMsg): Double = kiin(msg.myNeighbors, attrReborn.community) / (2 * numGraphEdges) -
+            attrReborn.outerLinkCount * msg.myOuterLinkCount / (2 * numGraphEdges * numGraphEdges)
 
           if (message.isEmpty) {
             attr
           } else {
-            val largestMes = message.maxBy(modGain)
+
+            val largestMes = messageReborn.maxBy(modGain) // message.maxBy{a => modGain(a)}
             val largestGain = modGain(largestMes)
 
             //if (largestGain <= 0) attr
             //else
-              NodeAttr(attr.neighbors, attr.community + largestMes.myId, attr.outerLinkCount + largestMes.myLinkCount - 2, attr.innerLinkCount + kiin(largestMes.myNeighbors, attr.community), largestGain)
+            NodeAttr(attr.neighbors, attr.community + largestMes.myId,
+              attr.outerLinkCount + largestMes.myOuterLinkCount - 2,
+              attr.innerLinkCount + kiin(largestMes.myNeighbors, attr.community), largestGain)
           }
 
         } ,
 
+        /**
+         * case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myCommunity: Set[VertexId],
+                     myOuterLinkCount: Int, myIfMatch: Boolean)
+
+           case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int,
+                    innerLinkCount: Int, ifMatch: Boolean,largestGain: Double)
+         */
+        sendMsg = e => {
+          if (!(e.srcAttr.community == e.dstAttr.community)) {
+            Iterator((e.dstId, List(UnfoldMsg(e.srcId, e.srcAttr.neighbors, e.srcAttr.community,
+              e.srcAttr.outerLinkCount))),
+              (e.srcId, List(UnfoldMsg(e.dstId, e.dstAttr.neighbors, e.dstAttr.community,
+                e.dstAttr.outerLinkCount))))
+          } else {
+            Iterator()
+          }
+        },
+
+        mergeMsg = (neighbor1, neighbor2) => neighbor1 ++ neighbor2
+      )
+
+
+      /**
+      secondPassGraph = Pregel(firstPassGraph, InitialMessage, maxIterations = 2, activeDirection = EdgeDirection.Either)(
+        (vid, attr, message) => {
+
+
+        } ,
+
+        /**
+         * case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myCommunity: Set[VertexId],
+                     myOuterLinkCount: Int, myIfMatch: Boolean)
+
+           case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int,
+                    innerLinkCount: Int, ifMatch: Boolean,largestGain: Double)
+         */
         e => {
-          if (e.srcAttr.community.size == 1) {
-            Iterator((e.dstId, List(UnfoldMsg(e.srcId, e.srcAttr.neighbors, e.srcAttr.outerLinkCount))))
+          if (e.srcAttr.community.size == 2 && e.srcAttr.community == e.dstAttr.community) {
+            Iterator((e.dstId, true,
+              e.srcAttr.outerLinkCount, e.srcAttr.ifMatch))))
           } else {
             Iterator()
           }
         },
 
         (neighbor1, neighbor2) => neighbor1 ++ neighbor2
-      )
+      )*/
     }
     firstPassGraph
   }
