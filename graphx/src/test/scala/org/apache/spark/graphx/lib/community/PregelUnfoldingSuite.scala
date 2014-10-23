@@ -31,9 +31,13 @@ class PregelUnfoldingSuite extends FunSuite with LocalSparkContext {
       val rawEdges = sc.parallelize(edges)
       val graph = Graph.fromEdgeTuples(rawEdges, -1)
       val puGraph = PregelUnfolding.run(graph, 1)
-      for ((id, com) <- puGraph.vertices.collect()) {
-        println(id)
-        println(com)
+      for ((a, NodeAttr(b, c, d, e, f)) <- puGraph.vertices.collect()) {
+        println(s"my id is $a")
+        println(s"my neighbors are ${b.mkString(",")}")
+        println(s"my community is ${c.mkString(",")}")
+        println(d)
+        println(e)
+        println(f)
       }
     }
   }

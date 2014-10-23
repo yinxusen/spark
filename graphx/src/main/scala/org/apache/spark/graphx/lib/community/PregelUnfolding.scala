@@ -20,6 +20,9 @@ package org.apache.spark.graphx.lib.community
 import org.apache.spark.graphx._
 import scala.reflect.ClassTag
 
+case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myLinkCount: Int)
+case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int, innerLinkCount: Int, largestGain: Double)
+
 object PregelUnfolding {
 
   /**
@@ -27,7 +30,7 @@ object PregelUnfolding {
    */
   def run[VD: ClassTag, ED: ClassTag](
       graph: Graph[VD, ED],
-      maxIter: Int): Graph[(Array[VertexId], Set[VertexId], Int, Int), ED] = {
+      maxIter: Int): Graph[NodeAttr, ED] = {
 
     graph.cache()
     val numGraphEdges = graph.degrees.map(_._2).fold(0)(_ + _) / 2
@@ -111,14 +114,13 @@ object PregelUnfolding {
     val neighID = graph.collectNeighborIds(EdgeDirection.Either)
     val ufWorkGraph = graph.outerJoinVertices(neighID)((vid, _, neighOpt) =>
       neighOpt.getOrElse(Array[VertexId]()))
-    val firstPassGraph = ufWorkGraph.mapVertices((vid, attr) => (attr, Set(vid), attr.size, 0))
+    var firstPassGraph = ufWorkGraph.mapVertices((vid, attr) => NodeAttr(attr, Set(vid), attr.size, 0, 0))
 
     var iter = 0
 
     while (iter < maxIter) {
       iter += 1
 
-      val initialMessage = Set[VertexId]()
       /**
       //generate a graph with vertex property as neighbor vertex' indexes
       ufWorkGraph = Pregel(ufWorkGraph, initialMessage, activeDirection = EdgeDirection.Either)(
@@ -137,24 +139,30 @@ object PregelUnfolding {
       //4. the links inside its community
       //the 2,3,4 are all for the first pass in fastunfolding
 
-      val InitialMessage: List[(Long, Array[VertexId], Int)]  //how to define initial message
+      val InitialMessage: List[UnfoldMsg] = Nil  //how to define initial message
 
-      firstPassGraph = Pregel(firstPassGraph, InitialMessage, activeDirection = EdgeDirection.Either)(
+      firstPassGraph = Pregel(firstPassGraph, InitialMessage, maxIterations = 2, activeDirection = EdgeDirection.Either)(
         (vid, attr, message) => {
-          def Kiin(a: Array[VertexId], b: Set[VertexId]) =
-            a.map{x => if ((x: VertexId) => b.contains(x)) 1 else 0}.reduce(_ + _)
+          def kiin(a: Array[VertexId], b: Set[VertexId]) = a.map(x => if (b.contains(x)) 1 else 0).reduce(_ + _)
 
-          val largestMes = message.maxBy(a => Kiin(a._2, attr._2) / 2 * numGraphEdges - attr._3 * a._3)
-          val largestGain = Kiin(largestMes._2, attr._2)  / 2 * numGraphEdges - attr._3 * largestMes._3
+          def modGain(msg: UnfoldMsg): Double = kiin(msg.myNeighbors, attr.community) / (2 * numGraphEdges) - attr.outerLinkCount * msg.myLinkCount / (2 * numGraphEdges * numGraphEdges)
 
-            if (largestGain <= 0 ) attr else
-            (attr._1, attr._2 + largestMes._1, attr._3 + largestMes._3 - 2, attr._4 + Kiin(largestMes._2, attr._2))
+          if (message.isEmpty) {
+            attr
+          } else {
+            val largestMes = message.maxBy(modGain)
+            val largestGain = modGain(largestMes)
+
+            //if (largestGain <= 0) attr
+            //else
+              NodeAttr(attr.neighbors, attr.community + largestMes.myId, attr.outerLinkCount + largestMes.myLinkCount - 2, attr.innerLinkCount + kiin(largestMes.myNeighbors, attr.community), largestGain)
+          }
 
         } ,
 
         e => {
-          if (e.srcAttr._2.size == 1) {
-            Iterator((e.dstId, (e.srcId, e.srcAttr._1, e.srcAttr._3)))
+          if (e.srcAttr.community.size == 1) {
+            Iterator((e.dstId, List(UnfoldMsg(e.srcId, e.srcAttr.neighbors, e.srcAttr.outerLinkCount))))
           } else {
             Iterator()
           }
