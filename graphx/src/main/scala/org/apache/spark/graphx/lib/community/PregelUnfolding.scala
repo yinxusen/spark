@@ -228,8 +228,11 @@ object PregelUnfolding {
             if (e.srcAttr.ifMatch && e.dstAttr.ifMatch && (e.srcAttr.community & e.dstAttr.community).size > 2 &&
               !(e.srcAttr.community == e.dstAttr.community) ) {
               Iterator((e.dstId, e.srcAttr.community.union(e.dstAttr.community)),
-                (e.srcId, e.srcAttr.community.union(e.dstAttr.community))
-            } else Iterator()
+                (e.srcId, e.srcAttr.community.union(e.dstAttr.community)))
+            } else if (e.srcAttr.ifMatch && !e.dstAttr.ifMatch && e.srcAttr.community(e.dstId)) {
+              Iterator((e.dstId, e.srcAttr.community))
+            }
+           else Iterator() 
           },
           mergeMsg = (a, b) => a.union(b)
         )
