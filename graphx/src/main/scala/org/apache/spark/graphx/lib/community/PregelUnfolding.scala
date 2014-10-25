@@ -157,15 +157,20 @@ object PregelUnfolding {
         vprog = (vid, attr, message) => {
 
           val messageReborn = message.map(msg =>  if(!msg.myIfMatch) UnfoldMsg(msg.myId, msg.myNeighbors,
-            Set(msg.myId), msg.myNeighbors.size, false))
+            Set(msg.myId), msg.myNeighbors.size, false) else msg)
+
+          val attrReborn =
+            if (!attr.ifMatch) NodeAttr(attr.neighbors, attr.community, attr.neighbors.size, 0, 0, false)
+            else attr
+
 
           def kiin(a: Array[VertexId], b: Set[VertexId]) = a.map(x => if (b.contains(x)) 1 else 0).reduce(_ + _)
 
-          def modGain(msg: UnfoldMsg): Double = kiin(msg.myNeighbors, attr.community) / (2 * numGraphEdges) -
-            attr.outerLinkCount * msg.myOuterLinkCount / (2 * numGraphEdges * numGraphEdges)
+          def modGain(msg: UnfoldMsg): Double = kiin(msg.myNeighbors, attrReborn.community) / (2 * numGraphEdges) -
+            attrReborn.outerLinkCount * msg.myOuterLinkCount / (2 * numGraphEdges * numGraphEdges)
 
           if (message.isEmpty) {
-            attr
+            attrReborn
           } else {
 
             val largestMes = messageReborn.maxBy(a => modGain(a)) // message.maxBy{a => modGain(a)}
@@ -173,9 +178,9 @@ object PregelUnfolding {
 
             //if (largestGain <= 0) attr
             //else
-            NodeAttr(attr.neighbors, attr.community + largestMes.myId,
-              attr.outerLinkCount + largestMes.myOuterLinkCount - 2,
-              attr.innerLinkCount + kiin(largestMes.myNeighbors, attr.community), largestGain, false)
+            NodeAttr(attrReborn.neighbors, attrReborn.community + largestMes.myId,
+              attrReborn.outerLinkCount + largestMes.myOuterLinkCount - 2,
+              attrReborn.innerLinkCount + kiin(largestMes.myNeighbors, attrReborn.community), largestGain, false)
           }
 
         } ,
@@ -213,6 +218,22 @@ object PregelUnfolding {
         },
         mergeMsg = (a, b) => a || b
       )
+      
+      // propogate the community newest changes
+      val tInitialMessage = false
+      firstPassGraph = Pregel(firstPassGraph, tInitialMessage, maxIterations = 1,
+        activeDirection = EdgeDirection.Either)(
+          vprog = (vid, attr, message) =>
+            NodeAttr(attr.neighbors, attr.community, attr.outerLinkCount,
+              attr.innerLinkCount, attr.largestGain, message),
+          sendMsg = e => {
+            if (e.srcAttr.community == e.dstAttr.community) {
+              Iterator((e.dstId, true),(e.srcId, true))
+            } else Iterator()
+          },
+          mergeMsg = (a, b) => a || b
+        )
+
 
 
       /**
