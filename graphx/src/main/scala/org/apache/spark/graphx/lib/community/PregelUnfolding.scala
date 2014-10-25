@@ -218,20 +218,20 @@ object PregelUnfolding {
         },
         mergeMsg = (a, b) => a || b
       )
-      
+
       // propogate the community newest changes
-      val tInitialMessage = false
-      firstPassGraph = Pregel(firstPassGraph, tInitialMessage, maxIterations = 1,
-        activeDirection = EdgeDirection.Either)(
-          vprog = (vid, attr, message) =>
-            NodeAttr(attr.neighbors, attr.community, attr.outerLinkCount,
-              attr.innerLinkCount, attr.largestGain, message),
+      val tInitialMessage = Set[VertexId]()
+      firstPassGraph = Pregel(firstPassGraph, tInitialMessage, activeDirection = EdgeDirection.Either)(
+          vprog = (vid, attr, message) => NodeAttr(attr.neighbors, message, attr.)// need to recalculate the outer inner links and maybe others
+            ,
           sendMsg = e => {
-            if (e.srcAttr.community == e.dstAttr.community) {
-              Iterator((e.dstId, true),(e.srcId, true))
+            if (e.srcAttr.ifMatch && e.dstAttr.ifMatch && (e.srcAttr.community & e.dstAttr.community).size > 2 &&
+              !(e.srcAttr.community == e.dstAttr.community) ) {
+              Iterator((e.dstId, e.srcAttr.community.union(e.dstAttr.community)),
+                (e.srcId, e.srcAttr.community.union(e.dstAttr.community))
             } else Iterator()
           },
-          mergeMsg = (a, b) => a || b
+          mergeMsg = (a, b) => a.union(b)
         )
 
 
