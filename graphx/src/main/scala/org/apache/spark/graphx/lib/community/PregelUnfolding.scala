@@ -160,7 +160,8 @@ object PregelUnfolding {
             //if (largestGain <= 0) attr
             //else
             NodeAttr(attrReborn.neighbors, attrReborn.community + largestMes.myId,
-              attrReborn.outerLinkCount + largestMes.myOuterLinkCount - 2,
+              attrReborn.outerLinkCount + largestMes.myOuterLinkCount -
+                2 * kiin(largestMes.myNeighbors, attrReborn.community),
               attrReborn.innerLinkCount + kiin(largestMes.myNeighbors, attrReborn.community), largestGain, false)
           }
 
@@ -208,14 +209,19 @@ object PregelUnfolding {
               else if (e.dstAttr.community subsetOf e.srcAttr.community)
               Iterator((e.dstId, e.srcAttr))
               else if (e.srcAttr.largestGain > e.dstAttr.largestGain)
-                Iterator((e.dstId, e.srcAttr))
-              else Iterator((e.srcId, e.dstAttr))
-            } else if (e.srcAttr.ifMatch && !e.dstAttr.ifMatch && e.srcAttr.community(e.dstId)) {
               Iterator((e.dstId, e.srcAttr))
-            } else if (e.dstAttr.ifMatch && !e.srcAttr.ifMatch && e.dstAttr.community(e.srcId)) {
+              else if (e.dstAttr.largestGain > e.srcAttr.largestGain)
+                Iterator((e.srcId, e.dstAttr))
+              else Iterator()
+
+            } else if (e.srcAttr.ifMatch && !e.dstAttr.ifMatch){
+              if (e.srcAttr.community(e.dstId))
+              Iterator((e.dstId, e.srcAttr))
+              else if (e.dstAttr.community(e.srcId))
               Iterator((e.srcId, e.dstAttr))
+              else Iterator()
             }
-           else Iterator()
+              else Iterator()
           },
           mergeMsg = (a, b) => {
             if (a.largestGain > b.largestGain) a else b
