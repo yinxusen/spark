@@ -125,17 +125,6 @@ object PregelUnfolding {
     while (iter < maxIter) {
       iter += 1
 
-      /**
-      //generate a graph with vertex property as neighbor vertex' indexes
-      ufWorkGraph = Pregel(ufWorkGraph, initialMessage, activeDirection = EdgeDirection.Either)(
-        (vid, attr, message) => message,
-
-        e => Iterator((e.dstId, Set(e.srcId)),(e.srcId, Set(e.dstId))),
-
-        (neighbor1, neighbor2) => neighbor1 ++ neighbor2
-      )
-      */
-
       //generate a graph with four elements as its vertex properties, including
       //1. neighbor vertex's indexes;
       //2. its community's members' indexes;
@@ -144,14 +133,6 @@ object PregelUnfolding {
       //the 2,3,4 are all for the first pass in fastunfolding
 
       val InitialMessage: List[UnfoldMsg] = Nil  //how to define initial message
-
-      /**
-       * case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myCommunity: Set[VertexId],
-                     myOuterLinkCount: Int)
-
-         case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int,
-                    innerLinkCount: Int, largestGain: Double)
-       */
 
       firstPassGraph = Pregel(firstPassGraph, InitialMessage, maxIterations = 1, activeDirection = EdgeDirection.Either)(
         vprog = (vid, attr, message) => {
@@ -185,13 +166,7 @@ object PregelUnfolding {
 
         } ,
 
-        /**
-         * case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myCommunity: Set[VertexId],
-                     myOuterLinkCount: Int, myIfMatch: Boolean)
 
-           case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int,
-                    innerLinkCount: Int, ifMatch: Boolean,largestGain: Double)
-         */
         sendMsg = e => {
           if (!e.srcAttr.ifMatch) {
             Iterator((e.dstId, List(UnfoldMsg(e.srcId, e.srcAttr.neighbors, e.srcAttr.community,
@@ -219,22 +194,32 @@ object PregelUnfolding {
         mergeMsg = (a, b) => a || b
       )
 
-      // propogate the community newest changes
-      val tInitialMessage = Set[VertexId]()
+      // propogate the community newest changes, no way to unify but keep one of two
+      val tInitialMessage = NodeAttr(Array(), Set(), 0, 0, Double.MinValue, false)
       firstPassGraph = Pregel(firstPassGraph, tInitialMessage, activeDirection = EdgeDirection.Either)(
-          vprog = (vid, attr, message) => NodeAttr(attr.neighbors, message, attr.)// need to recalculate the outer inner links and maybe others
+          vprog = (vid, attr, message) => {
+            message
+          }
             ,
           sendMsg = e => {
-            if (e.srcAttr.ifMatch && e.dstAttr.ifMatch && (e.srcAttr.community & e.dstAttr.community).size > 2 &&
-              !(e.srcAttr.community == e.dstAttr.community) ) {
-              Iterator((e.dstId, e.srcAttr.community.union(e.dstAttr.community)),
-                (e.srcId, e.srcAttr.community.union(e.dstAttr.community)))
+            if (e.srcAttr.ifMatch && e.dstAttr.ifMatch) {
+              if (e.srcAttr.community subsetOf e.dstAttr.community)
+              Iterator((e.srcId, e.dstAttr))
+              else if (e.dstAttr.community subsetOf e.srcAttr.community)
+              Iterator((e.dstId, e.srcAttr))
+              else if (e.srcAttr.largestGain > e.dstAttr.largestGain)
+                Iterator((e.dstId, e.srcAttr))
+              else Iterator((e.srcId, e.dstAttr))
             } else if (e.srcAttr.ifMatch && !e.dstAttr.ifMatch && e.srcAttr.community(e.dstId)) {
-              Iterator((e.dstId, e.srcAttr.community))
+              Iterator((e.dstId, e.srcAttr))
+            } else if (e.dstAttr.ifMatch && !e.srcAttr.ifMatch && e.dstAttr.community(e.srcId)) {
+              Iterator((e.srcId, e.dstAttr))
             }
-           else Iterator() 
+           else Iterator()
           },
-          mergeMsg = (a, b) => a.union(b)
+          mergeMsg = (a, b) => {
+            if (a.largestGain > b.largestGain) a else b
+          }
         )
 
 
@@ -246,13 +231,6 @@ object PregelUnfolding {
 
         } ,
 
-        /**
-         * case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myCommunity: Set[VertexId],
-                     myOuterLinkCount: Int, myIfMatch: Boolean)
-
-           case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int,
-                    innerLinkCount: Int, ifMatch: Boolean,largestGain: Double)
-         */
         e => {
           if (e.srcAttr.community.size == 2 && e.srcAttr.community == e.dstAttr.community) {
             Iterator((e.dstId, true,
