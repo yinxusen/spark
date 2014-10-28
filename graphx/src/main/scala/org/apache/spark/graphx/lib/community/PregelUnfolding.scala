@@ -21,10 +21,10 @@ import org.apache.spark.graphx._
 import scala.reflect.ClassTag
 
 case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myCommunity: Set[VertexId],
-                     myOuterLinkCount: Int, myIfMatch: Boolean)
+                     myOuterLinkCount: Int, myIfSingle: Boolean)
 
 case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int,
-                    innerLinkCount: Int, largestGain: Double, ifMatch: Boolean)
+                    innerLinkCount: Int, largestGain: Double, ifSingle: Boolean)
 
 object PregelUnfolding {
 
@@ -117,8 +117,7 @@ object PregelUnfolding {
     val neighID = graph.collectNeighborIds(EdgeDirection.Either)
     val ufWorkGraph = graph.outerJoinVertices(neighID)((vid, _, neighOpt) =>
       neighOpt.getOrElse(Array[VertexId]()))
-    var firstPassGraph = ufWorkGraph.mapVertices((vid, attr) => NodeAttr(attr, Set(vid), attr.size, 0, 0, false))
-    var colorGraph = ufWorkGraph.mapVertices((vid, attr) => false)
+    var firstPassGraph = ufWorkGraph.mapVertices((vid, attr) => NodeAttr(attr, Set(vid), attr.size, 0, 0, true))
 
     var iter = 0
 
@@ -137,11 +136,11 @@ object PregelUnfolding {
       firstPassGraph = Pregel(firstPassGraph, InitialMessage, maxIterations = 1, activeDirection = EdgeDirection.Either)(
         vprog = (vid, attr, message) => {
 
-          val messageReborn = message.map(msg =>  if(!msg.myIfMatch) UnfoldMsg(msg.myId, msg.myNeighbors,
-            Set(msg.myId), msg.myNeighbors.size, false) else msg)
+          val messageReborn = message.map(msg =>  if(!msg.myIfSingle) UnfoldMsg(msg.myId, msg.myNeighbors,
+            Set(msg.myId), msg.myNeighbors.size, true) else msg)
 
           val attrReborn =
-            if (!attr.ifMatch) NodeAttr(attr.neighbors, attr.community, attr.neighbors.size, 0, 0, false)
+            if (attr.ifSingle) NodeAttr(attr.neighbors, Set(vid), attr.neighbors.size, 0, 0, true)
             else attr
 
 
@@ -158,30 +157,31 @@ object PregelUnfolding {
             val largestGain = modGain(largestMes)
 
             //if (largestGain <= 0) attr
-            //else
+            //else 
             NodeAttr(attrReborn.neighbors, attrReborn.community + largestMes.myId,
               attrReborn.outerLinkCount + largestMes.myOuterLinkCount -
                 2 * kiin(largestMes.myNeighbors, attrReborn.community),
-              attrReborn.innerLinkCount + kiin(largestMes.myNeighbors, attrReborn.community), largestGain, false)
+              attrReborn.innerLinkCount + kiin(largestMes.myNeighbors, attrReborn.community),
+              largestGain, attrReborn.ifSingle)//
           }
 
         } ,
 
 
         sendMsg = e => {
-          if (!e.srcAttr.ifMatch) {
+          if (e.srcAttr.ifSingle) {
             Iterator((e.dstId, List(UnfoldMsg(e.srcId, e.srcAttr.neighbors, e.srcAttr.community,
-              e.srcAttr.outerLinkCount, e.srcAttr.ifMatch))))
-          } else if(!e.srcAttr.ifMatch) {
+              e.srcAttr.outerLinkCount, e.srcAttr.ifSingle))))
+          } else if(e.dstAttr.ifSingle) {
             Iterator((e.srcId, List(UnfoldMsg(e.dstId, e.dstAttr.neighbors, e.dstAttr.community,
-              e.dstAttr.outerLinkCount, e.srcAttr.ifMatch))))
+              e.dstAttr.outerLinkCount, e.srcAttr.ifSingle))))
           } else Iterator()
         },
 
         mergeMsg = (neighbor1, neighbor2) => neighbor1 ++ neighbor2
       )
 
-      val sInitialMessage = false
+      val sInitialMessage = true
       firstPassGraph = Pregel(firstPassGraph, sInitialMessage, maxIterations = 1,
         activeDirection = EdgeDirection.Either)(
         vprog = (vid, attr, message) =>
@@ -189,10 +189,10 @@ object PregelUnfolding {
             attr.innerLinkCount, attr.largestGain, message),
         sendMsg = e => {
           if (e.srcAttr.community == e.dstAttr.community) {
-            Iterator((e.dstId, true),(e.srcId, true))
+            Iterator((e.dstId, false),(e.srcId, false))
           } else Iterator()
         },
-        mergeMsg = (a, b) => a || b
+        mergeMsg = (a, b) => a && b
       )
 
       // propogate the community newest changes, no way to unify but keep one of two
@@ -203,7 +203,7 @@ object PregelUnfolding {
           }
             ,
           sendMsg = e => {
-            if (e.srcAttr.ifMatch && e.dstAttr.ifMatch) {
+            if (!e.srcAttr.ifSingle && !e.dstAttr.ifSingle) {
               if (e.srcAttr.community subsetOf e.dstAttr.community)
               Iterator((e.srcId, e.dstAttr))
               else if (e.dstAttr.community subsetOf e.srcAttr.community)
@@ -214,7 +214,7 @@ object PregelUnfolding {
                 Iterator((e.srcId, e.dstAttr))
               else Iterator()
 
-            } else if (e.srcAttr.ifMatch && !e.dstAttr.ifMatch){
+            } else if (!e.srcAttr.ifSingle && e.dstAttr.ifSingle){
               if (e.srcAttr.community(e.dstId))
               Iterator((e.dstId, e.srcAttr))
               else if (e.dstAttr.community(e.srcId))
