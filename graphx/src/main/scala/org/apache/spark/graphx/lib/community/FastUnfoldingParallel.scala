@@ -285,10 +285,10 @@ object FastUnfoldingParallel {
    * @return
    */
   def reCommunityParallel[VD: ClassTag](
-                                         graph: Graph[VD, Long],
-                                         sc: SparkContext,
-                                         maxIters: Int = Int.MaxValue,
-                                         minChange: Double = 0.01): RDD[(Long,Long)] = {
+      graph: Graph[VD, Long],
+      sc: SparkContext,
+      maxIters: Int = Int.MaxValue,
+      minChange: Double = 0.01): RDD[(Long,Long)] = {
 
     println("reCommunityParallel...")
     var iters = 0
@@ -299,8 +299,6 @@ object FastUnfoldingParallel {
       sendMsg = (edge) => Iterator((edge.srcId, edge.attr), (edge.dstId, edge.attr)),
       mergeMsg = (a, b) => a + b).vertices.map(v => (v._1.toLong, v._2))
 
-    // println("vertexTotalWeight " + vertexTotalWeight.count())
-
     var newGraph = generateInitGraph(graph, vertexTotalWeight).cache()
     var currentCommunity: RDD[(Long, Long)] = null
     var changeRate = 0.0
@@ -309,7 +307,7 @@ object FastUnfoldingParallel {
       val vertexRdd = newGraph.mapReduceTriplets[Array[VertexData]](edgeMapFunc, _ ++ _).cache()
       println("---iters: " + iters + "\tvertexRdd count:" + vertexRdd.count())
 
-      val idCommunity = vertexRdd.map{
+      val idCommunity = vertexRdd.map {
         case (vid, vdArray) => (vid.toLong, getBestCommunity(vdArray, curDegree))
       }.cache()
 
@@ -318,10 +316,6 @@ object FastUnfoldingParallel {
       val commWeightTmp = idCommunity.join(vertexTotalWeight).map{
         case (vid, (community, degree)) => (community, degree.toLong)
       }
-
-      val a = sc.parallelize(List((1l, 2l), (3l, 4l)))
-      val b = sc.parallelize(List((1l, 2l), (3l, 4l)))
-      val c = a.join(b).map { case (k, (x, y)) => ??? }
 
       val commWeight = commWeightTmp.reduceByKey(_ + _).cache()
       println("---iters: " + iters + "\tcommWeight count:" + commWeight.count())
@@ -437,6 +431,7 @@ object FastUnfoldingParallel {
         arr
     }
 
+    // TODO: Here use getOrElse(0) as dummy value seems have a problem.
     val newEdgeRdd = edgeRdd.leftOuterJoin(result)
       .map{ case (srcId, (dstId, srcComm)) => (dstId, srcComm.getOrElse(0L)) }
       .leftOuterJoin(result)
@@ -689,12 +684,12 @@ object FastUnfoldingParallel {
    * @param maxIters maximum times for "pass"
    */
   def process(
-               edgeFile: String,
-               partitionNum: Int,
-               sc: SparkContext,
-               maxProcessTimes: Int = Integer.MAX_VALUE,
-               minChange: Double = 0.001,
-               maxIters: Int = Integer.MAX_VALUE): RDD[(Long, Long)] = {
+      edgeFile: String,
+      partitionNum: Int,
+      sc: SparkContext,
+      maxProcessTimes: Int = Integer.MAX_VALUE,
+      minChange: Double = 0.001,
+      maxIters: Int = Integer.MAX_VALUE): RDD[(Long, Long)] = {
 
     initialization(edgeFile, partitionNum, sc)
 
@@ -704,12 +699,13 @@ object FastUnfoldingParallel {
     var edgeRdd = getEdgeRdd(graphEdges).cache()
     println("In the beginning edgeRdd count " + edgeRdd.count())
 
-    do{
+    do {
       val newEdgeRdd = edgeRdd
       val graph = Graph.fromEdges(newEdgeRdd, 1L).cache()
 
       val curResult = reCommunityParallel(graph, sc, maxIters, minChange)
-      //      println("################ times: " + current + "\tcurResult is: " + curResult.count())
+
+      outputCommunity(s"/tmp/res/temp-$current", communityResult)
 
       updateCommunity(curResult)
 
