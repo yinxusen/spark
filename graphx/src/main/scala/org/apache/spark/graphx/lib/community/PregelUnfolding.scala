@@ -136,7 +136,7 @@ object PregelUnfolding {
       firstPassGraph = Pregel(firstPassGraph, InitialMessage, maxIterations = 1, activeDirection = EdgeDirection.Either)(
         vprog = (vid, attr, message) => {
 
-          val messageReborn = message.map(msg =>  if(!msg.myIfSingle) UnfoldMsg(msg.myId, msg.myNeighbors,
+          val messageReborn = message.map(msg =>  if(msg.myIfSingle) UnfoldMsg(msg.myId, msg.myNeighbors,
             Set(msg.myId), msg.myNeighbors.size, true) else msg)
 
           val attrReborn =
@@ -144,25 +144,35 @@ object PregelUnfolding {
             else attr
 
 
-          def kiin(a: Array[VertexId], b: Set[VertexId]) = a.map(x => if (b.contains(x)) 1 else 0).reduce(_ + _)
+          def kiin(a: Array[VertexId], b: Set[VertexId]) = a.map(x => if (b.contains(x)) 1 else 0).fold(0)(_ + _)
 
-          def modGain(msg: UnfoldMsg): Double = kiin(msg.myNeighbors, attrReborn.community) / (2 * numGraphEdges) -
-            attrReborn.outerLinkCount * msg.myOuterLinkCount / (2 * numGraphEdges * numGraphEdges)
+          def modGain(msg: UnfoldMsg): Double = {
+            val a = msg.myNeighbors
+            val b = attrReborn.community
+            val c = numGraphEdges
+            val d = attrReborn.outerLinkCount
+            val e = msg.myOuterLinkCount
+            val res = 1.0 * kiin(msg.myNeighbors, attrReborn.community) -
+              attrReborn.outerLinkCount * msg.myOuterLinkCount * 1.0 / numGraphEdges
+            res
+          }
 
           if (message.isEmpty) {
-            attrReborn
+            attr
           } else {
 
-            val largestMes = messageReborn.maxBy(a => modGain(a)) // message.maxBy{a => modGain(a)}
+            val largestMes = messageReborn.maxBy(modGain) // message.maxBy{a => modGain(a)}
             val largestGain = modGain(largestMes)
 
-            //if (largestGain <= 0) attr
-            //else 
-            NodeAttr(attrReborn.neighbors, attrReborn.community + largestMes.myId,
-              attrReborn.outerLinkCount + largestMes.myOuterLinkCount -
-                2 * kiin(largestMes.myNeighbors, attrReborn.community),
-              attrReborn.innerLinkCount + kiin(largestMes.myNeighbors, attrReborn.community),
-              largestGain, attrReborn.ifSingle)//
+            if (largestGain <= 0) {
+              attr
+            } else {
+              NodeAttr(attrReborn.neighbors, attrReborn.community + largestMes.myId,
+                attrReborn.outerLinkCount + largestMes.myOuterLinkCount -
+                  2 * kiin(largestMes.myNeighbors, attrReborn.community),
+                attrReborn.innerLinkCount + kiin(largestMes.myNeighbors, attrReborn.community),
+                largestGain, attrReborn.ifSingle)
+            }
           }
 
         } ,
@@ -182,7 +192,7 @@ object PregelUnfolding {
       )
 
       val sInitialMessage = true
-      firstPassGraph = Pregel(firstPassGraph, sInitialMessage, maxIterations = 1,
+      firstPassGraph = Pregel(firstPassGraph, sInitialMessage, maxIterations = 2,
         activeDirection = EdgeDirection.Either)(
         vprog = (vid, attr, message) =>
           NodeAttr(attr.neighbors, attr.community, attr.outerLinkCount,
@@ -195,6 +205,7 @@ object PregelUnfolding {
         mergeMsg = (a, b) => a && b
       )
 
+      /*
       // propogate the community newest changes, no way to unify but keep one of two
       val tInitialMessage = NodeAttr(Array(), Set(), 0, 0, Double.MinValue, false)
       firstPassGraph = Pregel(firstPassGraph, tInitialMessage, activeDirection = EdgeDirection.Either)(
@@ -226,28 +237,7 @@ object PregelUnfolding {
           mergeMsg = (a, b) => {
             if (a.largestGain > b.largestGain) a else b
           }
-        )
-
-
-
-      /**
-      secondPassGraph = Pregel(firstPassGraph, InitialMessage, maxIterations = 2, activeDirection = EdgeDirection.Either)(
-        (vid, attr, message) => {
-
-
-        } ,
-
-        e => {
-          if (e.srcAttr.community.size == 2 && e.srcAttr.community == e.dstAttr.community) {
-            Iterator((e.dstId, true,
-              e.srcAttr.outerLinkCount, e.srcAttr.ifMatch))))
-          } else {
-            Iterator()
-          }
-        },
-
-        (neighbor1, neighbor2) => neighbor1 ++ neighbor2
-      )*/
+        )*/
     }
     firstPassGraph
   }

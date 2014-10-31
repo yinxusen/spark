@@ -24,21 +24,27 @@ class PregelUnfoldingSuite extends FunSuite with LocalSparkContext {
 
   test("2 Cycle Strongly Connected Components") {
     withSpark { sc =>
+/*
       val edges =
         Array(0L -> 1L, 1L -> 2L, 2L -> 0L) ++
         Array(3L -> 4L, 4L -> 5L, 5L -> 3L) ++
         Array(6L -> 0L, 5L -> 7L)
       val rawEdges = sc.parallelize(edges)
+*/
+      val rawEdges = sc.textFile("/home/lan/data/test.csv", 2).map(s => s.split(",").head.toLong -> s.split(",").last.toLong)
       val graph = Graph.fromEdgeTuples(rawEdges, -1)
-      val puGraph = PregelUnfolding.run(graph, 1)
+      val puGraph = PregelUnfolding.run(graph, 3)
       for ((a, NodeAttr(b, c, d, e, f, g)) <- puGraph.vertices.collect()) {
+        /*
         println(s"my id is $a")
         println(s"my neighbors are ${b.mkString(",")}")
         println(s"my community is ${c.mkString(",")}")
-        println(d)
-        println(e)
-        println(f)
-        println(g)
+        println(s"my outer links count is $d")
+        println(s"my inner links count is $e")
+        println(s"largest mod gain is $f")
+        println(s"Am I single? $g")
+        */
+        println(c.mkString(","))
       }
     }
   }
