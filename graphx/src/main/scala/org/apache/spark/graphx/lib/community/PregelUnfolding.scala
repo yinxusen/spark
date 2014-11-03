@@ -21,10 +21,10 @@ import org.apache.spark.graphx._
 import scala.reflect.ClassTag
 
 case class UnfoldMsg(myId: VertexId, myNeighbors: Array[VertexId], myCommunity: Set[VertexId],
-                     myOuterLinkCount: Int, myIfSingle: Boolean)
+                     myOuterLinkCount: Int)
 
 case class NodeAttr(neighbors: Array[VertexId], community: Set[VertexId], outerLinkCount: Int,
-                    innerLinkCount: Int, largestGain: Double, ifSingle: Boolean)
+                    innerLinkCount: Int, largestGain: List[(VertexId, Double)])
 
 object PregelUnfolding {
 
@@ -117,12 +117,66 @@ object PregelUnfolding {
     val neighID = graph.collectNeighborIds(EdgeDirection.Either)
     val ufWorkGraph = graph.outerJoinVertices(neighID)((vid, _, neighOpt) =>
       neighOpt.getOrElse(Array[VertexId]()))
-    var firstPassGraph = ufWorkGraph.mapVertices((vid, attr) => NodeAttr(attr, Set(vid), attr.size, 0, 0, true))
+    var firstPassGraph = ufWorkGraph.mapVertices((vid, neighbors) => NodeAttr(neighbors, Set(vid), neighbors.size, 0, Nil))
 
     var iter = 0
 
     while (iter < maxIter) {
       iter += 1
+
+
+
+      val InitialMessage: List[UnfoldMsg] = Nil  //how to define initial message
+
+      firstPassGraph = Pregel(firstPassGraph, InitialMessage, maxIterations = 1, activeDirection = EdgeDirection.Either)(
+        vprog = (vid, attr, message) => {
+
+          def kiin(a: Array[VertexId], b: Set[VertexId]) = a.map(x => if (b.contains(x)) 1 else 0).fold(0)(_ + _)
+
+          def modGain(msg: UnfoldMsg): Double = {
+            val a = msg.myNeighbors
+            val b = attr.community
+            val c = numGraphEdges
+            val d = attr.outerLinkCount
+            val e = msg.myOuterLinkCount
+            val res = 1.0 * kiin(msg.myNeighbors, attr.community) -
+              attr.outerLinkCount * msg.myOuterLinkCount * 1.0 / numGraphEdges
+            res
+          }
+
+          if (message.isEmpty) {
+            attr
+          } else {
+
+            val largestMes = message.maxBy(modGain) // message.maxBy{a => modGain(a)}
+            val largestGain = modGain(largestMes)
+
+            if (largestGain <= 0) {
+              attr
+            } else {
+              NodeAttr(attr.neighbors, attr.community + largestMes.myId,
+                attr.outerLinkCount + largestMes.myOuterLinkCount -
+                  2 * kiin(largestMes.myNeighbors, attr.community),
+                attr.innerLinkCount + kiin(largestMes.myNeighbors, attr.community),
+                attr.largestGain :+ (largestMes.myId, largestGain))
+            }
+          }
+
+        } ,
+
+
+        sendMsg = e => {
+          if (!e.dstAttr.community(e.srcId)) {
+            Iterator((e.dstId, List(UnfoldMsg(e.srcId, e.srcAttr.neighbors, Set(e.srcId),
+              e.srcAttr.neighbors.size))))
+          } else if(!e.srcAttr.community(e.dstId)) {
+            Iterator((e.srcId, List(UnfoldMsg(e.dstId, e.dstAttr.neighbors, Set(e.dstId),
+              e.dstAttr.neighbors.size))))
+          } else Iterator()
+        },
+
+        mergeMsg = (neighbor1, neighbor2) => neighbor1 ++ neighbor2
+      )
 
       //generate a graph with four elements as its vertex properties, including
       //1. neighbor vertex's indexes;
@@ -130,7 +184,7 @@ object PregelUnfolding {
       //3. the links incidents to its community;
       //4. the links inside its community
       //the 2,3,4 are all for the first pass in fastunfolding
-
+      /*
       val InitialMessage: List[UnfoldMsg] = Nil  //how to define initial message
 
       firstPassGraph = Pregel(firstPassGraph, InitialMessage, maxIterations = 1, activeDirection = EdgeDirection.Either)(
@@ -205,7 +259,7 @@ object PregelUnfolding {
         mergeMsg = (a, b) => a && b
       )
 
-      /*
+
       // propogate the community newest changes, no way to unify but keep one of two
       val tInitialMessage = NodeAttr(Array(), Set(), 0, 0, Double.MinValue, false)
       firstPassGraph = Pregel(firstPassGraph, tInitialMessage, activeDirection = EdgeDirection.Either)(
