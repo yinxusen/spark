@@ -20,6 +20,7 @@ package org.apache.spark.mllib.tree.impl
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.model.Bin
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{SQLContext, SchemaRDD}
 
 
 /**
@@ -67,6 +68,89 @@ private[tree] object TreePoint {
     input.map { x =>
       TreePoint.labeledPointToTreePoint(x, bins, featureArity, isUnordered)
     }
+  }
+
+  def convertToTreeRDD(
+      sqlCtx: SQLContext,
+      input: SchemaRDD,
+      columnNames: Array[String],
+      bins: Array[Array[Bin]],
+      metadata: DecisionTreeMetadata): RDD[TreePoint] = {
+    // Construct arrays for featureArity and isUnordered for efficiency in the inner loop.
+    val featureArity: Array[Int] = new Array[Int](metadata.numFeatures)
+    val isUnordered: Array[Boolean] = new Array[Boolean](metadata.numFeatures)
+    var featureIndex = 0
+    while (featureIndex < metadata.numFeatures) {
+      featureArity(featureIndex) = metadata.featureArity.getOrElse(featureIndex, 0)
+      isUnordered(featureIndex) = metadata.isUnordered(featureIndex)
+      featureIndex += 1
+    }
+    val binWiseInput = binWiseEachColumn(sqlCtx, input, columnNames, bins, featureArity, isUnordered)
+    convertSchemaRDDToTreeRDD(binWiseInput, columnNames.size)
+  }
+
+  private def convertSchemaRDDToTreeRDD(input: SchemaRDD, columnCount: Int): RDD[TreePoint] = {
+    input.map { row =>
+      new TreePoint(row.getDouble(0), Array.tabulate[Int](columnCount - 1)(i => row.getInt(i + 1)))
+    }
+  }
+
+  private def binarySearchForBins(bin: Array[Bin], feature: Double): Int = {
+    var left = 0
+    var right = bin.length - 1
+    while (left <= right) {
+      val mid = left + (right - left) / 2
+      val pos = bin(mid)
+      val lowThreshold = pos.lowSplit.threshold
+      val highThreshold = pos.highSplit.threshold
+      if ((lowThreshold < feature) && (highThreshold >= feature)) {
+        return mid
+      } else if (lowThreshold >= feature) {
+        right = mid - 1
+      } else {
+        left = mid + 1
+      }
+    }
+    -1
+  }
+
+  private val findBin: (Array[Bin], Int, Boolean) => Double => Int =
+    (bin, featureArity, isUnordered) =>
+      feature =>
+        if (featureArity == 0) {
+          // Perform binary search for finding bin for continuous features.
+          val binIndex = binarySearchForBins(bin, feature)
+          if (binIndex == -1) {
+            throw new RuntimeException("No bin was found for continuous feature." +
+              " This error can occur when given invalid data values (such as NaN).")
+          }
+          binIndex
+        } else {
+          // Categorical feature bins are indexed by feature values.
+          if (feature < 0 || feature >= featureArity) {
+            throw new IllegalArgumentException(
+              s"DecisionTree given invalid data.")
+          }
+          feature.toInt
+        }
+
+  private def binWiseEachColumn(
+      sqlCtx: SQLContext,
+      input: SchemaRDD,
+      columnNames: Array[String],
+      bins: Array[Array[Bin]],
+      featureArity: Array[Int],
+      isUnordered: Array[Boolean]): SchemaRDD = {
+
+    sqlCtx.registerRDDAsTable(input, "INPUT")
+    val parts = columnNames zip bins zip featureArity zip isUnordered map {
+      case (((columnName, bin), fArity), unordered) =>
+        sqlCtx.registerFunction(s"findBin$columnName", findBin(bin, fArity, unordered))
+        s"findBin$columnName($columnName) as bin$columnName"
+    }
+    val projections = parts.mkString(", ")
+    println(projections)
+    sqlCtx.sql(s"SELECT LABEL, $projections FROM INPUT")
   }
 
   /**
