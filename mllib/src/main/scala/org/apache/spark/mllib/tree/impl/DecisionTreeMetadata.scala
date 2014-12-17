@@ -17,6 +17,8 @@
 
 package org.apache.spark.mllib.tree.impl
 
+import org.apache.spark.sql.SchemaRDD
+
 import scala.collection.mutable
 
 import org.apache.spark.Logging
@@ -109,6 +111,88 @@ private[tree] object DecisionTreeMetadata extends Logging {
 
     val numFeatures = input.take(1)(0).features.size
     val numExamples = input.count()
+    val numClasses = strategy.algo match {
+      case Classification => strategy.numClasses
+      case Regression => 0
+    }
+
+    val maxPossibleBins = math.min(strategy.maxBins, numExamples).toInt
+    if (maxPossibleBins < strategy.maxBins) {
+      logWarning(s"DecisionTree reducing maxBins from ${strategy.maxBins} to $maxPossibleBins" +
+        s" (= number of training instances)")
+    }
+
+    // We check the number of bins here against maxPossibleBins.
+    // This needs to be checked here instead of in Strategy since maxPossibleBins can be modified
+    // based on the number of training examples.
+    if (strategy.categoricalFeaturesInfo.nonEmpty) {
+      val maxCategoriesPerFeature = strategy.categoricalFeaturesInfo.values.max
+      require(maxCategoriesPerFeature <= maxPossibleBins,
+        s"DecisionTree requires maxBins (= $maxPossibleBins) >= max categories " +
+          s"in categorical features (= $maxCategoriesPerFeature)")
+    }
+
+    val unorderedFeatures = new mutable.HashSet[Int]()
+    val numBins = Array.fill[Int](numFeatures)(maxPossibleBins)
+    if (numClasses > 2) {
+      // Multiclass classification
+      val maxCategoriesForUnorderedFeature =
+        ((math.log(maxPossibleBins / 2 + 1) / math.log(2.0)) + 1).floor.toInt
+      strategy.categoricalFeaturesInfo.foreach { case (featureIndex, numCategories) =>
+        // Decide if some categorical features should be treated as unordered features,
+        //  which require 2 * ((1 << numCategories - 1) - 1) bins.
+        // We do this check with log values to prevent overflows in case numCategories is large.
+        // The next check is equivalent to: 2 * ((1 << numCategories - 1) - 1) <= maxBins
+        if (numCategories <= maxCategoriesForUnorderedFeature) {
+          unorderedFeatures.add(featureIndex)
+          numBins(featureIndex) = numUnorderedBins(numCategories)
+        } else {
+          numBins(featureIndex) = numCategories
+        }
+      }
+    } else {
+      // Binary classification or regression
+      strategy.categoricalFeaturesInfo.foreach { case (featureIndex, numCategories) =>
+        numBins(featureIndex) = numCategories
+      }
+    }
+
+    // Set number of features to use per node (for random forests).
+    val _featureSubsetStrategy = featureSubsetStrategy match {
+      case "auto" =>
+        if (numTrees == 1) {
+          "all"
+        } else {
+          if (strategy.algo == Classification) {
+            "sqrt"
+          } else {
+            "onethird"
+          }
+        }
+      case _ => featureSubsetStrategy
+    }
+    val numFeaturesPerNode: Int = _featureSubsetStrategy match {
+      case "all" => numFeatures
+      case "sqrt" => math.sqrt(numFeatures).ceil.toInt
+      case "log2" => math.max(1, (math.log(numFeatures) / math.log(2)).ceil.toInt)
+      case "onethird" => (numFeatures / 3.0).ceil.toInt
+    }
+
+    new DecisionTreeMetadata(numFeatures, numExamples, numClasses, numBins.max,
+      strategy.categoricalFeaturesInfo, unorderedFeatures.toSet, numBins,
+      strategy.impurity, strategy.quantileCalculationStrategy, strategy.maxDepth,
+      strategy.minInstancesPerNode, strategy.minInfoGain, numTrees, numFeaturesPerNode)
+  }
+
+  def buildMetadata(
+      limitedInput: SchemaRDD,
+      columnNames: Array[String],
+      strategy: Strategy,
+      numTrees: Int,
+      featureSubsetStrategy: String): DecisionTreeMetadata = {
+
+    val numFeatures = columnNames.size
+    val numExamples = limitedInput.count()
     val numClasses = strategy.algo match {
       case Classification => strategy.numClasses
       case Regression => 0

@@ -17,6 +17,8 @@
 
 package org.apache.spark.mllib.tree
 
+import org.apache.spark.sql.{SQLContext, SchemaRDD}
+
 import scala.collection.mutable
 import scala.collection.JavaConverters._
 
@@ -257,6 +259,142 @@ private class RandomForest (
     new RandomForestModel(strategy.algo, trees)
   }
 
+  def run(
+      limitedInput: SchemaRDD,
+      columnNames: Array[String],
+      sqlCtx: SQLContext): RandomForestModel = {
+
+    val timer = new TimeTracker()
+
+    timer.start("total")
+
+    timer.start("init")
+
+    val metadata = DecisionTreeMetadata
+      .buildMetadata(limitedInput, columnNames, strategy, numTrees, featureSubsetStrategy)
+    logDebug("algo = " + strategy.algo)
+    logDebug("numTrees = " + numTrees)
+    logDebug("seed = " + seed)
+    logDebug("maxBins = " + metadata.maxBins)
+    logDebug("featureSubsetStrategy = " + featureSubsetStrategy)
+    logDebug("numFeaturesPerNode = " + metadata.numFeaturesPerNode)
+
+    // Find the splits and the corresponding bins (interval between the splits) using a sample
+    // of the input data.
+    timer.start("findSplitsBins")
+    val (splits, bins) = DecisionTree
+      .findSplitsBinsFromSchemaRDD(sqlCtx, limitedInput, columnNames, metadata)
+    timer.stop("findSplitsBins")
+    logDebug("numBins: feature: number of bins")
+    logDebug(Range(0, metadata.numFeatures).map { featureIndex =>
+        s"\t$featureIndex\t${metadata.numBins(featureIndex)}"
+      }.mkString("\n"))
+
+    // Bin feature values (TreePoint representation).
+    // Cache input RDD for speedup during multiple passes.
+    val treeInput = TreePoint.convertToTreeRDD(sqlCtx, limitedInput, columnNames, bins, metadata)
+
+    val (subsample, withReplacement) = {
+      // TODO: Have a stricter check for RF in the strategy
+      val isRandomForest = numTrees > 1
+      if (isRandomForest) {
+        (1.0, true)
+      } else {
+        (strategy.subsamplingRate, false)
+      }
+    }
+
+    val baggedInput
+      = BaggedPoint.convertToBaggedRDD(treeInput, subsample, numTrees, withReplacement, seed)
+        .persist(StorageLevel.MEMORY_AND_DISK)
+
+    // depth of the decision tree
+    val maxDepth = strategy.maxDepth
+    require(maxDepth <= 30,
+      s"DecisionTree currently only supports maxDepth <= 30, but was given maxDepth = $maxDepth.")
+
+    // Max memory usage for aggregates
+    // TODO: Calculate memory usage more precisely.
+    val maxMemoryUsage: Long = strategy.maxMemoryInMB * 1024L * 1024L
+    logDebug("max memory usage for aggregates = " + maxMemoryUsage + " bytes.")
+    val maxMemoryPerNode = {
+      val featureSubset: Option[Array[Int]] = if (metadata.subsamplingFeatures) {
+        // Find numFeaturesPerNode largest bins to get an upper bound on memory usage.
+        Some(metadata.numBins.zipWithIndex.sortBy(- _._1)
+          .take(metadata.numFeaturesPerNode).map(_._2))
+      } else {
+        None
+      }
+      RandomForest.aggregateSizeForNode(metadata, featureSubset) * 8L
+    }
+    require(maxMemoryPerNode <= maxMemoryUsage,
+      s"RandomForest/DecisionTree given maxMemoryInMB = ${strategy.maxMemoryInMB}," +
+      " which is too small for the given features." +
+      s"  Minimum value = ${maxMemoryPerNode / (1024L * 1024L)}")
+
+    timer.stop("init")
+
+    /*
+     * The main idea here is to perform group-wise training of the decision tree nodes thus
+     * reducing the passes over the data from (# nodes) to (# nodes / maxNumberOfNodesPerGroup).
+     * Each data sample is handled by a particular node (or it reaches a leaf and is not used
+     * in lower levels).
+     */
+
+    // Create an RDD of node Id cache.
+    // At first, all the rows belong to the root nodes (node Id == 1).
+    val nodeIdCache = if (strategy.useNodeIdCache) {
+      Some(NodeIdCache.init(
+        data = baggedInput,
+        numTrees = numTrees,
+        checkpointDir = strategy.checkpointDir,
+        checkpointInterval = strategy.checkpointInterval,
+        initVal = 1))
+    } else {
+      None
+    }
+
+    // FIFO queue of nodes to train: (treeIndex, node)
+    val nodeQueue = new mutable.Queue[(Int, Node)]()
+
+    val rng = new scala.util.Random()
+    rng.setSeed(seed)
+
+    // Allocate and queue root nodes.
+    val topNodes: Array[Node] = Array.fill[Node](numTrees)(Node.emptyNode(nodeIndex = 1))
+    Range(0, numTrees).foreach(treeIndex => nodeQueue.enqueue((treeIndex, topNodes(treeIndex))))
+
+    while (nodeQueue.nonEmpty) {
+      // Collect some nodes to split, and choose features for each node (if subsampling).
+      // Each group of nodes may come from one or multiple trees, and at multiple levels.
+      val (nodesForGroup, treeToNodeToIndexInfo) =
+        RandomForest.selectNodesToSplit(nodeQueue, maxMemoryUsage, metadata, rng)
+      // Sanity check (should never occur):
+      assert(nodesForGroup.size > 0,
+        s"RandomForest selected empty nodesForGroup.  Error for unknown reason.")
+
+      // Choose node splits, and enqueue new nodes as needed.
+      timer.start("findBestSplits")
+      DecisionTree.findBestSplits(baggedInput, metadata, topNodes, nodesForGroup,
+        treeToNodeToIndexInfo, splits, bins, nodeQueue, timer, nodeIdCache = nodeIdCache)
+      timer.stop("findBestSplits")
+    }
+
+    baggedInput.unpersist()
+
+    timer.stop("total")
+
+    logInfo("Internal timing for DecisionTree:")
+    logInfo(s"$timer")
+
+    // Delete any remaining checkpoints used for node Id cache.
+    if (nodeIdCache.nonEmpty) {
+      nodeIdCache.get.deleteAllCheckpoints()
+    }
+
+    val trees = topNodes.map(topNode => new DecisionTreeModel(topNode, strategy.algo))
+    new RandomForestModel(strategy.algo, trees)
+  }
 }
 
 object RandomForest extends Serializable with Logging {
