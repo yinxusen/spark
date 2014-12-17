@@ -17,6 +17,8 @@
 
 package org.apache.spark.mllib.tree
 
+import org.apache.spark.sql.{SQLContext, SchemaRDD}
+
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -37,8 +39,6 @@ import org.apache.spark.mllib.tree.impurity._
 import org.apache.spark.mllib.tree.model._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.random.XORShiftRandom
-import org.apache.spark.SparkContext._
-
 
 /**
  * :: Experimental ::
@@ -1085,6 +1085,129 @@ object DecisionTree extends Serializable with Logging {
   }
 
   /**
+   * Given a SchemaRDD and limits the operation in SQL. Rewrite `findSplitsBins()`.
+   */
+  protected[tree] def findSplitsBinsFromSchemaRDD(
+      sqlCtx: SQLContext,
+      limitedInput: SchemaRDD,
+      columnNames: Array[String],
+      metadata: DecisionTreeMetadata): (Array[Array[Split]], Array[Array[Bin]]) = {
+
+    logDebug("isMulticlass = " + metadata.isMulticlass)
+
+    val numFeatures = metadata.numFeatures
+
+    // Sampled input is only used in continuous features.
+    val sampledInput = {
+      // Calculate the number of samples for approximate quantile calculation.
+      val requiredSamples = math.max(metadata.maxBins * metadata.maxBins, 10000)
+      val fraction = if (requiredSamples < metadata.numExamples) {
+        requiredSamples.toDouble / metadata.numExamples
+      } else {
+        1.0
+      }
+      logDebug("fraction of data used for calculating quantiles = " + fraction)
+      limitedInput.sample(withReplacement = false, fraction, new XORShiftRandom().nextInt())
+    }
+
+    val lenOfSample = sampledInput.count().toInt
+    sqlCtx.registerRDDAsTable(limitedInput, "LIMITEDINPUT")
+
+    metadata.quantileStrategy match {
+      case Sort =>
+        val splits = new Array[Array[Split]](numFeatures)
+        val bins = new Array[Array[Bin]](numFeatures)
+
+        // Find all splits.
+        // Iterate over all features.
+        var featureIndex = 0
+        while (featureIndex < numFeatures) {
+          if (metadata.isContinuous(featureIndex)) {
+
+            val featureSplits = findSplitsForContinuousFeatureFromSchemaRDD(
+              sqlCtx, columnNames(featureIndex), lenOfSample, metadata, featureIndex)
+
+            val numSplits = featureSplits.length
+            val numBins = numSplits + 1
+            logDebug(s"featureIndex = $featureIndex, numSplits = $numSplits")
+            splits(featureIndex) = new Array[Split](numSplits)
+            bins(featureIndex) = new Array[Bin](numBins)
+
+            var splitIndex = 0
+            while (splitIndex < numSplits) {
+              val threshold = featureSplits(splitIndex)
+              splits(featureIndex)(splitIndex) =
+                new Split(featureIndex, threshold, Continuous, List())
+              splitIndex += 1
+            }
+            bins(featureIndex)(0) = new Bin(new DummyLowSplit(featureIndex, Continuous),
+              splits(featureIndex)(0), Continuous, Double.MinValue)
+
+            splitIndex = 1
+            while (splitIndex < numSplits) {
+              bins(featureIndex)(splitIndex) =
+                new Bin(splits(featureIndex)(splitIndex - 1), splits(featureIndex)(splitIndex),
+                  Continuous, Double.MinValue)
+              splitIndex += 1
+            }
+            bins(featureIndex)(numSplits) = new Bin(splits(featureIndex)(numSplits - 1),
+              new DummyHighSplit(featureIndex, Continuous), Continuous, Double.MinValue)
+          } else {
+            val numSplits = metadata.numSplits(featureIndex)
+            val numBins = metadata.numBins(featureIndex)
+            // Categorical feature
+            val featureArity = metadata.featureArity(featureIndex)
+            if (metadata.isUnordered(featureIndex)) {
+              // TODO: The second half of the bins are unused.  Actually, we could just use
+              //       splits and not build bins for unordered features.  That should be part of
+              //       a later PR since it will require changing other code (using splits instead
+              //       of bins in a few places).
+              // Unordered features
+              //   2^(maxFeatureValue - 1) - 1 combinations
+              splits(featureIndex) = new Array[Split](numSplits)
+              bins(featureIndex) = new Array[Bin](numBins)
+              var splitIndex = 0
+              while (splitIndex < numSplits) {
+                val categories: List[Double] =
+                  extractMultiClassCategories(splitIndex + 1, featureArity)
+                splits(featureIndex)(splitIndex) =
+                  new Split(featureIndex, Double.MinValue, Categorical, categories)
+                bins(featureIndex)(splitIndex) = {
+                  if (splitIndex == 0) {
+                    new Bin(
+                      new DummyCategoricalSplit(featureIndex, Categorical),
+                      splits(featureIndex)(0),
+                      Categorical,
+                      Double.MinValue)
+                  } else {
+                    new Bin(
+                      splits(featureIndex)(splitIndex - 1),
+                      splits(featureIndex)(splitIndex),
+                      Categorical,
+                      Double.MinValue)
+                  }
+                }
+                splitIndex += 1
+              }
+            } else {
+              // Ordered features
+              //   Bins correspond to feature values, so we do not need to compute splits or bins
+              //   beforehand.  Splits are constructed as needed during training.
+              splits(featureIndex) = new Array[Split](0)
+              bins(featureIndex) = new Array[Bin](0)
+            }
+          }
+          featureIndex += 1
+        }
+        (splits, bins)
+      case MinMax =>
+        throw new UnsupportedOperationException("minmax not supported yet.")
+      case ApproxHist =>
+        throw new UnsupportedOperationException("approximate histogram not supported yet.")
+    }
+  }
+
+  /**
    * Nested method to extract list of eligible categories given an index. It extracts the
    * position of ones in a binary representation of the input. If binary
    * representation of an number is 01101 (13), the output list should (3.0, 2.0,
@@ -1144,6 +1267,71 @@ object DecisionTree extends Serializable with Logging {
       } else {
         // stride between splits
         val stride: Double = featureSamples.length.toDouble / (numSplits + 1)
+        logDebug("stride = " + stride)
+
+        // iterate `valueCount` to find splits
+        val splits = new ArrayBuffer[Double]
+        var index = 1
+        // currentCount: sum of counts of values that have been visited
+        var currentCount = valueCounts(0)._2
+        // targetCount: target value for `currentCount`.
+        // If `currentCount` is closest value to `targetCount`,
+        // then current value is a split threshold.
+        // After finding a split threshold, `targetCount` is added by stride.
+        var targetCount = stride
+        while (index < valueCounts.length) {
+          val previousCount = currentCount
+          currentCount += valueCounts(index)._2
+          val previousGap = math.abs(previousCount - targetCount)
+          val currentGap = math.abs(currentCount - targetCount)
+          // If adding count of current value to currentCount
+          // makes the gap between currentCount and targetCount smaller,
+          // previous value is a split threshold.
+          if (previousGap < currentGap) {
+            splits.append(valueCounts(index - 1)._1)
+            targetCount += stride
+          }
+          index += 1
+        }
+
+        splits.toArray
+      }
+    }
+
+    assert(splits.length > 0)
+    // set number of splits accordingly
+    metadata.setNumSplits(featureIndex, splits.length)
+
+    splits
+  }
+
+  private[tree] def findSplitsForContinuousFeatureFromSchemaRDD(
+      sqlCtx: SQLContext,
+      featureName: String,
+      lenOfSample: Int,
+      metadata: DecisionTreeMetadata,
+      featureIndex: Int): Array[Double] = {
+    require(metadata.isContinuous(featureIndex),
+      "findSplitsForContinuousFeature can only be used to find splits for a continuous feature.")
+
+    val splits = {
+      val numSplits = metadata.numSplits(featureIndex)
+
+      // get count for each distinct value
+      val valueCountMap = sqlCtx
+        .sql(s"SELECT $featureName, COUNT($featureName) FROM LIMITEDINPUT GROUP BY $featureName")
+
+      // sort distinct values
+      val valueCounts = valueCountMap
+        .map(row => (row.getDouble(0), row.getInt(1))).collect().sortBy(_._1)
+
+      // if possible splits is not enough or just enough, just return all possible splits
+      val possibleSplits = valueCounts.length
+      if (possibleSplits <= numSplits) {
+        valueCounts.map(_._1)
+      } else {
+        // stride between splits
+        val stride: Double = lenOfSample.toDouble / (numSplits + 1)
         logDebug("stride = " + stride)
 
         // iterate `valueCount` to find splits
