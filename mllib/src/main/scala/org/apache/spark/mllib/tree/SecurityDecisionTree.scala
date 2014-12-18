@@ -21,10 +21,10 @@ import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.configuration.Algo._
-import org.apache.spark.mllib.tree.configuration.{Algo, Strategy}
+import org.apache.spark.mllib.tree.configuration.{DataSchema, Algo, Strategy}
 import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{SchemaRDD, SQLContext}
 import org.apache.spark.util.Utils
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -74,7 +74,6 @@ object SecurityDecisionTree {
   /**
    * Load training and test data from files.
    * @param input  Path to input dataset.
-   * @param dataFormat  "libsvm" or "dense"
    * @param testInput  Path to test dataset.
    * @param algo  Classification or Regression
    * @param fracTest  Fraction of input data to hold out for testing.  Ignored if testInput given.
@@ -84,19 +83,21 @@ object SecurityDecisionTree {
   private[mllib] def loadDatasets(
       sc: SparkContext,
       sqlCtx: SQLContext,
-      input: String,
-      dataFormat: String,
-      testInput: String,
+      input: SchemaRDD,
+      table: String,
+      schema: DataSchema,
       algo: Algo,
-      fracTest: Double): (RDD[LabeledPoint], RDD[LabeledPoint], Int) = {
-    // How to load data from our platform?
-    val origExamples = sqlCtx.sql("How to query?")
+      fracTest: Double): (SchemaRDD, SchemaRDD, Map[Int, Int], Int) = {
+    import sqlCtx._
+    import schema._
+    registerRDDAsTable(input, table)
 
-    // For classification, re-index classes if needed.
+    // ETL of label
     val (examples, classIndexMap, numClasses) = algo match {
       case Classification => {
         // classCounts: class --> # examples in class
-        val classCounts = origExamples.map(_.label).countByValue()
+        val classCounts = sql(s"SELECT $label, COUNT($label) FROM $table GROUP BY $label")
+          .map(r => (r.getDouble(0), r.getLong(1))).collect().toMap
         val sortedClasses = classCounts.keys.toList.sorted
         val numClasses = classCounts.size
         // classIndexMap: class --> index in 0,...,numClasses-1
@@ -107,11 +108,13 @@ object SecurityDecisionTree {
             Map[Double, Int]()
           }
         }
+        val reIndexLabel: Double => Double = label => classIndexMap(label).toDouble
+        registerFunction("reIndexLabel", reIndexLabel)
         val examples = {
           if (classIndexMap.isEmpty) {
-            origExamples
+            input
           } else {
-            origExamples.map(lp => LabeledPoint(classIndexMap(lp.label), lp.features))
+            sql(s"SELECT reIndexLabel($label), $featuresString FROM $table")
           }
         }
         val numExamples = examples.count()
@@ -125,48 +128,12 @@ object SecurityDecisionTree {
         (examples, classIndexMap, numClasses)
       }
       case Regression =>
-        (origExamples, null, 0)
+        (input, null, 0)
       case _ =>
         throw new IllegalArgumentException("Algo ${params.algo} not supported.")
     }
-
-    // Create training, test sets.
-    val splits = if (testInput != "") {
-      // Load testInput.
-      val numFeatures = examples.take(1)(0).features.size
-      val origTestExamples = dataFormat match {
-        case "dense" => MLUtils.loadLabeledPoints(sc, testInput)
-        case "libsvm" => MLUtils.loadLibSVMFile(sc, testInput, numFeatures)
-      }
-      algo match {
-        case Classification => {
-          // classCounts: class --> # examples in class
-          val testExamples = {
-            if (classIndexMap.isEmpty) {
-              origTestExamples
-            } else {
-              origTestExamples.map(lp => LabeledPoint(classIndexMap(lp.label), lp.features))
-            }
-          }
-          Array(examples, testExamples)
-        }
-        case Regression =>
-          Array(examples, origTestExamples)
-      }
-    } else {
-      // Split input into training, test.
-      examples.randomSplit(Array(1.0 - fracTest, fracTest))
-    }
-    val training = splits(0).cache()
-    val test = splits(1).cache()
-
-    val numTraining = training.count()
-    val numTest = test.count()
-    println(s"numTraining = $numTraining, numTest = $numTest.")
-
-    examples.unpersist(blocking = false)
-
-    (training, test, numClasses)
+    // ETL of features
+    ???
   }
 
   def run(params: Params) {
@@ -199,6 +166,7 @@ object SecurityDecisionTree {
           useNodeIdCache = params.useNodeIdCache,
           checkpointDir = params.checkpointDir,
           checkpointInterval = params.checkpointInterval)
+
     if (params.numTrees == 1) {
       val startTime = System.nanoTime()
       val model = DecisionTree.train(training, strategy)
