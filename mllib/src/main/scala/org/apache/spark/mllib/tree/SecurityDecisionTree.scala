@@ -21,13 +21,14 @@ import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.configuration.Algo._
-import org.apache.spark.mllib.tree.configuration.{DataSchema, Algo, Strategy}
+import org.apache.spark.mllib.tree.configuration.{FeatureType, DataSchema, Algo, Strategy}
 import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{SchemaRDD, SQLContext}
 import org.apache.spark.util.Utils
 import org.apache.spark.{SparkConf, SparkContext}
 
+import scala.collection.parallel.mutable
 import scala.language.reflectiveCalls
 
 /**
@@ -50,9 +51,9 @@ object SecurityDecisionTree {
   import org.apache.spark.mllib.tree.SecurityDecisionTree.ImpurityType._
 
   case class Params(
-      input: String = null,
-      testInput: String = "",
-      dataFormat: String = "libsvm",
+      input: SchemaRDD = null,
+      table: String = null,
+      schema: DataSchema = null,
       algo: Algo = Classification,
       maxDepth: Int = 5,
       impurity: ImpurityType = Gini,
@@ -73,12 +74,6 @@ object SecurityDecisionTree {
 
   /**
    * Load training and test data from files.
-   * @param input  Path to input dataset.
-   * @param testInput  Path to test dataset.
-   * @param algo  Classification or Regression
-   * @param fracTest  Fraction of input data to hold out for testing.  Ignored if testInput given.
-   * @return  (training dataset, test dataset, number of classes),
-   *          where the number of classes is inferred from data (and set to 0 for Regression)
    */
   private[mllib] def loadDatasets(
       sc: SparkContext,
@@ -132,8 +127,36 @@ object SecurityDecisionTree {
       case _ =>
         throw new IllegalArgumentException("Algo ${params.algo} not supported.")
     }
+
+    var categoricalFeaturesInfo = Map[Int, Int]()
+
+    val reLabeledTable = "RELABELEDTABLE"
+    registerRDDAsTable(examples, reLabeledTable)
     // ETL of features
-    ???
+    val queryStr = (features zip featureTypes).zipWithIndex.map { case ((column, fType), i) =>
+      fType match {
+        case FeatureType.Continuous =>
+          column
+        case FeatureType.Categorical =>
+          val classCounts = sql(s"SELECT $column, COUNT($column) FROM $reLabeledTable GROUP BY $column")
+            .map(r => (r.getDouble(0), r.getLong(1))).collect().toMap
+          val numClasses = classCounts.size
+          categoricalFeaturesInfo = categoricalFeaturesInfo.+((i, numClasses))
+          val sortedClasses = classCounts.keys.toList.sorted
+          val classIndexMap = sortedClasses.zipWithIndex.toMap
+          val reIndexLabel: Double => Double = label => classIndexMap(label).toDouble
+          registerFunction(s"reIndex$column", reIndexLabel)
+          s"reIndex$column($column)"
+        case _ =>
+          throw new IllegalArgumentException(s"Feature types $fType not supported.")
+      }
+    }
+
+    val res = sql(s"SELECT $label, ${queryStr.mkString(", ")} FROM $reLabeledTable")
+    val splits = res.randomSplit(Array(1.0 - fracTest, fracTest))
+    val trainSet = splits(0)
+    val testSet = splits(1)
+    (trainSet.asInstanceOf[SchemaRDD], testSet.asInstanceOf[SchemaRDD], categoricalFeaturesInfo, numClasses)
   }
 
   def run(params: Params) {
@@ -145,8 +168,8 @@ object SecurityDecisionTree {
     println(s"DecisionTreeRunner with parameters:\n$params")
 
     // Load training and test data and cache it.
-    val (training, test, numClasses) = loadDatasets(sc, params.input, params.dataFormat,
-      params.testInput, params.algo, params.fracTest)
+    val (training, test, categoricalFeatureInfo, numClasses) = loadDatasets(
+      sc, sqlCtx, params.input, params.table, params.schema, params.algo, params.fracTest)
 
     val impurityCalculator = params.impurity match {
       case Gini => impurity.Gini
@@ -165,72 +188,21 @@ object SecurityDecisionTree {
           minInfoGain = params.minInfoGain,
           useNodeIdCache = params.useNodeIdCache,
           checkpointDir = params.checkpointDir,
-          checkpointInterval = params.checkpointInterval)
+          checkpointInterval = params.checkpointInterval,
+          categoricalFeaturesInfo = categoricalFeatureInfo)
 
     if (params.numTrees == 1) {
       val startTime = System.nanoTime()
-      val model = DecisionTree.train(training, strategy)
+      val randomSeed = Utils.random.nextInt()
+      val model = new RandomForest(strategy, params.numTrees, params.featureSubsetStrategy, randomSeed)
+      model.run(training, params.schema.features, sqlCtx)
       val elapsedTime = (System.nanoTime() - startTime) / 1e9
-      println(s"Training time: $elapsedTime seconds")
-      if (model.numNodes < 20) {
+      if (model.totalNumNodes < 30) {
         println(model.toDebugString) // Print full model.
       } else {
         println(model) // Print model summary.
       }
-      if (params.algo == Classification) {
-        val trainAccuracy =
-          new MulticlassMetrics(training.map(lp => (model.predict(lp.features), lp.label)))
-            .precision
-        println(s"Train accuracy = $trainAccuracy")
-        val testAccuracy =
-          new MulticlassMetrics(test.map(lp => (model.predict(lp.features), lp.label))).precision
-        println(s"Test accuracy = $testAccuracy")
-      }
-      if (params.algo == Regression) {
-        val trainMSE = meanSquaredError(model, training)
-        println(s"Train mean squared error = $trainMSE")
-        val testMSE = meanSquaredError(model, test)
-        println(s"Test mean squared error = $testMSE")
-      }
-    } else {
-      val randomSeed = Utils.random.nextInt()
-      if (params.algo == Classification) {
-        val startTime = System.nanoTime()
-        val model = RandomForest.trainClassifier(training, strategy, params.numTrees,
-          params.featureSubsetStrategy, randomSeed)
-        val elapsedTime = (System.nanoTime() - startTime) / 1e9
-        println(s"Training time: $elapsedTime seconds")
-        if (model.totalNumNodes < 30) {
-          println(model.toDebugString) // Print full model.
-        } else {
-          println(model) // Print model summary.
-        }
-        val trainAccuracy =
-          new MulticlassMetrics(training.map(lp => (model.predict(lp.features), lp.label)))
-            .precision
-        println(s"Train accuracy = $trainAccuracy")
-        val testAccuracy =
-          new MulticlassMetrics(test.map(lp => (model.predict(lp.features), lp.label))).precision
-        println(s"Test accuracy = $testAccuracy")
-      }
-      if (params.algo == Regression) {
-        val startTime = System.nanoTime()
-        val model = RandomForest.trainRegressor(training, strategy, params.numTrees,
-          params.featureSubsetStrategy, randomSeed)
-        val elapsedTime = (System.nanoTime() - startTime) / 1e9
-        println(s"Training time: $elapsedTime seconds")
-        if (model.totalNumNodes < 30) {
-          println(model.toDebugString) // Print full model.
-        } else {
-          println(model) // Print model summary.
-        }
-        val trainMSE = meanSquaredError(model, training)
-        println(s"Train mean squared error = $trainMSE")
-        val testMSE = meanSquaredError(model, test)
-        println(s"Test mean squared error = $testMSE")
-      }
     }
-
     sc.stop()
   }
 
