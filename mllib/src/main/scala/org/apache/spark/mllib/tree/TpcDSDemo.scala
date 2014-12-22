@@ -32,6 +32,53 @@ object StringUtils {
   }
 }
 
+case class Customer(
+    cCustomerSk: Int,
+    cCustomerId: String,
+    cCurrentCDemoSk: Option[Int],
+    cCurrentHDemoSk: Option[Int],
+    cCurrentAddrSk: Option[Int],
+    cFirstShipToDateSk: Option[Int],
+    cFirstSalesDateSk: Option[Int],
+    cSalutation: Option[String],
+    cFirstName: Option[String],
+    cLastName: Option[String],
+    cPreferredCustFlag: Option[String],
+    cBirthDay: Option[Int],
+    cBirthMonth: Option[Int],
+    cBirthYear: Option[Int],
+    cBirthCountry: Option[String],
+    cLogin: Option[String],
+    cEmailAddress: Option[String],
+    cLastReviewDate: Option[String]
+)
+
+object Customer {
+  def apply(splits: Array[String]): Customer = {
+    assert(splits.size == 18)
+    Customer(
+      splits(0).toInt,
+      splits(1),
+      splits(2).toIntOpt,
+      splits(3).toIntOpt,
+      splits(4).toIntOpt,
+      splits(5).toIntOpt,
+      splits(6).toIntOpt,
+      splits(7).toStringOpt,
+      splits(8).toStringOpt,
+      splits(9).toStringOpt,
+      splits(10).toStringOpt,
+      splits(11).toIntOpt,
+      splits(12).toIntOpt,
+      splits(13).toIntOpt,
+      splits(14).toStringOpt,
+      splits(15).toStringOpt,
+      splits(16).toStringOpt,
+      splits(17).toStringOpt
+    )
+  }
+}
+
 case class CustomerDemographics(
     cdDemoSk: Int,
     cdGender: Option[String],
@@ -145,7 +192,31 @@ object TpcDSDemo {
 
     registerRDDAsTable(storeSales, "store_sales")
 
+    /*
     sql("select ssItemSk, ssCustomerSk from store_sales")
-      .foreach(r => println(s"${if (r.isNullAt(0)) "null" else r.getInt(0)}, ${if (r.isNullAt(1)) "null" else r.getInt(1)}"))
+      .foreach(r => println(s"${if (r.isNullAt(0)) "null" else r.getInt(0)}," +
+      s" ${if (r.isNullAt(1)) "null" else r.getInt(1)}"))
+    */
+
+    sql("select cdDemoSk, cdCreditRating from customer_demographics where cdCreditRating is null")
+      .foreach(r => println(s"${r.getInt(0)}, ${if (r.isNullAt(1)) "null" else r.getString(1)}"))
+
+    sql("select count(cdDemoSk) from customer_demographics")
+      .foreach(r => println(s"${r.getLong(0)}"))
+
+    val customer = sc
+      .textFile("/home/sen/data/tpcds-data/customer.dat", minPartitions)
+      .map(l => Customer(l.toColumns)).toSchemaRDD
+
+    registerRDDAsTable(customer, "customer")
+
+    sql("select count(cCustomerSk) from customer")
+      .foreach(r => println(s"${r.getLong(0)}"))
+
+    sql("select count(cCurrentCDemoSk) from customer where cCurrentCDemoSk is not null")
+      .foreach(r => println(s"${r.getLong(0)}"))
+
+    sql("select count(cCurrentHDemoSk) from customer where cCurrentHDemoSk is not null")
+      .foreach(r => println(s"${r.getLong(0)}"))
   }
 }
