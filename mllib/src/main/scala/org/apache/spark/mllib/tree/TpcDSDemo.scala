@@ -12,7 +12,7 @@ import scala.reflect.runtime.universe._
 
 object StringUtils {
   implicit class StringImprovements(val s: String) {
-    def getColumns(s: String, sep: Char): Array[String] = {
+    def getColumns(s: String, sep: Char): List[String] = {
       val sb = new StringBuilder()
       val res = mutable.MutableList[String]()
       var i = 0
@@ -25,7 +25,7 @@ object StringUtils {
         }
         i += 1
       }
-      res.toArray
+      res.toList
     }
     import scala.util.control.Exception._
     def toIntOpt = catching(classOf[NumberFormatException]) opt s.toInt
@@ -38,54 +38,62 @@ object StringUtils {
 }
 
 class ReflectionUtil[A: TypeTag : ClassTag] {
-  private lazy val aryStrToAryAny: (List[Type]) => (List[String]) => List[Any] =
-    tpe =>
-      splits => {
-        tpe.zip(splits).map {
-          case (tag, x) if tag == typeOf[Int] => x.toInt
-          case (tag, x) if tag == typeOf[Float] => x.toFloat
-          case (tag, x) if tag == typeOf[String] => x
-          case (tag, x) if tag == typeOf[Option[Int]] => x.toIntOpt
-          case (tag, x) if tag == typeOf[Option[Float]] => x.toFloatOpt
-          case (tag, x) if tag == typeOf[Option[String]] => x.toStringOpt
-          case _ => throw new Exception
-        }
-      }
+  private val c = classTag[A]
+  private val currentClass = cm.classSymbol(c.runtimeClass)
+  private val currentModule = currentClass.companionSymbol.asModule
+  private val instanceMirror = cm.reflect(cm.reflectModule(currentModule).instance)
+  private val applyTerm = newTermName("apply")
+  private val typesOfSymbols = instanceMirror.symbol.typeSignature
+  private val applyMethod = typesOfSymbols.member(applyTerm).asMethod
+  private val func = instanceMirror.reflectMethod(applyMethod)
 
-  private lazy val getFieldTypes: (TypeTag[_]) => List[Type] = t => {
+  private val fieldTypes: List[Type] = {
+    val t = typeTag[A]
     val members = t.tpe.members.sorted.collect {
       case m if !m.isMethod => m
     }.toList
     members.map(m => m.typeSignature)
   }
 
-  val newCase: List[String] => A = (splits) => {
-    val t = typeTag[A]
-    val c = classTag[A]
-    val types = getFieldTypes(t)
-    val currentClass = cm.classSymbol(c.runtimeClass)
-    val currentModule = currentClass.companionSymbol.asModule
-    val im = cm.reflect(cm.reflectModule(currentModule).instance)
-    val func = default(im, "apply")
-    func.compose[List[String]](aryStrToAryAny(types))(splits)
+  private val aryStrToAryAny = fieldTypes.map {
+    case tag if tag == typeOf[Int] =>
+      (x: String) => x.toInt
+    case tag if tag == typeOf[Float] =>
+      (x: String) => x.toFloat
+    case tag if tag == typeOf[String] =>
+      (x: String) => x
+    case tag if tag == typeOf[Option[Int]] =>
+      (x: String) => x.toIntOpt
+    case tag if tag == typeOf[Option[Float]] =>
+      (x: String) => x.toFloatOpt
+    case tag if tag == typeOf[Option[String]] =>
+      (x: String) => x.toStringOpt
+    case tag => throw new Exception {
+      override def toString = s"Unsupported type to cast: $tag."
+    }
   }
 
-  private lazy val default: (InstanceMirror, String) => List[Any] => A =
-    (im, name) =>
-      (args) => {
-        val at = newTermName(name)
-        val ts = im.symbol.typeSignature
-        val method = ts.member(at).asMethod
-        im.reflectMethod(method)(args: _*).asInstanceOf[A]
-      }
+  val newCase: List[String] => A = (splits) => {
+    val zips = aryStrToAryAny.zip(splits).map{case (f, v) => f(v)}
+    try {
+      func(zips: _*).asInstanceOf[A]
+    } catch {
+      case e: IllegalArgumentException =>
+        println(zips.mkString(","))
+        println(zips.size)
+        println(typeOf[A])
+        None.asInstanceOf[A]
+    }
+  }
 }
 
 object ReflectionUtil {
   val iStoreSales = new ReflectionUtil[StoreSales].newCase
   val iCustomer = new ReflectionUtil[Customer].newCase
   val iCustomerDemoGraphics = new ReflectionUtil[CustomerDemographics].newCase
+  val iHouseholdDemographics = new ReflectionUtil[HouseholdDemographics].newCase
+  val iCustomerAddress = new ReflectionUtil[CustomerAddress].newCase
 }
-
 
 case class Customer(
     cCustomerSk: Int,
@@ -146,6 +154,30 @@ case class StoreSales(
     ssNetProfit: Option[Float]
 )
 
+case class HouseholdDemographics (
+   hdDemoSk: Int,
+   hdIncomeBankSk: Option[Int],
+   hdBuyPotential: Option[String],
+   hdDepCount: Option[Int],
+   hdVehicleCount: Option[Int]
+)
+
+case class CustomerAddress(
+   caAddressSk: Int,
+   caAddressId: String,
+   caStreetNumber: Option[String],
+   caStreetName: Option[String],
+   caStreetType: Option[String],
+   caSuiteNumber: Option[String],
+   caCity: Option[String],
+   caCounty: Option[String],
+   caState: Option[String],
+   caZip: Option[String],
+   caCountry: Option[String],
+   caGMTOffset: Option[Float],
+   caLocationType: Option[String]
+)
+
 class TpcDSDemo {
 
 }
@@ -160,46 +192,98 @@ object TpcDSDemo {
     val minPartitions = 10
     import sqlCtx._
 
+    /**
+     * Load data from SQL.
+     */
     val customerDemographics = sc
       .textFile("/home/sen/data/tpcds-data/customer_demographics.dat", minPartitions)
-      .map(l => iCustomerDemoGraphics(l.split('|').toList)).toSchemaRDD
-
+      .map(l => iCustomerDemoGraphics(l.toColumns)).toSchemaRDD.cache()
     registerRDDAsTable(customerDemographics, "customer_demographics")
-
-    sql("select distinct cdGender from customer_demographics")
-      .foreach(r => println(s"cdCreditRating:\t${r.getString(0)}"))
 
     val storeSales = sc
       .textFile("/home/sen/data/tpcds-data/store_sales.dat", minPartitions)
-      .map(l => iStoreSales(l.split('|').toList)).toSchemaRDD
-
+      .map(l => iStoreSales(l.toColumns)).toSchemaRDD.cache()
     registerRDDAsTable(storeSales, "store_sales")
-
-    /*
-    sql("select ssItemSk, ssCustomerSk from store_sales")
-      .foreach(r => println(s"${if (r.isNullAt(0)) "null" else r.getInt(0)}," +
-      s" ${if (r.isNullAt(1)) "null" else r.getInt(1)}"))
-    */
-
-    sql("select cdDemoSk, cdCreditRating from customer_demographics where cdCreditRating is null")
-      .foreach(r => println(s"${r.getInt(0)}, ${if (r.isNullAt(1)) "null" else r.getString(1)}"))
-
-    sql("select count(cdDemoSk) from customer_demographics")
-      .foreach(r => println(s"${r.getLong(0)}"))
 
     val customer = sc
       .textFile("/home/sen/data/tpcds-data/customer.dat", minPartitions)
-      .map(l => iCustomer(l.split('|').toList)).toSchemaRDD
-
+      .map(l => iCustomer(l.toColumns)).toSchemaRDD.cache()
     registerRDDAsTable(customer, "customer")
 
-    sql("select count(cCustomerSk) from customer")
-      .foreach(r => println(s"${r.getLong(0)}"))
+    val householdDemographics = sc
+      .textFile("/home/sen/data/tpcds-data/household_demographics.dat", minPartitions)
+      .map(l => iHouseholdDemographics(l.toColumns)).toSchemaRDD.cache()
+    registerRDDAsTable(householdDemographics, "household_demographics")
 
-    sql("select count(cCurrentCDemoSk) from customer where cCurrentCDemoSk is not null")
-      .foreach(r => println(s"${r.getLong(0)}"))
+    val customerAddress = sc
+      .textFile("/home/sen/data/tpcds-data/customer_address.dat", minPartitions)
+      .map(l => iCustomerAddress(l.toColumns)).toSchemaRDD.cache()
+    registerRDDAsTable(customerAddress, "customer_address")
 
-    sql("select count(cCurrentHDemoSk) from customer where cCurrentHDemoSk is not null")
-      .foreach(r => println(s"${r.getLong(0)}"))
+    /**
+     * ETL for features.
+     * CustomerAddress:
+     *   caStreetNumber
+     *   caStreetType
+     *   caSuiteNumber
+     *   caCity
+     *   caCounty
+     *   caState
+     *   caZip
+     *   caCountry
+     *   caGMTOffset
+     *   caLocationType
+     *
+     * Customer:
+     *   cFirstShipToDateSk
+     *   cFirstSalesDateSk
+     *   cSalutation
+     *   cFirstName
+     *   cLastName
+     *   cPreferredCustFlag
+     *   cBirthDay
+     *   cBirthMonth
+     *   cBirthYear
+     *   cBirthCountry
+     *   cLogin
+     *   cEmailAddress
+     *   cLastReviewDate
+     *
+     * CustomerDemographics
+     *   cdGender
+     *   cdMaritalStatus
+     *   cdEducationStatus
+     *   cdPurchaseEstimate
+     *   cdCreditRating *
+     *   cdDepCount
+     *   cdDepEmployedCount
+     *   cdDepCollegeCount
+     *
+     * HouseholdDemographics
+     *   hdIncomeBandSk
+     *   hdBuyPotential
+     *   hdDepCount
+     *   hdVehicleCount
+     *
+     * StoreSales
+     *   ssItemSk
+     *   ssAddrSk
+     *   ssStoreSk
+     *   ssPromoSk
+     *   ssQuantity
+     *   ssWholeSaleCost
+     *   ssListPrice
+     *   ssSalesPrice
+     *   ssExtDiscountAmt
+     *   ssExtSalesPrice
+     *   ssExtWholeSaleCost
+     *   ssExtListPrice
+     *   ssExtTax
+     *   ssCouponAmt
+     *   ssNetPaid
+     *   ssNetPaidIncTax
+     *   ssNetProfit
+     */
+    sql("select ssItemSk from store_sales").foreach(row => println(row.getInt(0)))
   }
 }
