@@ -1,6 +1,5 @@
 package org.apache.spark.mllib.tree
 
-
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkContext, SparkConf}
 import scala.collection._
@@ -10,8 +9,6 @@ import scala.reflect.ClassTag
 import reflect._
 import scala.reflect.runtime.{ currentMirror => cm }
 import scala.reflect.runtime.universe._
-
-
 
 object StringUtils {
   implicit class StringImprovements(val s: String) {
@@ -40,45 +37,55 @@ object StringUtils {
   }
 }
 
-object ReflectionUtils {
-  def getFieldsAndTypes(t: TypeTag[_]): List[Type] = {
+class ReflectionUtil[A: TypeTag : ClassTag] {
+  private lazy val aryStrToAryAny: (List[Type]) => (List[String]) => List[Any] =
+    tpe =>
+      splits => {
+        tpe.zip(splits).map {
+          case (tag, x) if tag == typeOf[Int] => x.toInt
+          case (tag, x) if tag == typeOf[Float] => x.toFloat
+          case (tag, x) if tag == typeOf[String] => x
+          case (tag, x) if tag == typeOf[Option[Int]] => x.toIntOpt
+          case (tag, x) if tag == typeOf[Option[Float]] => x.toFloatOpt
+          case (tag, x) if tag == typeOf[Option[String]] => x.toStringOpt
+          case _ => throw new Exception
+        }
+      }
+
+  private lazy val getFieldTypes: (TypeTag[_]) => List[Type] = t => {
     val members = t.tpe.members.sorted.collect {
       case m if !m.isMethod => m
     }.toList
     members.map(m => m.typeSignature)
   }
 
-  def typeToClassTag[T: TypeTag]: ClassTag[T] = {
-    ClassTag[T](typeTag[T].mirror.runtimeClass(typeTag[T].tpe))
-  }
-
-  def newCase[A:TypeTag:ClassTag](splits: Array[String]): A = {
+  val newCase: List[String] => A = (splits) => {
     val t = typeTag[A]
     val c = classTag[A]
-    val typedValues = getFieldsAndTypes(t).zip(splits).map {
-      case (tag, v) if tag == typeOf[Int] => v.toInt
-      case (tag, v) if tag == typeOf[Float] => v.toFloat
-      case (tag, v) if tag == typeOf[String] => v.toString
-      case (tag, v) if tag == typeOf[Option[Int]] => v.toIntOpt
-      case (tag, v) if tag == typeOf[Option[Float]] => v.toFloatOpt
-      case (tag, v) if tag == typeOf[Option[String]] => v.toStringOpt
-      case _ => throw new Exception
-    }
+    val types = getFieldTypes(t)
     val currentClass = cm.classSymbol(c.runtimeClass)
     val currentModule = currentClass.companionSymbol.asModule
     val im = cm.reflect(cm.reflectModule(currentModule).instance)
-    default[A](im, "apply", typedValues)
+    val func = default(im, "apply")
+    func.compose[List[String]](aryStrToAryAny(types))(splits)
   }
 
-  def default[A](im: InstanceMirror, name: String, args: List[Any]): A = {
-    val at = newTermName(name)
-    val ts = im.symbol.typeSignature
-    val method = ts.member(at).asMethod
-    im.reflectMethod(method)(args: _*).asInstanceOf[A]
-  }
+  private lazy val default: (InstanceMirror, String) => List[Any] => A =
+    (im, name) =>
+      (args) => {
+        val at = newTermName(name)
+        val ts = im.symbol.typeSignature
+        val method = ts.member(at).asMethod
+        im.reflectMethod(method)(args: _*).asInstanceOf[A]
+      }
 }
 
-import ReflectionUtils._
+object ReflectionUtil {
+  val iStoreSales = new ReflectionUtil[StoreSales].newCase
+  val iCustomer = new ReflectionUtil[Customer].newCase
+  val iCustomerDemoGraphics = new ReflectionUtil[CustomerDemographics].newCase
+}
+
 
 case class Customer(
     cCustomerSk: Int,
@@ -144,6 +151,7 @@ class TpcDSDemo {
 }
 
 object TpcDSDemo {
+  import ReflectionUtil._
 
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf().setAppName("TPC-DS DEMO").setMaster("local[4]")
@@ -152,13 +160,9 @@ object TpcDSDemo {
     val minPartitions = 10
     import sqlCtx._
 
-    val a = newCase[CustomerDemographics]("1,2,3,4,5,6,7,8,9".split(','))
-    println(a.cdCreditRating)
-    val b = newCase[StoreSales]("1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23".split(','))
-    println(b.ssAddrSk)
     val customerDemographics = sc
       .textFile("/home/sen/data/tpcds-data/customer_demographics.dat", minPartitions)
-      .map(l => newCase[CustomerDemographics](l.toColumns)).toSchemaRDD
+      .map(l => iCustomerDemoGraphics(l.split('|').toList)).toSchemaRDD
 
     registerRDDAsTable(customerDemographics, "customer_demographics")
 
@@ -167,7 +171,7 @@ object TpcDSDemo {
 
     val storeSales = sc
       .textFile("/home/sen/data/tpcds-data/store_sales.dat", minPartitions)
-      .map(l => newCase[StoreSales](l.toColumns)).toSchemaRDD
+      .map(l => iStoreSales(l.split('|').toList)).toSchemaRDD
 
     registerRDDAsTable(storeSales, "store_sales")
 
@@ -185,7 +189,7 @@ object TpcDSDemo {
 
     val customer = sc
       .textFile("/home/sen/data/tpcds-data/customer.dat", minPartitions)
-      .map(l => newCase[Customer](l.toColumns)).toSchemaRDD
+      .map(l => iCustomer(l.split('|').toList)).toSchemaRDD
 
     registerRDDAsTable(customer, "customer")
 
