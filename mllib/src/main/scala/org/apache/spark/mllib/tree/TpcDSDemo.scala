@@ -1,9 +1,17 @@
 package org.apache.spark.mllib.tree
 
+
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkContext, SparkConf}
 import scala.collection._
 import StringUtils._
+
+import scala.reflect.ClassTag
+import reflect._
+import scala.reflect.runtime.{ currentMirror => cm }
+import scala.reflect.runtime.universe._
+
+
 
 object StringUtils {
   implicit class StringImprovements(val s: String) {
@@ -32,6 +40,46 @@ object StringUtils {
   }
 }
 
+object ReflectionUtils {
+  def getFieldsAndTypes(t: TypeTag[_]): List[Type] = {
+    val members = t.tpe.members.sorted.collect {
+      case m if !m.isMethod => m
+    }.toList
+    members.map(m => m.typeSignature)
+  }
+
+  def typeToClassTag[T: TypeTag]: ClassTag[T] = {
+    ClassTag[T](typeTag[T].mirror.runtimeClass(typeTag[T].tpe))
+  }
+
+  def newCase[A:TypeTag:ClassTag](splits: Array[String]): A = {
+    val t = typeTag[A]
+    val c = classTag[A]
+    val typedValues = getFieldsAndTypes(t).zip(splits).map {
+      case (tag, v) if tag == typeOf[Int] => v.toInt
+      case (tag, v) if tag == typeOf[Float] => v.toFloat
+      case (tag, v) if tag == typeOf[String] => v.toString
+      case (tag, v) if tag == typeOf[Option[Int]] => v.toIntOpt
+      case (tag, v) if tag == typeOf[Option[Float]] => v.toFloatOpt
+      case (tag, v) if tag == typeOf[Option[String]] => v.toStringOpt
+      case _ => throw new Exception
+    }
+    val currentClass = cm.classSymbol(c.runtimeClass)
+    val currentModule = currentClass.companionSymbol.asModule
+    val im = cm.reflect(cm.reflectModule(currentModule).instance)
+    default[A](im, "apply", typedValues)
+  }
+
+  def default[A](im: InstanceMirror, name: String, args: List[Any]): A = {
+    val at = newTermName(name)
+    val ts = im.symbol.typeSignature
+    val method = ts.member(at).asMethod
+    im.reflectMethod(method)(args: _*).asInstanceOf[A]
+  }
+}
+
+import ReflectionUtils._
+
 case class Customer(
     cCustomerSk: Int,
     cCustomerId: String,
@@ -53,32 +101,6 @@ case class Customer(
     cLastReviewDate: Option[String]
 )
 
-object Customer {
-  def apply(splits: Array[String]): Customer = {
-    assert(splits.size == 18)
-    Customer(
-      splits(0).toInt,
-      splits(1),
-      splits(2).toIntOpt,
-      splits(3).toIntOpt,
-      splits(4).toIntOpt,
-      splits(5).toIntOpt,
-      splits(6).toIntOpt,
-      splits(7).toStringOpt,
-      splits(8).toStringOpt,
-      splits(9).toStringOpt,
-      splits(10).toStringOpt,
-      splits(11).toIntOpt,
-      splits(12).toIntOpt,
-      splits(13).toIntOpt,
-      splits(14).toStringOpt,
-      splits(15).toStringOpt,
-      splits(16).toStringOpt,
-      splits(17).toStringOpt
-    )
-  }
-}
-
 case class CustomerDemographics(
     cdDemoSk: Int,
     cdGender: Option[String],
@@ -90,22 +112,6 @@ case class CustomerDemographics(
     cdDepEmployedCount: Option[Int],
     cdDepCollegeCount: Option[Int]
 )
-
-object CustomerDemographics {
-  def apply(splits: Array[String]): CustomerDemographics = {
-    assert(splits.size == 9)
-    CustomerDemographics(
-      splits(0).toInt,
-      splits(1).toStringOpt,
-      splits(2).toStringOpt,
-      splits(3).toStringOpt,
-      splits(4).toIntOpt,
-      splits(5).toStringOpt,
-      splits(6).toIntOpt,
-      splits(7).toIntOpt,
-      splits(8).toIntOpt)
-  }
-}
 
 case class StoreSales(
     ssSoldDateSk: Option[Int],
@@ -133,37 +139,6 @@ case class StoreSales(
     ssNetProfit: Option[Float]
 )
 
-object StoreSales {
-  def apply(splits: Array[String]): StoreSales = {
-    assert(splits.size == 23)
-    new StoreSales(
-      splits(0).toIntOpt,
-      splits(1).toIntOpt,
-      splits(2).toInt,
-      splits(3).toIntOpt,
-      splits(4).toIntOpt,
-      splits(5).toIntOpt,
-      splits(6).toIntOpt,
-      splits(7).toIntOpt,
-      splits(8).toIntOpt,
-      splits(9).toInt,
-      splits(10).toIntOpt,
-      splits(11).toFloatOpt,
-      splits(12).toFloatOpt,
-      splits(13).toFloatOpt,
-      splits(14).toFloatOpt,
-      splits(15).toFloatOpt,
-      splits(16).toFloatOpt,
-      splits(17).toFloatOpt,
-      splits(18).toFloatOpt,
-      splits(19).toFloatOpt,
-      splits(20).toFloatOpt,
-      splits(21).toFloatOpt,
-      splits(22).toFloatOpt
-    )
-  }
-}
-
 class TpcDSDemo {
 
 }
@@ -177,9 +152,13 @@ object TpcDSDemo {
     val minPartitions = 10
     import sqlCtx._
 
+    val a = newCase[CustomerDemographics]("1,2,3,4,5,6,7,8,9".split(','))
+    println(a.cdCreditRating)
+    val b = newCase[StoreSales]("1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23".split(','))
+    println(b.ssAddrSk)
     val customerDemographics = sc
       .textFile("/home/sen/data/tpcds-data/customer_demographics.dat", minPartitions)
-      .map(l => CustomerDemographics(l.toColumns)).toSchemaRDD
+      .map(l => newCase[CustomerDemographics](l.toColumns)).toSchemaRDD
 
     registerRDDAsTable(customerDemographics, "customer_demographics")
 
@@ -188,7 +167,7 @@ object TpcDSDemo {
 
     val storeSales = sc
       .textFile("/home/sen/data/tpcds-data/store_sales.dat", minPartitions)
-      .map(l => StoreSales(l.toColumns)).toSchemaRDD
+      .map(l => newCase[StoreSales](l.toColumns)).toSchemaRDD
 
     registerRDDAsTable(storeSales, "store_sales")
 
@@ -206,7 +185,7 @@ object TpcDSDemo {
 
     val customer = sc
       .textFile("/home/sen/data/tpcds-data/customer.dat", minPartitions)
-      .map(l => Customer(l.toColumns)).toSchemaRDD
+      .map(l => newCase[Customer](l.toColumns)).toSchemaRDD
 
     registerRDDAsTable(customer, "customer")
 
