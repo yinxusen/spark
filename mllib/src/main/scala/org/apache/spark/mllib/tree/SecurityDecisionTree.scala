@@ -67,11 +67,6 @@ object SecurityDecisionTree {
       checkpointDir: Option[String] = None,
       checkpointInterval: Int = 10)
 
-  def main(args: Array[String]) {
-    val params = Params()
-    run(params)
-  }
-
   /**
    * Load training and test data from files.
    */
@@ -79,19 +74,19 @@ object SecurityDecisionTree {
       sc: SparkContext,
       sqlCtx: SQLContext,
       input: SchemaRDD,
-      table: String,
+      oriTable: String,
       schema: DataSchema,
       algo: Algo,
       fracTest: Double): (SchemaRDD, SchemaRDD, Map[Int, Int], Int) = {
     import sqlCtx._
     import schema._
-    registerRDDAsTable(input, table)
+    registerRDDAsTable(input, oriTable)
 
     // ETL of label
     val (examples, classIndexMap, numClasses) = algo match {
       case Classification => {
         // classCounts: class --> # examples in class
-        val classCounts = sql(s"SELECT $label, COUNT($label) FROM $table GROUP BY $label")
+        val classCounts = sql(s"SELECT $label, COUNT($label) FROM $oriTable GROUP BY $label")
           .map(r => (r.getDouble(0), r.getLong(1))).collect().toMap
         val sortedClasses = classCounts.keys.toList.sorted
         val numClasses = classCounts.size
@@ -109,7 +104,7 @@ object SecurityDecisionTree {
           if (classIndexMap.isEmpty) {
             input
           } else {
-            sql(s"SELECT reIndexLabel($label), $featuresString FROM $table")
+            sql(s"SELECT reIndexLabel($label), $featuresString FROM $oriTable")
           }
         }
         val numExamples = examples.count()
@@ -159,11 +154,7 @@ object SecurityDecisionTree {
     (trainSet.asInstanceOf[SchemaRDD], testSet.asInstanceOf[SchemaRDD], categoricalFeaturesInfo, numClasses)
   }
 
-  def run(params: Params) {
-
-    val conf = new SparkConf().setAppName(s"DecisionTreeRunner with $params")
-    val sc = new SparkContext(conf)
-    val sqlCtx = new SQLContext(sc)
+  def run(params: Params, sc: SparkContext, sqlCtx: SQLContext) {
 
     println(s"DecisionTreeRunner with parameters:\n$params")
 
@@ -197,11 +188,7 @@ object SecurityDecisionTree {
       val model = new RandomForest(strategy, params.numTrees, params.featureSubsetStrategy, randomSeed)
       model.run(training, params.schema.features, sqlCtx)
       val elapsedTime = (System.nanoTime() - startTime) / 1e9
-      if (model.totalNumNodes < 30) {
-        println(model.toDebugString) // Print full model.
-      } else {
-        println(model) // Print model summary.
-      }
+      println(model) // Print model summary.
     }
     sc.stop()
   }

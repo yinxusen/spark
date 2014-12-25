@@ -1,5 +1,7 @@
 package org.apache.spark.mllib.tree
 
+import org.apache.spark.mllib.tree.SecurityDecisionTree.Params
+import org.apache.spark.mllib.tree.configuration.{FeatureType, DataSchema}
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkContext, SparkConf}
 import scala.collection._
@@ -40,9 +42,9 @@ object StringUtils {
 class ReflectionUtil[A: TypeTag : ClassTag] {
   private val c = classTag[A]
   private val currentClass = cm.classSymbol(c.runtimeClass)
-  private val currentModule = currentClass.companionSymbol.asModule
+  private val currentModule = currentClass.companion.asModule
   private val instanceMirror = cm.reflect(cm.reflectModule(currentModule).instance)
-  private val applyTerm = newTermName("apply")
+  private val applyTerm = TermName("apply")
   private val typesOfSymbols = instanceMirror.symbol.typeSignature
   private val applyMethod = typesOfSymbols.member(applyTerm).asMethod
   private val func = instanceMirror.reflectMethod(applyMethod)
@@ -284,6 +286,20 @@ object TpcDSDemo {
      *   ssNetPaidIncTax
      *   ssNetProfit
      */
-    sql("select ssItemSk from store_sales").foreach(row => println(row.getInt(0)))
+    val input = sql("select cdCreditRating, cdGender, cdMaritalStatus, cdEducationStatus," +
+      " cdPurchaseEstimate, cdDepCount," +
+      " cdDepEmployedCount, cdDepCollegeCount from customer_demographics")
+
+    val dataSchema = DataSchema("cdCreditRating",
+      ("cdGender, cdMaritalStatus, cdEducationStatus, cdPurchaseEstimate, cdDepCount," +
+        " cdDepEmployedCount, cdDepCollegeCount").split(", "),
+    Array(FeatureType.Categorical, FeatureType.Categorical, FeatureType.Categorical,
+      FeatureType.Continuous, FeatureType.Continuous, FeatureType.Continuous, FeatureType.Continuous))
+
+    val params = Params(
+      input, "tpcds", dataSchema
+    )
+
+    SecurityDecisionTree.run(params, sc, sqlCtx)
   }
 }
