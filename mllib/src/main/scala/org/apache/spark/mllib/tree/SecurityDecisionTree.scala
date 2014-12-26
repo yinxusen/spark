@@ -91,7 +91,7 @@ object SecurityDecisionTree {
         val classIndexMap = classLabels.zipWithIndex.toMap
         val reIndexLabel: Any => Double = label => classIndexMap(label).toDouble
         registerFunction("reIndexLabel", reIndexLabel)
-        val examples = sql(s"SELECT reIndexLabel($label) as new$label, $featuresString FROM $oriTable")
+        val examples = sql(s"SELECT reIndexLabel($label) as $label, $featuresString FROM $oriTable")
         val numExamples = examples.count()
         println(s"numClasses = $numClasses.")
         println(s"Per-class example fractions, counts:")
@@ -112,11 +112,14 @@ object SecurityDecisionTree {
     val reLabeledTable = "RELABELEDTABLE"
     registerRDDAsTable(examples, reLabeledTable)
 
+    val intToDouble: (Int) => Double = (x) => x.toDouble
+    registerFunction("IntToDouble", intToDouble)
+
     // ETL of features
     val queryStr = (features zip featureTypes).zipWithIndex.map { case ((column, fType), i) =>
       fType match {
         case FeatureType.Continuous =>
-          column
+          s"IntToDouble($column) as $column"
         case FeatureType.Categorical =>
           val classCounts = sql(s"SELECT $column, COUNT($column) FROM $reLabeledTable GROUP BY $column")
             .map(r => (r(0), r.getLong(1))).collect().toMap
@@ -126,13 +129,13 @@ object SecurityDecisionTree {
           val classIndexMap = classLabels.zipWithIndex.toMap
           val reIndexLabel: Any => Double = label => classIndexMap(label).toDouble
           registerFunction(s"reIndex$column", reIndexLabel)
-          s"reIndex$column($column)"
+          s"reIndex$column($column) as $column"
         case _ =>
           throw new IllegalArgumentException(s"Feature types $fType not supported.")
       }
     }
 
-    val res = sql(s"SELECT new$label, ${queryStr.mkString(", ")} FROM $reLabeledTable")
+    val res = sql(s"SELECT $label, ${queryStr.mkString(", ")} FROM $reLabeledTable")
     val splits = res.splitTrainAndTest(Array(1.0 - fracTest, fracTest))
     val trainSet = splits(0)
     val testSet = splits(1)
@@ -171,10 +174,11 @@ object SecurityDecisionTree {
       val startTime = System.nanoTime()
       val randomSeed = Utils.random.nextInt()
       val model = new RandomForest(strategy, params.numTrees, params.featureSubsetStrategy, randomSeed)
-      model.run(training, params.schema.features, sqlCtx)
+
+      val resModel = model.run(training, params.schema.label, params.schema.features, sqlCtx)
       val elapsedTime = (System.nanoTime() - startTime) / 1e9
-      println(model) // Print model summary.
-    }
+      resModel.trees.foreach(t => println(t.toDebugString))
+    } else { ??? }
     sc.stop()
   }
 

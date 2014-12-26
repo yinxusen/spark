@@ -261,6 +261,7 @@ private class RandomForest (
 
   def run(
       limitedInput: SchemaRDD,
+      labelName: String,
       columnNames: Array[String],
       sqlCtx: SQLContext): RandomForestModel = {
 
@@ -282,9 +283,11 @@ private class RandomForest (
     // Find the splits and the corresponding bins (interval between the splits) using a sample
     // of the input data.
     timer.start("findSplitsBins")
+    logInfo("Begin finding splits and bins")
     val (splits, bins) = DecisionTree
       .findSplitsBinsFromSchemaRDD(sqlCtx, limitedInput, columnNames, metadata)
     timer.stop("findSplitsBins")
+    logInfo("End finding splits and bins")
     logDebug("numBins: feature: number of bins")
     logDebug(Range(0, metadata.numFeatures).map { featureIndex =>
         s"\t$featureIndex\t${metadata.numBins(featureIndex)}"
@@ -292,7 +295,9 @@ private class RandomForest (
 
     // Bin feature values (TreePoint representation).
     // Cache input RDD for speedup during multiple passes.
-    val treeInput = TreePoint.convertToTreeRDD(sqlCtx, limitedInput, columnNames, bins, metadata)
+    logInfo("Begin transferring SchemaRDD into TreeRDD")
+    val treeInput = TreePoint.convertToTreeRDD(sqlCtx, limitedInput, labelName, columnNames, bins, metadata)
+    logInfo("End transferring SchemaRDD into TreeRDD")
 
     val (subsample, withReplacement) = {
       // TODO: Have a stricter check for RF in the strategy
@@ -304,9 +309,11 @@ private class RandomForest (
       }
     }
 
+    logInfo("Begin transferring tree RDD into bagged RDD")
     val baggedInput
       = BaggedPoint.convertToBaggedRDD(treeInput, subsample, numTrees, withReplacement, seed)
         .persist(StorageLevel.MEMORY_AND_DISK)
+    logInfo("End transferring tree RDD into bagged RDD")
 
     // depth of the decision tree
     val maxDepth = strategy.maxDepth
@@ -325,8 +332,10 @@ private class RandomForest (
       } else {
         None
       }
+      logInfo("Begin aggregate size for node")
       RandomForest.aggregateSizeForNode(metadata, featureSubset) * 8L
     }
+    logInfo("End aggregate size for node")
     require(maxMemoryPerNode <= maxMemoryUsage,
       s"RandomForest/DecisionTree given maxMemoryInMB = ${strategy.maxMemoryInMB}," +
       " which is too small for the given features." +
@@ -375,9 +384,11 @@ private class RandomForest (
 
       // Choose node splits, and enqueue new nodes as needed.
       timer.start("findBestSplits")
+      logInfo("Begin find best splits")
       DecisionTree.findBestSplits(baggedInput, metadata, topNodes, nodesForGroup,
         treeToNodeToIndexInfo, splits, bins, nodeQueue, timer, nodeIdCache = nodeIdCache)
       timer.stop("findBestSplits")
+      logInfo("End find best splits")
     }
 
     baggedInput.unpersist()

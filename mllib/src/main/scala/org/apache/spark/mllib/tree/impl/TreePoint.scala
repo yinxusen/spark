@@ -73,6 +73,7 @@ private[tree] object TreePoint {
   def convertToTreeRDD(
       sqlCtx: SQLContext,
       input: SchemaRDD,
+      labelName: String,
       columnNames: Array[String],
       bins: Array[Array[Bin]],
       metadata: DecisionTreeMetadata): RDD[TreePoint] = {
@@ -85,13 +86,13 @@ private[tree] object TreePoint {
       isUnordered(featureIndex) = metadata.isUnordered(featureIndex)
       featureIndex += 1
     }
-    val binWiseInput = binWiseEachColumn(sqlCtx, input, columnNames, bins, featureArity, isUnordered)
+    val binWiseInput = binWiseEachColumn(sqlCtx, input, labelName, columnNames, bins, featureArity, isUnordered)
     convertSchemaRDDToTreeRDD(binWiseInput, columnNames.size)
   }
 
   private def convertSchemaRDDToTreeRDD(input: SchemaRDD, columnCount: Int): RDD[TreePoint] = {
     input.map { row =>
-      new TreePoint(row.getDouble(0), Array.tabulate[Int](columnCount - 1)(i => row.getInt(i + 1)))
+      new TreePoint(row.getDouble(0), Array.tabulate[Int](columnCount)(i => row.getInt(i + 1)))
     }
   }
 
@@ -137,6 +138,7 @@ private[tree] object TreePoint {
   private def binWiseEachColumn(
       sqlCtx: SQLContext,
       input: SchemaRDD,
+      labelName: String,
       columnNames: Array[String],
       bins: Array[Array[Bin]],
       featureArity: Array[Int],
@@ -146,11 +148,11 @@ private[tree] object TreePoint {
     val parts = columnNames zip bins zip featureArity zip isUnordered map {
       case (((columnName, bin), fArity), unordered) =>
         sqlCtx.registerFunction(s"findBin$columnName", findBin(bin, fArity, unordered))
-        s"findBin$columnName($columnName) as bin$columnName"
+        s"findBin$columnName($columnName) as $columnName"
     }
     val projections = parts.mkString(", ")
     println(projections)
-    sqlCtx.sql(s"SELECT LABEL, $projections FROM INPUT")
+    sqlCtx.sql(s"SELECT $labelName, $projections FROM INPUT")
   }
 
   /**

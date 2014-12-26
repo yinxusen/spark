@@ -1323,7 +1323,7 @@ object DecisionTree extends Serializable with Logging {
 
       // sort distinct values
       val valueCounts = valueCountMap
-        .map(row => (row.getDouble(0), row.getInt(1))).collect().sortBy(_._1)
+        .map(row => (row.getDouble(0), row.getLong(1))).collect().sortBy(_._1)
 
       // if possible splits is not enough or just enough, just return all possible splits
       val possibleSplits = valueCounts.length
