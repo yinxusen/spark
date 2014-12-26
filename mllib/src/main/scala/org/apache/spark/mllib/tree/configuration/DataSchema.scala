@@ -22,4 +22,12 @@ object DataSchema {
   def apply(label: String, features: Array[String]): DataSchema = {
     DataSchema(label, features, features.map(_ => FeatureType.Continuous))
   }
+
+  def apply(
+      label: String,
+      features: Array[String],
+      isFeatureCategorical: Array[Boolean]): DataSchema = {
+    DataSchema(label, features,
+      isFeatureCategorical.map(b => if(b) FeatureType.Categorical else FeatureType.Continuous))
+  }
 }

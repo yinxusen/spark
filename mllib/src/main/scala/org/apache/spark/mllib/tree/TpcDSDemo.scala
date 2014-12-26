@@ -286,19 +286,15 @@ object TpcDSDemo {
      *   ssNetPaidIncTax
      *   ssNetProfit
      */
-    val input = sql("select cdCreditRating, cdGender, cdMaritalStatus, cdEducationStatus," +
-      " cdPurchaseEstimate, cdDepCount," +
-      " cdDepEmployedCount, cdDepCollegeCount from customer_demographics")
 
-    val dataSchema = DataSchema("cdCreditRating",
-      ("cdGender, cdMaritalStatus, cdEducationStatus, cdPurchaseEstimate, cdDepCount," +
-        " cdDepEmployedCount, cdDepCollegeCount").split(", "),
-    Array(FeatureType.Categorical, FeatureType.Categorical, FeatureType.Categorical,
-      FeatureType.Continuous, FeatureType.Continuous, FeatureType.Continuous, FeatureType.Continuous))
+    val labelName = "cdCreditRating"
+    val columnNames = "cdGender, cdMaritalStatus, cdEducationStatus, cdPurchaseEstimate, cdDepCount," +
+      " cdDepEmployedCount, cdDepCollegeCount"
+    val columnTypes = Array(true, true, true, false, false, false, false)
 
-    val params = Params(
-      input, "tpcds", dataSchema
-    )
+    val input = sql(s"select $labelName, $columnNames from customer_demographics")
+    val dataSchema = DataSchema(labelName, columnNames.split(", "), columnTypes)
+    val params = Params(input, "TPCDS_DEMO", dataSchema)
 
     SecurityDecisionTree.run(params, sc, sqlCtx)
   }
