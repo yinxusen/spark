@@ -186,7 +186,7 @@ object SecurityDecisionTree {
       labelMap: Map[Any, Int],
       featureMaps: Map[Int, Map[Any, Int]]): String = {
     val header = model.toString
-    header + subtreeToString(model.topNode, labelMap, columnNames, featureMaps, 4)
+    header + "\n" + subtreeToString(model.topNode, labelMap, columnNames, featureMaps, 4)
   }
 
   private def reverseMap(ori: Map[Any, Int]): Map[Int, Any] = {
