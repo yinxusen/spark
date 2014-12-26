@@ -17,19 +17,16 @@
 
 package org.apache.spark.mllib.tree
 
-import org.apache.spark.mllib.evaluation.MulticlassMetrics
+import scala.language.reflectiveCalls
+
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.configuration.Algo._
-import org.apache.spark.mllib.tree.configuration.{FeatureType, DataSchema, Algo, Strategy}
-import org.apache.spark.mllib.util.MLUtils
+import org.apache.spark.mllib.tree.configuration.{FeatureType, DataSchema, Strategy}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{SchemaRDD, SQLContext}
 import org.apache.spark.util.Utils
-import org.apache.spark.{SparkConf, SparkContext}
-
-import scala.collection.parallel.mutable
-import scala.language.reflectiveCalls
+import org.apache.spark.SparkContext
 
 /**
  * An example runner for decision trees and random forests. Run with
@@ -84,39 +81,26 @@ object SecurityDecisionTree {
 
     // ETL of label
     val (examples, classIndexMap, numClasses) = algo match {
-      case Classification => {
+      case Classification =>
         // classCounts: class --> # examples in class
         val classCounts = sql(s"SELECT $label, COUNT($label) FROM $oriTable GROUP BY $label")
-          .map(r => (r.getDouble(0), r.getLong(1))).collect().toMap
-        val sortedClasses = classCounts.keys.toList.sorted
+          .map(r => (r(0), r.getLong(1))).collect().toMap
+        val classLabels = classCounts.keys.toList
         val numClasses = classCounts.size
         // classIndexMap: class --> index in 0,...,numClasses-1
-        val classIndexMap = {
-          if (classCounts.keySet != Set(0.0, 1.0)) {
-            sortedClasses.zipWithIndex.toMap
-          } else {
-            Map[Double, Int]()
-          }
-        }
-        val reIndexLabel: Double => Double = label => classIndexMap(label).toDouble
+        val classIndexMap = classLabels.zipWithIndex.toMap
+        val reIndexLabel: Any => Double = label => classIndexMap(label).toDouble
         registerFunction("reIndexLabel", reIndexLabel)
-        val examples = {
-          if (classIndexMap.isEmpty) {
-            input
-          } else {
-            sql(s"SELECT reIndexLabel($label), $featuresString FROM $oriTable")
-          }
-        }
+        val examples = sql(s"SELECT reIndexLabel($label) as new$label, $featuresString FROM $oriTable")
         val numExamples = examples.count()
         println(s"numClasses = $numClasses.")
         println(s"Per-class example fractions, counts:")
         println(s"Class\tFrac\tCount")
-        sortedClasses.foreach { c =>
+        classLabels.foreach { c =>
           val frac = classCounts(c) / numExamples.toDouble
           println(s"$c\t$frac\t${classCounts(c)}")
         }
         (examples, classIndexMap, numClasses)
-      }
       case Regression =>
         (input, null, 0)
       case _ =>
@@ -127,6 +111,7 @@ object SecurityDecisionTree {
 
     val reLabeledTable = "RELABELEDTABLE"
     registerRDDAsTable(examples, reLabeledTable)
+
     // ETL of features
     val queryStr = (features zip featureTypes).zipWithIndex.map { case ((column, fType), i) =>
       fType match {
@@ -134,12 +119,12 @@ object SecurityDecisionTree {
           column
         case FeatureType.Categorical =>
           val classCounts = sql(s"SELECT $column, COUNT($column) FROM $reLabeledTable GROUP BY $column")
-            .map(r => (r.getDouble(0), r.getLong(1))).collect().toMap
+            .map(r => (r(0), r.getLong(1))).collect().toMap
           val numClasses = classCounts.size
           categoricalFeaturesInfo = categoricalFeaturesInfo.+((i, numClasses))
-          val sortedClasses = classCounts.keys.toList.sorted
-          val classIndexMap = sortedClasses.zipWithIndex.toMap
-          val reIndexLabel: Double => Double = label => classIndexMap(label).toDouble
+          val classLabels = classCounts.keys.toList
+          val classIndexMap = classLabels.zipWithIndex.toMap
+          val reIndexLabel: Any => Double = label => classIndexMap(label).toDouble
           registerFunction(s"reIndex$column", reIndexLabel)
           s"reIndex$column($column)"
         case _ =>
@@ -147,11 +132,11 @@ object SecurityDecisionTree {
       }
     }
 
-    val res = sql(s"SELECT $label, ${queryStr.mkString(", ")} FROM $reLabeledTable")
-    val splits = res.randomSplit(Array(1.0 - fracTest, fracTest))
+    val res = sql(s"SELECT new$label, ${queryStr.mkString(", ")} FROM $reLabeledTable")
+    val splits = res.splitTrainAndTest(Array(1.0 - fracTest, fracTest))
     val trainSet = splits(0)
     val testSet = splits(1)
-    (trainSet.asInstanceOf[SchemaRDD], testSet.asInstanceOf[SchemaRDD], categoricalFeaturesInfo, numClasses)
+    (trainSet, testSet, categoricalFeaturesInfo, numClasses)
   }
 
   def run(params: Params, sc: SparkContext, sqlCtx: SQLContext) {

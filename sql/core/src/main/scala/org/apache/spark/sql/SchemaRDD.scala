@@ -20,6 +20,8 @@ package org.apache.spark.sql
 import java.util.{Map => JMap, List => JList}
 
 
+import org.apache.spark.util.Utils
+
 import scala.collection.JavaConversions._
 
 import com.fasterxml.jackson.core.JsonFactory
@@ -488,6 +490,12 @@ class SchemaRDD(
   override def subtract(other: RDD[Row], p: Partitioner)
                        (implicit ord: Ordering[Row] = null): SchemaRDD =
     applySchema(super.subtract(other, p)(ord))
+
+  def splitTrainAndTest(
+      weights: Array[Double],
+      seed: Long = Utils.random.nextLong): Array[SchemaRDD] = {
+    super.randomSplit(weights, seed).map(applySchema)
+  }
 
   /** Overridden cache function will always use the in-memory columnar caching. */
   override def cache(): this.type = {
