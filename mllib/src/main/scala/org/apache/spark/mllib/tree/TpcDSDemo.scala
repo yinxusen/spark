@@ -158,27 +158,27 @@ case class StoreSales(
 )
 
 case class HouseholdDemographics (
-   hdDemoSk: Int,
-   hdIncomeBankSk: Option[Int],
-   hdBuyPotential: Option[String],
-   hdDepCount: Option[Int],
-   hdVehicleCount: Option[Int]
+    hdDemoSk: Int,
+    hdIncomeBankSk: Option[Int],
+    hdBuyPotential: Option[String],
+    hdDepCount: Option[Int],
+    hdVehicleCount: Option[Int]
 )
 
 case class CustomerAddress(
-   caAddressSk: Int,
-   caAddressId: String,
-   caStreetNumber: Option[String],
-   caStreetName: Option[String],
-   caStreetType: Option[String],
-   caSuiteNumber: Option[String],
-   caCity: Option[String],
-   caCounty: Option[String],
-   caState: Option[String],
-   caZip: Option[String],
-   caCountry: Option[String],
-   caGMTOffset: Option[Float],
-   caLocationType: Option[String]
+    caAddressSk: Int,
+    caAddressId: String,
+    caStreetNumber: Option[String],
+    caStreetName: Option[String],
+    caStreetType: Option[String],
+    caSuiteNumber: Option[String],
+    caCity: Option[String],
+    caCounty: Option[String],
+    caState: Option[String],
+    caZip: Option[String],
+    caCountry: Option[String],
+    caGMTOffset: Option[Float],
+    caLocationType: Option[String]
 )
 
 class TpcDSDemo {
