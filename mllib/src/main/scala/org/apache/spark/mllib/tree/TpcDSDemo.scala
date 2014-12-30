@@ -1,11 +1,12 @@
 package org.apache.spark.mllib.tree
 
 import org.apache.spark.mllib.tree.SecurityDecisionTree.Params
-import org.apache.spark.mllib.tree.configuration.{FeatureType, DataSchema}
+import org.apache.spark.mllib.tree.configuration.DataSchema
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkContext, SparkConf}
 import scala.collection._
 import StringUtils._
+import org.apache.spark.Logging
 
 import scala.reflect.ClassTag
 import reflect._
@@ -184,12 +185,10 @@ class TpcDSDemo {
 
 }
 
-object TpcDSDemo {
+object TpcDSDemo extends Logging {
   import ReflectionUtil._
 
-  def main(args: Array[String]): Unit = {
-    val conf = new SparkConf().setAppName("TPC-DS DEMO").setMaster("local[4]")
-    val sc = new SparkContext(conf)
+  def runBody(sc: SparkContext) = {
     val sqlCtx = new SQLContext(sc)
     val minPartitions = 10
     import sqlCtx._
@@ -222,80 +221,54 @@ object TpcDSDemo {
       .map(l => iCustomerAddress(l.toColumns)).toSchemaRDD.cache()
     registerRDDAsTable(customerAddress, "customer_address")
 
-    /**
-     * ETL for features.
-     * CustomerAddress:
-     *   caStreetNumber
-     *   caStreetType
-     *   caSuiteNumber
-     *   caCity
-     *   caCounty
-     *   caState
-     *   caZip
-     *   caCountry
-     *   caGMTOffset
-     *   caLocationType
-     *
-     * Customer:
-     *   cFirstShipToDateSk
-     *   cFirstSalesDateSk
-     *   cSalutation
-     *   cFirstName
-     *   cLastName
-     *   cPreferredCustFlag
-     *   cBirthDay
-     *   cBirthMonth
-     *   cBirthYear
-     *   cBirthCountry
-     *   cLogin
-     *   cEmailAddress
-     *   cLastReviewDate
-     *
-     * CustomerDemographics
-     *   cdGender
-     *   cdMaritalStatus
-     *   cdEducationStatus
-     *   cdPurchaseEstimate
-     *   cdCreditRating *
-     *   cdDepCount
-     *   cdDepEmployedCount
-     *   cdDepCollegeCount
-     *
-     * HouseholdDemographics
-     *   hdIncomeBandSk
-     *   hdBuyPotential
-     *   hdDepCount
-     *   hdVehicleCount
-     *
-     * StoreSales
-     *   ssItemSk
-     *   ssAddrSk
-     *   ssStoreSk
-     *   ssPromoSk
-     *   ssQuantity
-     *   ssWholeSaleCost
-     *   ssListPrice
-     *   ssSalesPrice
-     *   ssExtDiscountAmt
-     *   ssExtSalesPrice
-     *   ssExtWholeSaleCost
-     *   ssExtListPrice
-     *   ssExtTax
-     *   ssCouponAmt
-     *   ssNetPaid
-     *   ssNetPaidIncTax
-     *   ssNetProfit
-     */
-
     val labelName = "cdCreditRating"
-    val columnNames = "cdGender, cdMaritalStatus, cdEducationStatus, cdPurchaseEstimate, cdDepCount," +
-      " cdDepEmployedCount, cdDepCollegeCount"
-    val columnTypes = Array(true, true, true, false, false, false, false)
+    val columnNames =
+      """
+        |cdGender, cdMaritalStatus, cdEducationStatus, cdPurchaseEstimate, cdDepCount,
+        | cdDepEmployedCount, cdDepCollegeCount,
+        | ssItemSk, ssAddrSk, ssStoreSk, ssPromoSk, ssQuantity, ssWholeSaleCost, ssListPrice,
+        | ssSalesPrice, ssExtDiscountAmt, ssExtSalesPrice, ssExtWholeSaleCost, ssExtListPrice,
+        | ssExtTax, ssCouponAmt, ssNetPaid, ssNetPaidIncTax, ssNetProfit,
+        | caStreetNumber, caStreetType, caSuiteNumber, caCity, caCounty, caState, caZip, caCountry,
+        | caGMTOffset, caLocationType,
+        | cFirstShipToDateSk, cFirstSalesDateSk, cSalutation, cFirstName, cLastName,
+        | cPreferredCustFlag, cBirthDay, cBirthMonth, cBirthYear, cLastReviewDate,
+        | hdIncomeBankSk, hdBuyPotential, hdDepCount, hdVehicleCount
+      """.stripMargin
 
-    val input = sql(s"select $labelName, $columnNames from customer_demographics")
-    val dataSchema = DataSchema(labelName, columnNames.split(", "), columnTypes)
+    val columnTypes = Array(
+      true, true, true, false, false, false, false,
+      true, true, true, true, false, false, false, false, false, false, false, false, false, false,
+      false, false, false,
+      true, true, true, true, true, true, true, true, true, true,
+      true, true, true, true, true, true, true, true, true, true, true,
+      true, true, false, false
+    )
+
+    val loadSql = s"SELECT $labelName, $columnNames" +
+      """
+        |FROM store_sales
+        |LEFT OUTER JOIN household_demographics
+        |ON ssHDemoSk = hdDemoSk
+        |LEFT OUTER JOIN customer_address
+        |ON ssAddrSk = caAddressSk
+        |LEFT OUTER JOIN customer_demographics
+        |ON ssCDemoSk = cdDemoSk
+        |LEFT OUTER JOIN customer
+        |ON ssCustomerSk = cCustomerSk
+      """.stripMargin
+
+    val input = sql(loadSql)
+    logInfo(s"Input RDD schema is: \n$input")
+    val dataSchema = DataSchema(labelName, columnNames.split(',').map(_.trim), columnTypes)
     val params = Params(input, "TPCDS_DEMO", dataSchema)
 
     SecurityDecisionTree.run(params, sc, sqlCtx)
+  }
+
+  def main(args: Array[String]): Unit = {
+    val conf = new SparkConf().setAppName("TPC-DS DEMO").setMaster("local[4]")
+    val sc = new SparkContext(conf)
+    runBody(sc)
   }
 }

@@ -17,15 +17,14 @@
 
 package org.apache.spark.mllib.tree
 
-import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.configuration.Algo._
 import org.apache.spark.mllib.tree.configuration.FeatureType._
 import org.apache.spark.mllib.tree.configuration.{FeatureType, DataSchema, Strategy}
 import org.apache.spark.mllib.tree.model.{Split, DecisionTreeModel, Node}
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{SchemaRDD, SQLContext}
 import org.apache.spark.util.Utils
 import org.apache.spark.SparkContext
+import org.apache.spark.Logging
 
 /**
  * An example runner for decision trees and random forests. Run with
@@ -37,7 +36,7 @@ import org.apache.spark.SparkContext
  * Note: This script treats all features as real-valued (not categorical).
  *       To include categorical features, modify categoricalFeaturesInfo.
  */
-object SecurityDecisionTree {
+object SecurityDecisionTree extends Logging {
 
   object ImpurityType extends Enumeration {
     type ImpurityType = Value
@@ -78,6 +77,7 @@ object SecurityDecisionTree {
     // ETL of label
     val (examples, labelClassIndexMap, numClasses) = algorithm match {
       case Classification =>
+        logInfo(s"Counting classes info of $label in table $tableName")
         val classCounts = sql(s"SELECT $label, COUNT($label) FROM $tableName GROUP BY $label")
           .map(r => (r(0), r.getLong(1))).collect().toMap
         val classLabels = classCounts.keys.toList
@@ -117,8 +117,10 @@ object SecurityDecisionTree {
         case FeatureType.Continuous =>
           s"IntToDouble($column) as $column"
         case FeatureType.Categorical =>
-          val classCounts = sql(s"SELECT $column, COUNT($column) FROM $relabeledTableName GROUP BY $column")
-            .map(r => (r(0), r.getLong(1))).collect().toMap
+          logInfo(s"Counting classes info of $column in table $relabeledTableName")
+          val classCounts =
+            sql(s"SELECT $column, COUNT($column) FROM $relabeledTableName GROUP BY $column")
+              .map(r => (r(0), r.getLong(1))).collect().toMap
           val numClasses = classCounts.size
           categoricalFeaturesInfo += ((i, numClasses))
           val classLabels = classCounts.keys.toList
@@ -132,7 +134,9 @@ object SecurityDecisionTree {
       }
     }
 
-    val res = sql(s"SELECT $label, ${queryStr.mkString(", ")} FROM $relabeledTableName")
+    val preparedDataSql = s"SELECT $label, ${queryStr.mkString(", ")} FROM $relabeledTableName"
+    logInfo(s"Query prepared dataset with SQL: \n$preparedDataSql")
+    val res = sql(preparedDataSql)
     val splits = res.splitTrainAndTest(Array(1.0 - fractionTest, fractionTest))
     val trainSet = splits(0)
     val testSet = splits(1)
@@ -142,10 +146,10 @@ object SecurityDecisionTree {
 
   def run(params: Params, sc: SparkContext, sqlCtx: SQLContext) {
 
-    println(s"DecisionTreeRunner with parameters:\n$params")
-
+    logInfo(s"Begin load data from ${params.table}")
     val (train, test, catFeatureInfo, numClasses, labelMap, featureMaps) = loadData(
       sqlCtx, params.input, params.table, params.schema, params.algorithm, params.fractionTest)
+    logInfo(s"End load data from ${params.table}")
 
     val impurityCalculator = params.impurity match {
       case Gini => impurity.Gini
@@ -171,11 +175,12 @@ object SecurityDecisionTree {
       val randomSeed = Utils.random.nextInt()
       val model = new RandomForest(
         strategy, params.numTrees, params.featureSubsetStrategy, randomSeed)
+      logInfo(s"Begin training model with parameters: \n$params")
       val resModel = model.run(train, params.schema.label, params.schema.features, sqlCtx)
       val totalTime = (System.nanoTime() - startTime) / 1e9
+      logInfo(s"End training model, total time cost: $totalTime")
       resModel.trees.foreach(t =>
         println(parseTreeToString(t, params.schema.features, labelMap, featureMaps)))
-      println(s"Total time cost: $totalTime")
     } else { ??? }
     sc.stop()
   }
