@@ -1,16 +1,16 @@
 package org.apache.spark.newml.scheduler
 
-import breeze.linalg.DenseVector
 import org.apache.spark.Logging
 import org.apache.spark.newml.linalg.{Vectors, Vector}
 import org.apache.spark.newml.optimization.{Updater, Gradient}
-import org.apache.spark.newml.optimization.GradientDescent._
 import org.apache.spark.rdd.RDD
+
+import breeze.linalg.{DenseVector => BDV}
 
 import scala.collection.mutable.ArrayBuffer
 
 class StructuredScheduler extends Logging {
-  def runMiniBatchSGD(
+  def run(
       data: RDD[(Double, Vector)],
       gradient: Gradient,
       updater: Updater,
@@ -50,7 +50,7 @@ class StructuredScheduler extends Logging {
       // Sample a subset (fraction miniBatchFraction) of the total data
       // compute and sum up the subgradients on this subset (this is one map-reduce)
       val (gradientSum, lossSum, miniBatchSize) = data.sample(false, miniBatchFraction, 42 + i)
-        .treeAggregate((BDV.zeros[Double](n), 0.0, 0L))(
+        .aggregate((BDV.zeros[Double](n), 0.0, 0L))(
           seqOp = (c, v) => {
             // c: (grad, loss, count), v: (label, features)
             val l = gradient.compute(v._2, v._1, bcWeights.value, Vectors.fromBreeze(c._1))

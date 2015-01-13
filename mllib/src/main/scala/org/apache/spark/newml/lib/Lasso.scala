@@ -24,12 +24,13 @@ case class Lasso private (
 
   private val gradient = new LeastSquaresGradient()
   private val updater = new L1Updater()
-  val optimizer = new GradientDescent(gradient, updater)
+  private val scheduler = new StructuredScheduler()
+
+  val optimizer = new GradientDescent(scheduler, gradient, updater)
     .setStepSize(stepSize)
     .setNumIterations(numIterations)
     .setRegParam(regParam)
     .setMiniBatchFraction(miniBatchFraction)
-  val scheduler = new StructuredScheduler
 
   /**
    * Construct a Lasso object with default parameters: {stepSize: 1.0, numIterations: 100,
