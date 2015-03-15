@@ -1110,4 +1110,12 @@ private[spark] object SerDe extends Serializable {
       }
     }.toJavaRDD()
   }
+
+  def getKMeansModel(centers: Array[Vector]): KMeansModel = {
+    KMeansModel.genKMeansModel(centers)
+  }
+
+  def loadKMeansModel(jsc: JavaSparkContext, path: String): KMeansModel = {
+    KMeansModel.load(jsc.sc, path)
+  }
 }

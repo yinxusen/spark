@@ -74,6 +74,10 @@ class KMeansModel (val clusterCenters: Array[Vector]) extends Saveable with Seri
 }
 
 object KMeansModel extends Loader[KMeansModel] {
+  def genKMeansModel(centers: Array[Vector]): KMeansModel = {
+    new KMeansModel(centers)
+  }
+
   override def load(sc: SparkContext, path: String): KMeansModel = {
     KMeansModel.SaveLoadV1_0.load(sc, path)
   }

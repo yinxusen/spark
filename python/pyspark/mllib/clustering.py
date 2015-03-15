@@ -55,6 +55,7 @@ class KMeansModel(object):
     True
     >>> type(model.clusterCenters)
     <type 'list'>
+    >>> model.save(sc, '/tmp/test')
     """
 
     def __init__(self, centers):
@@ -77,6 +78,14 @@ class KMeansModel(object):
                 best_distance = distance
         return best
 
+    def save(self, sc, path):
+        java_vector = map(lambda x: _convert_to_vector(x), self.centers)
+        java_model = callMLlibFunc("getKMeansModel", java_vector)
+        java_model.save(sc._jsc.sc(), path)
+
+    #def load(self, sc, path):
+    #    java_model = callMLlibFunc("loadKMeansModel", sc._jsc.sc(), path)
+    #    self.centers = java_model.centers
 
 class KMeans(object):
 
