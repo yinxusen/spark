@@ -19,7 +19,7 @@ package org.apache.spark.ml.feature
 
 import org.scalatest.FunSuite
 
-import org.apache.spark.mllib.linalg.{Vector, Vectors, DenseVector, SparseVector}
+import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
 import org.apache.spark.mllib.util.MLlibTestSparkContext
 import org.apache.spark.mllib.util.TestingUtils._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
@@ -56,15 +56,17 @@ class IDFSuite extends FunSuite with MLlibTestSparkContext {
     val data = Array(
       Vectors.sparse(numOfFeatures, Array(1, 3), Array(1.0, 2.0)),
       Vectors.dense(0.0, 1.0, 2.0, 3.0),
-      Vectors.sparse(numOfFeatures, Array(1), Array(1.0))
-    )
-    val numOfData = data.size
+      Vectors.sparse(numOfFeatures, Array(1), Array(1.0)))
+    val numOfData = data.length
 
     val sqlContext = new SQLContext(sc)
     import sqlContext.implicits._
     val dataFrame = sc.parallelize(data, 2).map(Tuple1.apply).toDF("features")
 
-    val idfModel = new IDF().setInputCol("features").setOutputCol("idf_value").fit(dataFrame)
+    val idfModel = new IDF()
+      .setInputCol("features")
+      .setOutputCol("idf_value")
+      .fit(dataFrame)
 
     val expectedModel = Vectors.dense(Array(0, 3, 1, 2).map { x =>
       math.log((numOfData + 1.0) / (x + 1.0))
@@ -80,15 +82,17 @@ class IDFSuite extends FunSuite with MLlibTestSparkContext {
     val data = Array(
       Vectors.sparse(numOfFeatures, Array(1, 3), Array(1.0, 2.0)),
       Vectors.dense(0.0, 1.0, 2.0, 3.0),
-      Vectors.sparse(numOfFeatures, Array(1), Array(1.0))
-    )
-    val numOfData = data.size
+      Vectors.sparse(numOfFeatures, Array(1), Array(1.0)))
+    val numOfData = data.length
 
     val sqlContext = new SQLContext(sc)
     import sqlContext.implicits._
     val dataFrame = sc.parallelize(data, 2).map(Tuple1.apply).toDF("features")
 
-    val idfModel = new IDF().setInputCol("features").setOutputCol("idf_value").setMinDocFreq(1)
+    val idfModel = new IDF()
+      .setInputCol("features")
+      .setOutputCol("idf_value")
+      .setMinDocFreq(1)
       .fit(dataFrame)
 
     val expectedModel = Vectors.dense(Array(0, 3, 1, 2).map { x =>
