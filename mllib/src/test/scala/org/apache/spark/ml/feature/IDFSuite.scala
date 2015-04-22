@@ -26,6 +26,13 @@ import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
 class IDFSuite extends FunSuite with MLlibTestSparkContext {
 
+  @transient var sqlContext: SQLContext = _
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    sqlContext = new SQLContext(sc)
+  }
+
   def getResultFromDF(result: DataFrame): Array[Vector] = {
     result.select("idf_value").collect().map {
       case Row(features: Vector) => features
@@ -58,23 +65,22 @@ class IDFSuite extends FunSuite with MLlibTestSparkContext {
       Vectors.dense(0.0, 1.0, 2.0, 3.0),
       Vectors.sparse(numOfFeatures, Array(1), Array(1.0)))
     val numOfData = data.length
+    val idf = Vectors.dense(Array(0, 3, 1, 2).map { x =>
+      math.log((numOfData + 1.0) / (x + 1.0))
+    })
+    val expected = getResultFromVector(data, idf)
 
-    val sqlContext = new SQLContext(sc)
-    import sqlContext.implicits._
-    val dataFrame = sc.parallelize(data, 2).map(Tuple1.apply).toDF("features")
+    val df = sqlContext.createDataFrame(data.zip(expected)).toDF("features", "expected")
 
     val idfModel = new IDF()
       .setInputCol("features")
       .setOutputCol("idf_value")
-      .fit(dataFrame)
+      .fit(df)
 
-    val expectedModel = Vectors.dense(Array(0, 3, 1, 2).map { x =>
-      math.log((numOfData + 1.0) / (x + 1.0))
-    })
-
-    assertValues(
-      getResultFromDF(idfModel.transform(dataFrame)),
-      getResultFromVector(data, expectedModel))
+    idfModel.transform(df).select("idf_value", "expected").collect().foreach {
+      case Row(x: Vector, y: Vector) =>
+        assert(x ~== y absTol 1e-5)
+    }
   }
 
   test("Normalization with setter") {
