@@ -20,12 +20,15 @@ package org.apache.spark.ml.feature
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Random
 
 import org.apache.spark.annotation.AlphaComponent
 import org.apache.spark.ml.UnaryTransformer
-import org.apache.spark.ml.param.{IntParam, ParamMap}
+import org.apache.spark.ml.param.{IntParam, Param, ParamMap}
 import org.apache.spark.mllib.linalg._
 import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.{DataFrame, SQLContext}
+import org.apache.spark.{SparkConf, SparkContext}
 
 /**
  * :: AlphaComponent ::
@@ -51,16 +54,34 @@ class PolynomialMapper extends UnaryTransformer[Vector, Vector, PolynomialMapper
   /** @group setParam */
   def setDegree(value: Int): this.type = set(degree, value)
 
+  /**
+   * There are two implementations of `PolynomialMapper`, use a parameter here to control the
+   * selection of different versions.
+   */
+  val mapperVersion = new Param[ExpandLike](
+    this, "mapperVersion", "different polynomial mapper for performance testing")
+  setDefault(mapperVersion -> PolynomialMapperV1)
+
+  /** @group getParam */
+  def getMapperVersion = getOrDefault(mapperVersion)
+
+  /** @group setParam */
+  def setMapperVersion(value: ExpandLike): this.type = set(mapperVersion, value)
+
   override protected def createTransformFunc(paramMap: ParamMap): Vector => Vector = { v =>
     val d = paramMap(degree)
-    // PolynomialMapper.transform(getDegree)
-    PolynomialMapperV2.expand(v, d)
+    val mapper = paramMap(mapperVersion)
+    mapper.expand(v, d)
   }
 
   override protected def outputDataType: DataType = new VectorUDT()
 }
 
-object PolynomialMapper {
+trait ExpandLike {
+  def expand(v: Vector, degree: Int): Vector
+}
+
+object PolynomialMapperV1 extends ExpandLike {
   /**
    * The number that combines k items from N items without repeat, i.e. the binomial coefficient.
    */
@@ -208,10 +229,10 @@ object PolynomialMapper {
    * Transform a vector of variables into a larger vector which stores the polynomial expansion from
    * degree 1 to degree `degree`.
    */
-  private def transform(degree: Int)(feature: Vector): Vector = {
-    val expectedDims = numExpandedDims(degree, feature.size)
+  override def expand(v: Vector, degree: Int): Vector = {
+    val expectedDims = numExpandedDims(degree, v.size)
 
-    feature match {
+    v match {
       case f: DenseVector =>
         val originalLen = f.size
 
@@ -236,7 +257,7 @@ object PolynomialMapper {
           values += f.values(i)
         }
 
-        fillSparseVector(indices, values, 0, originalLen, 2, degree, feature.size, originalLen)
+        fillSparseVector(indices, values, 0, originalLen, 2, degree, v.size, originalLen)
 
         Vectors.sparse(expectedDims, indices.toArray, values.toArray)
     }
@@ -255,7 +276,7 @@ object PolynomialMapper {
  * To handle sparsity, if c is zero, we can skip all monomials that contain it. We remember the
  * current index and increment it properly for sparse input.
  */
-object PolynomialMapperV2 {
+object PolynomialMapperV2 extends ExpandLike {
 
   private def choose(n: Int, k: Int): Int = {
     Range(n, n - k, -1).product / Range(k, 1, -1).product
@@ -343,11 +364,66 @@ object PolynomialMapperV2 {
     new SparseVector(polySize, polyIndices.result(), polyValues.result())
   }
 
-  def expand(v: Vector, degree: Int): Vector = {
+  override def expand(v: Vector, degree: Int): Vector = {
     v match {
       case dv: DenseVector => expand(dv, degree)
       case sv: SparseVector => expand(sv, degree)
       case _ => throw new IllegalArgumentException
+    }
+  }
+
+  object PolynomialMapper {
+
+    /**
+     * Run a block of code `numIterations` times and average the total time consuming.
+     */
+    def time[R](block: => R): Unit = {
+      val numIterations = 100
+      val t0 = System.nanoTime()
+      val result = for (i <- 0 until numIterations) block
+      val t1 = System.nanoTime()
+      println("Elapsed time: " + (t1 - t0) / numIterations + "ns")
+    }
+
+    def test(dataset: DataFrame, mapper: PolynomialMapper): Unit = {
+      println(s"Testing mapper ${mapper.getMapperVersion}")
+      println(s"Testing degree ${mapper.getDegree}")
+      time[Unit](mapper.transform(dataset).count())
+    }
+
+    def main(args: Array[String]): Unit = {
+      val conf = new SparkConf().setMaster("local[4]")
+        .setAppName("Performance testing of PolynomialMapper")
+      val sc = new SparkContext(conf)
+      val sqlCtx = new SQLContext(sc)
+      import sqlCtx.implicits._
+
+      val seed = 42L
+      val random = new Random(seed)
+      val numData: Int = 1e10.toInt
+      val numFeatures = 100
+      val localDenseData = Seq.fill(numData, numFeatures)(random.nextDouble())
+        .map(x => Vectors.dense(x.toArray))
+      val denseDataSet = sc.parallelize(localDenseData, 12).map(Tuple1.apply).toDF("denseData")
+
+      val localSparseData = Seq.fill[Vector](numData) {
+        val indices = Array.fill[Int](numFeatures)(random.nextInt(numFeatures))
+        val values = Array.fill[Double](numFeatures)(random.nextDouble())
+        Vectors.sparse(numFeatures * 10, indices, values)
+      }
+      val sparseDataSet = sc.parallelize(localSparseData, 12).map(Tuple1.apply).toDF("sparseData")
+
+      val degrees = Array(2, 3, 5, 10)
+      val mappers = Array(PolynomialMapperV1, PolynomialMapperV2)
+      val dataSets = Array((denseDataSet, "denseData"), (sparseDataSet, "sparseData"))
+      val mapper = new PolynomialMapper()
+      for (d <- degrees; m <- mappers; (data, name) <- dataSets) {
+        val outputName = s"$d-$m-$name"
+        test(
+          data,
+          mapper.setDegree(d).setMapperVersion(m).setInputCol(name).setOutputCol(outputName)
+        )
+      }
     }
   }
 }
