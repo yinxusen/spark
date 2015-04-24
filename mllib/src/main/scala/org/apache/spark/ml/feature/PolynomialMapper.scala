@@ -371,59 +371,59 @@ object PolynomialMapperV2 extends ExpandLike {
       case _ => throw new IllegalArgumentException
     }
   }
+}
 
-  object PolynomialMapper {
+object PolynomialMapper {
 
-    /**
-     * Run a block of code `numIterations` times and average the total time consuming.
-     */
-    def time[R](block: => R): Unit = {
-      val numIterations = 100
-      val t0 = System.nanoTime()
-      val result = for (i <- 0 until numIterations) block
-      val t1 = System.nanoTime()
-      println("Elapsed time: " + (t1 - t0) / numIterations + "ns")
+  /**
+   * Run a block of code `numIterations` times and average the total time consuming.
+   */
+  def time[R](block: => R): Unit = {
+    val numIterations = 100
+    val t0 = System.nanoTime()
+    for (i <- 0 until numIterations) block
+    val t1 = System.nanoTime()
+    println("Elapsed time: " + (t1 - t0) / numIterations + "ns")
+  }
+
+  def test(dataset: DataFrame, mapper: PolynomialMapper): Unit = {
+    println(s"Testing mapper ${mapper.getMapperVersion}")
+    println(s"Testing degree ${mapper.getDegree}")
+    time[Unit](mapper.transform(dataset).count())
+  }
+
+  def main(args: Array[String]): Unit = {
+    val conf = new SparkConf().setMaster("local[4]")
+      .setAppName("Performance testing of PolynomialMapper")
+    val sc = new SparkContext(conf)
+    val sqlCtx = new SQLContext(sc)
+    import sqlCtx.implicits._
+
+    val seed = 42L
+    val random = new Random(seed)
+    val numData: Int = 1024 * 1024
+    val numFeatures = 100
+    val localDenseData = Seq.fill(numData, numFeatures)(random.nextDouble())
+      .map(x => Vectors.dense(x.toArray))
+    val denseDataSet = sc.parallelize(localDenseData, 12).map(Tuple1.apply).toDF("denseData")
+
+    val localSparseData = Seq.fill[Vector](numData) {
+      val indices = Array.fill[Int](numFeatures)(random.nextInt(numFeatures))
+      val values = Array.fill[Double](numFeatures)(random.nextDouble())
+      Vectors.sparse(numFeatures * 10, indices, values)
     }
+    val sparseDataSet = sc.parallelize(localSparseData, 12).map(Tuple1.apply).toDF("sparseData")
 
-    def test(dataset: DataFrame, mapper: PolynomialMapper): Unit = {
-      println(s"Testing mapper ${mapper.getMapperVersion}")
-      println(s"Testing degree ${mapper.getDegree}")
-      time[Unit](mapper.transform(dataset).count())
-    }
-
-    def main(args: Array[String]): Unit = {
-      val conf = new SparkConf().setMaster("local[4]")
-        .setAppName("Performance testing of PolynomialMapper")
-      val sc = new SparkContext(conf)
-      val sqlCtx = new SQLContext(sc)
-      import sqlCtx.implicits._
-
-      val seed = 42L
-      val random = new Random(seed)
-      val numData: Int = 1e10.toInt
-      val numFeatures = 100
-      val localDenseData = Seq.fill(numData, numFeatures)(random.nextDouble())
-        .map(x => Vectors.dense(x.toArray))
-      val denseDataSet = sc.parallelize(localDenseData, 12).map(Tuple1.apply).toDF("denseData")
-
-      val localSparseData = Seq.fill[Vector](numData) {
-        val indices = Array.fill[Int](numFeatures)(random.nextInt(numFeatures))
-        val values = Array.fill[Double](numFeatures)(random.nextDouble())
-        Vectors.sparse(numFeatures * 10, indices, values)
-      }
-      val sparseDataSet = sc.parallelize(localSparseData, 12).map(Tuple1.apply).toDF("sparseData")
-
-      val degrees = Array(2, 3, 5, 10)
-      val mappers = Array(PolynomialMapperV1, PolynomialMapperV2)
-      val dataSets = Array((denseDataSet, "denseData"), (sparseDataSet, "sparseData"))
-      val mapper = new PolynomialMapper()
-      for (d <- degrees; m <- mappers; (data, name) <- dataSets) {
-        val outputName = s"$d-$m-$name"
-        test(
-          data,
-          mapper.setDegree(d).setMapperVersion(m).setInputCol(name).setOutputCol(outputName)
-        )
-      }
+    val degrees = Array(2, 3, 5)
+    val mappers = Array(PolynomialMapperV1, PolynomialMapperV2)
+    val dataSets = Array((denseDataSet, "denseData"), (sparseDataSet, "sparseData"))
+    val mapper = new PolynomialMapper()
+    for (d <- degrees; m <- mappers; (data, name) <- dataSets) {
+      val outputName = s"$d-$m-$name"
+      test(
+        data,
+        mapper.setDegree(d).setMapperVersion(m).setInputCol(name).setOutputCol(outputName)
+      )
     }
   }
 }
