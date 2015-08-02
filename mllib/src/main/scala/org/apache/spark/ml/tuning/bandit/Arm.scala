@@ -1,5 +1,6 @@
 package org.apache.spark.ml.tuning.bandit
 
+import org.apache.spark.ml.param.shared.HasMaxIter
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.sql.DataFrame
 
@@ -8,7 +9,7 @@ import org.apache.spark.sql.DataFrame
  */
 class Arm[M <: Model[M]](var data: DataFrame,
     var modelType: String,
-    var estimator: Estimator[M],
+    var estimator: Estimator[M] with HasMaxIter,
     var model: M,
     val downSamplingFactor: Double = 1,
     var results: (Double, Double, Double) = null,
@@ -29,6 +30,7 @@ class Arm[M <: Model[M]](var data: DataFrame,
 
   def pullArm(): Unit = {
     this.numPulls += 1
+    this.estimator.maxIter -> 1
     // TODO some settings of estimator, i.e. the downsampling factor
     model = this.estimator.fit(data)
   }
