@@ -1,6 +1,7 @@
 package org.apache.spark.ml.tuning.bandit
 
-import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.ml.evaluation.RegressionEvaluator
+import org.apache.spark.ml.regression.{LinearRegressionModel, LinearRegression}
 import org.apache.spark.util.IntParam
 
 import scala.collection.mutable
@@ -28,9 +29,11 @@ abstract class ModelFamily(val name: String, val paramList: Array[ParamMap]) {
   }
 }
 
-class LinRegressionModelFamily(override val name: String, override val paramList: Array[ParamMap], val linRegressionModel: LinearRegression)
+class LinRegressionModelFamily(override val name: String, override val paramList: Array[ParamMap])
   extends ModelFamily(name, paramList) {
-  override def createArm(initData: DataFrame, params: ParamMap): Arm = {
-    val reg = params.get(linRegressionModel.regParam)
+
+  override def createArm(initData: DataFrame, params: ParamMap): Arm[_] = {
+    val linearRegression = new LinearRidgeRegression().copy(params)
+    new Arm[LinearRegressionModel](linearRegression, new RegressionEvaluator(), 1)
   }
 }

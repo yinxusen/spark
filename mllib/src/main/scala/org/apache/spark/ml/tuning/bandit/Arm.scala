@@ -10,7 +10,10 @@ import org.apache.spark.sql.DataFrame
  * Created by panda on 7/31/15.
  */
 
-class Arm[M <: Model[M]](val estimator: PartialEstimator[M], val params: ParamMap, evaluator: Evaluator, stepsPerPulling: Int) {
+class Arm[M <: Model[M]](
+    val estimator: PartialEstimator[M],
+    evaluator: Evaluator,
+    stepsPerPulling: Int) {
 
   /**
    * Pull an arm once time, given a dataset, then return the error in the step.
