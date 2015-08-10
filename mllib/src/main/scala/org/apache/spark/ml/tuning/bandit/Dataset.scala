@@ -7,14 +7,20 @@ import org.apache.spark.sql.{SQLContext, DataFrame, Row}
 /**
  * Created by panda on 8/9/15.
  */
-trait Dataset {
+abstract class Dataset(
+    val name: String,
+    val trainingSet: DataFrame,
+    val validationSet: DataFrame,
+    val testSet: DataFrame) {
   def baseValErr(): Double
 }
 
-class ClassifyDataset(val name: String,
-    val trainingSet: DataFrame,
-    val validationSet: DataFrame,
-    val testSet: DataFrame) extends Dataset {
+class ClassifyDataset(
+    override val name: String,
+    override val trainingSet: DataFrame,
+    override val validationSet: DataFrame,
+    override val testSet: DataFrame)
+  extends Dataset(name, trainingSet, validationSet, testSet) {
 
   override def baseValErr(): Double = {
     val ySum = validationSet.select("label").map { case Row(x: Double) => x}.sum()

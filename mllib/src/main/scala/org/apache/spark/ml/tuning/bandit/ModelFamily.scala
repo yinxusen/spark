@@ -6,22 +6,23 @@ import org.apache.spark.util.IntParam
 
 import scala.collection.mutable
 
-import org.apache.spark.ml.param.{DoubleParam, ParamMap, Params}
+import org.apache.spark.ml.param.{DoubleParam, ParamMap, Params, Param}
 import org.apache.spark.sql.DataFrame
 
 /**
  * Created by panda on 8/1/15.
  */
-abstract class ModelFamily(val name: String, val paramList: Array[ParamMap]) {
+abstract class ModelFamily(val name: String, val paramList: Array[Param[_]]) {
   def createArm(initData: DataFrame, params: ParamMap): Arm
 
   def addArm(hp: ParamMap, arms: mutable.Map[(String, String), Arm], arm: Arm): Unit = {
     arms += ((this.name, hp.toString) -> arm)
   }
 
-  def createArms(hpPoints: Array[ParamMap],
-    initData: DataFrame,
-    arms: mutable.Map[(String, String), Arm]): mutable.Map[(String, String), Arm] = {
+  def createArms(
+      hpPoints: Array[ParamMap],
+      initData: DataFrame,
+      arms: mutable.Map[(String, String), Arm]): mutable.Map[(String, String), Arm] = {
     for (hp <- hpPoints) {
       this.addArm(hp, arms, this.createArm(initData, hp))
     }
@@ -29,7 +30,7 @@ abstract class ModelFamily(val name: String, val paramList: Array[ParamMap]) {
   }
 }
 
-class LinRegressionModelFamily(override val name: String, override val paramList: Array[ParamMap])
+class LinRegressionModelFamily(override val name: String, override val paramList: Array[Param[_]])
   extends ModelFamily(name, paramList) {
 
   override def createArm(initData: DataFrame, params: ParamMap): Arm[_] = {

@@ -8,17 +8,17 @@ import org.apache.spark.sql.DataFrame
  * Created by panda on 7/31/15.
  */
 
-case class Key(dataName: String, numArms: Int, maxIter: Int, trial: Int)
+case class ArmInfo(dataName: String, numArms: Int, maxIter: Int, trial: Int)
 
-class SearchStrategy(val name: String, val allResults: mutable.Map[Key, Arm] = Map.empty) {
+abstract class SearchStrategy(
+    val name: String,
+    val allResults: mutable.Map[ArmInfo, Array[Arm[_]]] = Map.empty) {
 
-  def appendResults(dataName: String, trial: Int, arms: Array[Arm], maxIter: Int, numArms: Int) = {
-
+  def appendResults(armInfo: ArmInfo, arms: Array[Arm[_]]) = {
+    allResults(armInfo) = arms
   }
 
-  def search(modelFamilies: String, maxIter: Int, data: DataFrame, arms: Map[Key, Arm]): Arm = {
-    ???
-  }
+  def search(modelFamilies: String, maxIter: Int, data: DataFrame, arms: Map[ArmInfo, Arm]): Arm
 }
 
 class StaticSearchStrategy(override val name: String, override val allResults: mutable.Map[Key, Arm]) extends SearchStrategy(name, allResults) {
