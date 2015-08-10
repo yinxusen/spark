@@ -30,7 +30,9 @@ abstract class ModelFamily(val name: String, val paramList: Array[ParamSampler[_
   }
 }
 
-class LinRegressionModelFamily(override val name: String, override val paramList: Array[ParamSampler[_]])
+class LinRegressionModelFamily(
+    override val name: String,
+    override val paramList: Array[ParamSampler[_]])
   extends ModelFamily(name, paramList) {
 
   override def createArm(initData: DataFrame, params: ParamMap): Arm[_] = {

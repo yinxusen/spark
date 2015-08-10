@@ -21,13 +21,23 @@ abstract class SearchStrategy(
   def search(modelFamilies: String, maxIter: Int, data: DataFrame, arms: Map[ArmInfo, Arm]): Arm
 }
 
-class StaticSearchStrategy(override val name: String, override val allResults: mutable.Map[Key, Arm]) extends SearchStrategy(name, allResults) {
-  override def search(modelFamilies: String, maxIter: Int, data: DataFrame, arms: Map[Key, Arm]): Arm = {
+class StaticSearchStrategy(
+    override val name: String,
+    override val allResults: mutable.Map[ArmInfo, Array[Arm[_]]])
+  extends SearchStrategy(name, allResults) {
+
+  override def search(
+      modelFamilies: Array[ModelFamily],
+      maxIter: Int,
+      data: DataFrame,
+      arms: Map[(String, String), Arm]): Arm = {
+
     assert(arms.keys.size != 0, "ERROR: No arms!")
+    val armValues = arms.values.toArray
     val numArms = arms.keys.size
     var i = 0
     while (i  < maxIter) {
-      arms.values(i % numArms).pullArm()
+      armValues(i % numArms).pullArm()
       i += 1
     }
   }

@@ -10,7 +10,9 @@ import scala.annotation.varargs
 /**
  * Created by panda on 8/2/15.
  */
-abstract class PartialEstimator[M <: Model[M]] extends Estimator[M] {
+abstract class PartialEstimator[M <: Model[M]] extends Estimator[M] with HasDownSamplingFactor {
+
+  def setDownSamplingFactor(value: Double): this.type = set(downSamplingFactor, value)
 
   def fit(dataset: DataFrame, initModel: M, paramMap: ParamMap, steps: Int = 1): M = {
     copy(paramMap).fit(dataset, initModel, steps)

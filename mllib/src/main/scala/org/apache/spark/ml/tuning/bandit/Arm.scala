@@ -13,17 +13,51 @@ import scala.collection.mutable
  */
 
 class Arm[M <: Model[M]](
+    var data: Dataset,
+    var model: M,
+    var results: (Double, Double, Double),
+    var numPulls: Int,
+    var numEvals: Int,
+    var abridgedHistoryValCompute: Boolean = false,
+    var abridgedHistoryValX: Array[Double] = Array.empty[Double],
+    var abridgedHistoryValY: Array[Double] = Array.empty[Double],
+    var abridgedHistoryValAlpha: Double = 1.2,
+    val modelType: String,
     val estimator: PartialEstimator[M],
-    evaluator: Evaluator,
-    stepsPerPulling: Int) {
+    val downSamplingFactor: Double = 1,
+    val evaluator: Evaluator,
+    val stepsPerPulling: Int) {
 
-  /**
-   * Pull an arm once time, given a dataset, then return the error in the step.
-   */
-  def pullArm(data: DataFrame, initModel: M, stepsPerPulling: Int = this.stepsPerPulling): (M, Double) = {
-    val partialModel = this.estimator.fit(data, initModel, stepsPerPulling)
-    val score = this.evaluator.evaluate(partialModel.transform(data))
-    (partialModel, score)
+  def reset(): this.type = {
+    this.results = null
+    this.numPulls = 0
+    this.numEvals = 0
+    // TODO making default model for every kind of model.
+    // this.model.
+    this
+  }
+
+  def stripArm(): Unit = {
+    this.data = null
+    // TODO define null model
+    // this.model = None
+    this.abridgedHistoryValX = Array.empty
+    this.abridgedHistoryValY = Array.empty
+  }
+
+  def pullArm(): Unit = {
+    this.numPulls += 1
+    val partialModel = this.estimator.setDownSamplingFactor(downSamplingFactor)
+      .fit(this.data.trainingSet, this.model, this.stepsPerPulling)
+    this.model = partialModel
+  }
+
+  def trainToCompletion(maxIter: Double): Unit = {
+
+  }
+
+  def getResults(forceRecompute: Boolean = true, partition: String = None): (Double, Double, Double) = {
+    ???
   }
 }
 
