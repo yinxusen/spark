@@ -39,10 +39,12 @@ object Arms {
       val hyperParameterPoints = (0 until numArmsForModelFamily).map { index =>
         val paramMap = new ParamMap()
         modelFamily.paramList.map {
-          case parameter@(_: IntParam) =>
-            paramMap.put(parameter, 1)
-          case parameter@(_: DoubleParam) =>
-            paramMap.put(parameter, 1.0)
+          case parameter@(_: IntParamSampler) =>
+            val param = new IntParam("from arm", parameter.name, "arm generated parameter")
+            paramMap.put(param, parameter.getOneRandomSample)
+          case parameter@(_: DoubleParamSampler) =>
+            val param = new DoubleParam("from arm", parameter.name, "arm generated parameter")
+            paramMap.put(param, parameter.getOneRandomSample)
           case _ =>
           // TODO refine the code
         }

@@ -12,7 +12,7 @@ import org.apache.spark.sql.DataFrame
 /**
  * Created by panda on 8/1/15.
  */
-abstract class ModelFamily(val name: String, val paramList: Array[Param[_]]) {
+abstract class ModelFamily(val name: String, val paramList: Array[ParamSampler[_]]) {
   def createArm(initData: DataFrame, params: ParamMap): Arm
 
   def addArm(hp: ParamMap, arms: mutable.Map[(String, String), Arm], arm: Arm): Unit = {
@@ -30,7 +30,7 @@ abstract class ModelFamily(val name: String, val paramList: Array[Param[_]]) {
   }
 }
 
-class LinRegressionModelFamily(override val name: String, override val paramList: Array[Param[_]])
+class LinRegressionModelFamily(override val name: String, override val paramList: Array[ParamSampler[_]])
   extends ModelFamily(name, paramList) {
 
   override def createArm(initData: DataFrame, params: ParamMap): Arm[_] = {
