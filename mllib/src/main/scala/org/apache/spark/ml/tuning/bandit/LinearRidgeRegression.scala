@@ -66,7 +66,7 @@ class LinearRidgeRegression(override val uid: String)
     new LinearRidgeRegressionModel(uid, weight, initModel.intercept)
   }
 
-  override def copy(extra: ParamMap): LinearRidgeRegressionModel = defaultCopy(extra)
+  override def copy(extra: ParamMap): LinearRidgeRegression = defaultCopy(extra)
 
 }
 

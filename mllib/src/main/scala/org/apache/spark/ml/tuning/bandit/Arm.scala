@@ -18,14 +18,12 @@ class AbridgedHistory(var compute: Boolean, var iterations: Array[Int], var erro
 class Arm[M <: Model[M]](
     var data: Dataset,
     var model: Option[M],
-    var results: Array[Double] = Array.empty,
     var numPulls: Int,
     var numEvals: Int,
     val modelType: String,
-    // TODO remember to set all parameters, like downSamplingFactor, stepsPerPulling, etc.
     val estimator: PartialEstimator[M],
-    // TODO, remember to set all parameters for evaluator, i.e. label column and score column
     val evaluator: Evaluator,
+    var results: Array[Double] = Array.empty,
     val abridgedHistory: AbridgedHistory = new AbridgedHistory(false, Array.empty, Array.empty, 1.2)) {
 
   def reset(): this.type = {
