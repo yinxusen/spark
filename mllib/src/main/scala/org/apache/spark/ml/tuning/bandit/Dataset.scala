@@ -2,7 +2,7 @@ package org.apache.spark.ml.tuning.bandit
 
 import org.apache.spark.ml.feature.StandardScaler
 import org.apache.spark.mllib.util.MLUtils
-import org.apache.spark.sql.{SQLContext, DataFrame, Row}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
 /**
  * Created by panda on 8/9/15.

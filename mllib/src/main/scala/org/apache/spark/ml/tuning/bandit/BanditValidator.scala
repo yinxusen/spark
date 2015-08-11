@@ -18,84 +18,49 @@
 package org.apache.spark.ml.tuning.bandit
 
 import com.github.fommil.netlib.F2jBLAS
-
-import org.apache.spark.Logging
 import org.apache.spark.Logging
 import org.apache.spark.annotation.Experimental
-import org.apache.spark.annotation.Experimental
-import org.apache.spark.ml.Estimator
-import org.apache.spark.ml.Model
-import org.apache.spark.ml._
+import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.ml.evaluation.Evaluator
-import org.apache.spark.ml.evaluation.Evaluator
-import org.apache.spark.ml.param.IntParam
-import org.apache.spark.ml.param.Param
-import org.apache.spark.ml.param.ParamMap
-import org.apache.spark.ml.param.ParamValidators
-import org.apache.spark.ml.param.Params
-import org.apache.spark.ml.param._
-import org.apache.spark.ml.param.shared.HasMaxIter
+import org.apache.spark.ml.param.{IntParam, Param, ParamMap, Params, _}
+import org.apache.spark.ml.param.shared.HasSeed
 import org.apache.spark.ml.util.Identifiable
-import org.apache.spark.ml.util.Identifiable
-import org.apache.spark.mllib.util.MLUtils
-import org.apache.spark.mllib.util.MLUtils
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrame, SQLContext}
 
 /**
  * Params for [[BanditValidator]] and [[BanditValidatorModel]].
  */
-private[ml] trait BanditValidatorParams extends Params {
+private[ml] trait BanditValidatorParams extends Params with HasStepsPerPulling with HasSeed {
 
-  val fitOnce: IntParam = new IntParam(this, "fitOnce", "the count of steps fitting once", (n: Int) => n >= 1)
-  setDefault(fitOnce -> 1)
+  val problemType: Param[String] = new Param(this, "problemType", "types of problems")
+  setDefault(problemType, "CLASSIFY")
 
-  def getFitOnce: Int = $(fitOnce)
+  def getProblemType: String = $(problemType)
 
-  /**
-   * param for the estimator to be cross-validated
-   * @group param
-   */
-  val estimator: Param[Estimator[_] with HasMaxIter] = new Param(this, "estimator", "estimator for selection")
+  val computeHistory: BooleanParam = new BooleanParam(this, "computeHistory", "whether to compute history or not")
 
-  /** @group getParam */
-  def getEstimator: Estimator[_] with HasMaxIter = $(estimator)
+  setDefault(computeHistory, true)
 
-  /**
-   * param for estimator param maps
-   * @group param
-   */
-  val estimatorParamMaps: Param[Array[ParamMap]] =
-    new Param(this, "estimatorParamMaps", "param maps for the estimator")
+  val baselines: Param[Map[String, Double]] = new Param(this, "baselines", "baseline of each dataset")
 
-  /** @group getParam */
-  def getEstimatorParamMaps: Array[ParamMap] = $(estimatorParamMaps)
+  val modelFamilies: Param[Array[ModelFamily]] = new Param(this, "modelFamilies", "model families")
 
-  /**
-   * param for the evaluator used to select hyper-parameters that maximize the cross-validated
-   * metric
-   * @group param
-   */
+  val numTrails: IntParam = new IntParam(this, "numTrails", "number of trails")
+
+  val datasets: Param[Map[String, String]] = new Param(this, "datasets", "datasets to use")
+
+  val numArmsList: Param[Array[Int]] = new Param(this, "numArmsList", "a list of numbers of arms per parameter")
+
+  val expectedIters: Param[Array[Int]] = new Param(this, "expectedIters", "expected iterations")
+
+  val searchStrategies: Param[Array[SearchStrategy]] = new Param(this, "searchStrategies", "")
+
   val evaluator: Param[Evaluator] = new Param(this, "evaluator",
     "evaluator used to select hyper-parameters that maximize the cross-validated metric")
 
   /** @group getParam */
   def getEvaluator: Evaluator = $(evaluator)
-
-  /**
-   * Param for number of folds for cross validation.  Must be >= 2.
-   * Default: 3
-   * @group param
-   */
-  val numFolds: IntParam = new IntParam(this, "numFolds",
-    "number of folds for cross validation (>= 2)", ParamValidators.gtEq(2))
-
-  /** @group getParam */
-  def getNumFolds: Int = $(numFolds)
-
-  setDefault(numFolds -> 3)
 }
 
 /**
@@ -106,93 +71,61 @@ private[ml] trait BanditValidatorParams extends Params {
 class BanditValidator(override val uid: String) extends Estimator[BanditValidatorModel]
 with BanditValidatorParams with Logging {
 
-  def this() = this(Identifiable.randomUID("cv"))
+  def this() = this(Identifiable.randomUID("bandit validation"))
+
+  def transformSchema(schema: StructType): StructType = {
+    schema
+  }
+
+  def copy(extra: ParamMap): BanditValidator = ???
 
   private val f2jBLAS = new F2jBLAS
 
-  def setFitOnce(value: Int): this.type = set(fitOnce, value)
-
-  /** @group setParam */
-  def setEstimator(value: Estimator[_] with HasMaxIter): this.type = set(estimator, value)
-
-  /** @group setParam */
-  def setEstimatorParamMaps(value: Array[ParamMap]): this.type = set(estimatorParamMaps, value)
+  def setComputeHistory(value: Boolean): this.type = set(computeHistory, value)
 
   /** @group setParam */
   def setEvaluator(value: Evaluator): this.type = set(evaluator, value)
 
-  /** @group setParam */
-  def setNumFolds(value: Int): this.type = set(numFolds, value)
+  override def fit(dataset: DataFrame): BanditValidatorModel = ???
 
-  override def fit(dataset: DataFrame): BanditValidatorModel = {
-    val schema = dataset.schema
-    transformSchema(schema, logging = true)
-    val sqlCtx = dataset.sqlContext
-    val est = $(estimator)
-    val eval = $(evaluator)
-    val epm = $(estimatorParamMaps)
-    val numModels = epm.length
-    val metrics = new Array[Double](epm.length)
-    val splits = MLUtils.kFold(dataset.rdd, $(numFolds), 0)
-    splits.zipWithIndex.foreach { case ((training, validation), splitIndex) =>
-      val trainingDataset = sqlCtx.createDataFrame(training, schema).cache()
-      val validationDataset = sqlCtx.createDataFrame(validation, schema).cache()
-      // multi-model training
-      logDebug(s"Train split $splitIndex with multiple sets of parameters.")
-      val models = est.fit(trainingDataset, epm).asInstanceOf[Seq[Model[_]]]
-      trainingDataset.unpersist()
-      var i = 0
-      while (i < numModels) {
-        // TODO: duplicate evaluator to take extra params from input
-        val metric = eval.evaluate(models(i).transform(validationDataset, epm(i)))
-        logDebug(s"Got metric $metric for model trained with ${epm(i)}.")
-        metrics(i) += metric
-        i += 1
+  def fit(sqlCtx: SQLContext) = {
+    val results = $(datasets).flatMap { case (dataName, fileName) =>
+      val data = ClassifyDataset.scaleAndPartitionData(sqlCtx, dataName, fileName)
+      val allArms = Arms.generateArms($(modelFamilies), data, $(numArmsList).max).mapValues { arm =>
+        arm.abridgedHistory.compute = $(computeHistory)
+        arm
       }
-      validationDataset.unpersist()
-    }
-    f2jBLAS.dscal(numModels, 1.0 / $(numFolds), metrics, 1)
-    logInfo(s"Average cross-validation metrics: ${metrics.toSeq}")
-    val (bestMetric, bestIndex) = metrics.zipWithIndex.maxBy(_._1)
-    logInfo(s"Best set of parameters:\n${epm(bestIndex)}")
-    logInfo(s"Best cross-validation metric: $bestMetric.")
-    val bestModel = est.fit(dataset, epm(bestIndex)).asInstanceOf[Model[_]]
-    copyValues(new BanditValidatorModel(uid, bestModel).setParent(this))
-  }
 
-  override def transformSchema(schema: StructType): StructType = {
-    $(estimator).transformSchema(schema)
-  }
+      val armsAllocator = new ArmsAllocator(allArms)
 
-  override def validateParams(): Unit = {
-    super.validateParams()
-    val est = $(estimator)
-    for (paramMap <- $(estimatorParamMaps)) {
-      est.copy(paramMap).validateParams()
-    }
-  }
+      if ($(computeHistory)) {
+        for ((armInfo, arm) <- allArms) {
+          val maxIter = math.pow(2, 14)
+          arm.trainToCompletion(maxIter)
+          println(armInfo)
+          println(arm.abridgedHistory.iterations.mkString(", "))
+          println(arm.abridgedHistory.errors.mkString(", "))
+        }
+      }
 
-  override def copy(extra: ParamMap): CrossValidator = {
-    val copied = defaultCopy(extra).asInstanceOf[CrossValidator]
-    if (copied.isDefined(estimator)) {
-      copied.setEstimator(copied.getEstimator.copy(extra))
+      $(numArmsList).flatMap { case numArmsPerParameter =>
+        val numArms = $(modelFamilies).map(modelFamily => math.pow(numArmsPerParameter, modelFamily.paramList.size)).sum.toInt
+        $(expectedIters).zipWithIndex.flatMap { case (expectedNumItersPerArm, idx) =>
+          $(searchStrategies).map { case searchStrategy =>
+            val arms = armsAllocator.allocate(numArms)
+            val bestArm = searchStrategy.search($(modelFamilies), expectedNumItersPerArm * numArms, arms)
+            ((searchStrategy.name, dataName, numArms, expectedNumItersPerArm), bestArm.getResults(false, None))
+          }
+        }
+      }
     }
-    if (copied.isDefined(evaluator)) {
-      copied.setEvaluator(copied.getEvaluator.copy(extra))
-    }
-    copied
   }
 }
 
-/**
- * :: Experimental ::
- * Model from k-fold cross validation.
- */
-@Experimental
 class BanditValidatorModel private[ml] (
-                                        override val uid: String,
-                                        val bestModel: Model[_])
-  extends Model[CrossValidatorModel] with CrossValidatorParams {
+    override val uid: String,
+    val bestModel: Model[_])
+  extends Model[BanditValidatorModel] with BanditValidatorParams {
 
   override def validateParams(): Unit = {
     bestModel.validateParams()
@@ -207,8 +140,9 @@ class BanditValidatorModel private[ml] (
     bestModel.transformSchema(schema)
   }
 
-  override def copy(extra: ParamMap): CrossValidatorModel = {
-    val copied = new CrossValidatorModel(uid, bestModel.copy(extra).asInstanceOf[Model[_]])
+  override def copy(extra: ParamMap): BanditValidatorModel = {
+    val copied = new BanditValidatorModel(uid, bestModel.copy(extra).asInstanceOf[Model[_]])
     copyValues(copied, extra)
   }
 }
+

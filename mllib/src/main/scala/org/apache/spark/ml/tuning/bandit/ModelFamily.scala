@@ -1,13 +1,9 @@
 package org.apache.spark.ml.tuning.bandit
 
 import org.apache.spark.ml.evaluation.RegressionEvaluator
-import org.apache.spark.ml.regression.{LinearRegressionModel, LinearRegression}
-import org.apache.spark.util.IntParam
+import org.apache.spark.ml.param.ParamMap
 
 import scala.collection.mutable
-
-import org.apache.spark.ml.param.{DoubleParam, ParamMap, Params, Param}
-import org.apache.spark.sql.DataFrame
 
 /**
  * Created by panda on 8/1/15.

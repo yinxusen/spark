@@ -1,11 +1,8 @@
 package org.apache.spark.ml.tuning.bandit
 
-import org.apache.spark.ml.Estimator
-import org.apache.spark.ml.Model
-import org.apache.spark.ml.param.{ParamMap, ParamPair}
+import org.apache.spark.ml.{Estimator, Model}
+import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.sql.DataFrame
-
-import scala.annotation.varargs
 
 /**
  * Created by panda on 8/2/15.

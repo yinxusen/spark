@@ -2,8 +2,6 @@ package org.apache.spark.ml.tuning.bandit
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.DataFrame
-
 /**
  * Created by panda on 7/31/15.
  */

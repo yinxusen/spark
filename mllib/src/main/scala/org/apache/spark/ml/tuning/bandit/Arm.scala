@@ -1,10 +1,8 @@
 package org.apache.spark.ml.tuning.bandit
 
+import org.apache.spark.ml.Model
 import org.apache.spark.ml.evaluation.Evaluator
 import org.apache.spark.ml.param.{DoubleParam, IntParam, ParamMap}
-import org.apache.spark.ml.param.shared.HasMaxIter
-import org.apache.spark.ml.{Estimator, Model}
-import org.apache.spark.sql.DataFrame
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -97,7 +95,7 @@ class Arm[M <: Model[M]](
 object Arms {
   def generateArms(
       modelFamilies: Array[ModelFamily],
-      data: DataFrame,
+      data: Dataset,
       numArmsPerParameter: Int): Map[(String, String), Arm] = {
     val arms = new mutable.HashMap[(String, String), Arm]()
     for (modelFamily <- modelFamilies) {
@@ -120,5 +118,29 @@ object Arms {
       modelFamily.createArms(hyperParameterPoints, data, arms)
     }
     arms.toMap
+  }
+}
+
+class ArmsAllocator(val allArms: Map[(String, String), Arm]) {
+  val usedArms = new ArrayBuffer[(String, String)]()
+  val unusedArms = new ArrayBuffer[(String, String)]()
+  unusedArms.appendAll(allArms.keys)
+  val arms = new mutable.HashMap[(String, String), Arm]()
+
+  def allocate(numArms: Int): Map[(String, String), Arm] = {
+    assert(numArms <= allArms.size, "Required arms exceed the total amount.")
+    val arms = new mutable.HashMap[(String, String), Arm]()
+    var i = 0
+    while (i < math.min(numArms, usedArms.size)) {
+      arms += usedArms(i) -> allArms(usedArms(i))
+      i += 1
+    }
+    while (i < numArms) {
+      val armInfo = unusedArms.remove(0)
+      arms += armInfo -> allArms(armInfo)
+      usedArms.append(armInfo)
+      i += 1
+    }
+    arms.toMap.mapValues(_.reset())
   }
 }

@@ -1,6 +1,6 @@
 package org.apache.spark.ml.tuning.bandit
 
-import org.apache.spark.ml.param.{DoubleParam, IntParam, Param, Params}
+import org.apache.spark.ml.param.{DoubleParam, IntParam, Params}
 
 /**
  * Created by panda on 8/10/15.

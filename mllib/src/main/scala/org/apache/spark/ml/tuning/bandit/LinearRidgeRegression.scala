@@ -1,16 +1,15 @@
 package org.apache.spark.ml.tuning.bandit
 
-import org.apache.spark.ml.param.shared.{HasOutputCol, HasInputCol}
-import org.apache.spark.ml.param.{IntParam, ParamMap, DoubleParam, Params}
-import org.apache.spark.ml.util.{Identifiable, SchemaUtils}
-import org.apache.spark.mllib.linalg.{Vectors, VectorUDT, Vector}
-import org.apache.spark.mllib.regression.{RidgeRegressionWithSGD, LabeledPoint}
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.types.{DataTypes, StructType}
+import org.apache.spark.ml.param.shared.{HasInputCol, HasOutputCol}
+import org.apache.spark.ml.param.{DoubleParam, ParamMap, Params}
 import org.apache.spark.ml.regression.RegressionModel
+import org.apache.spark.ml.util.{Identifiable, SchemaUtils}
 import org.apache.spark.mllib.linalg.BLAS._
+import org.apache.spark.mllib.linalg.{Vector, VectorUDT}
+import org.apache.spark.mllib.regression.{LabeledPoint, RidgeRegressionWithSGD}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.types.StructType
 
 /**
  * Created by panda on 8/10/15.
