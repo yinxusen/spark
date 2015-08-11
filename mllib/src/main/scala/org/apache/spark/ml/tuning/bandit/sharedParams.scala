@@ -21,5 +21,11 @@ private[ml] trait HasStepControl extends Params {
 private[ml] trait HasDownSamplingFactor extends Params {
   final val downSamplingFactor: DoubleParam = new DoubleParam(this, "downSamplingFactor", "down sampling factor")
   setDefault(downSamplingFactor -> 1)
-  final def getStep: Double = $(downSamplingFactor)
+  final def getDownSamplingFactor: Double = $(downSamplingFactor)
+}
+
+private[ml] trait HasStepsPerPulling extends Params {
+  final val stepsPerPulling: IntParam = new IntParam(this, "stepsPerPulling", "the count of iterative steps in one pulling")
+  setDefault(stepsPerPulling -> 1)
+  final def getStepsPerPulling: Int = $(stepsPerPulling)
 }

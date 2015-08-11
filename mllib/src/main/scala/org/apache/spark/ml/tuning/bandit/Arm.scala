@@ -15,7 +15,7 @@ import scala.collection.mutable.ArrayBuffer
 
 class Arm[M <: Model[M]](
     var data: Dataset,
-    var model: M,
+    var model: Option[M],
     var results: Array[Double] = Array.empty,
     var numPulls: Int,
     var numEvals: Int,
@@ -24,6 +24,7 @@ class Arm[M <: Model[M]](
     var abridgedHistoryValY: Array[Double] = Array.empty,
     var abridgedHistoryValAlpha: Double = 1.2,
     val modelType: String,
+    // TODO remember to set all parameters, like downSamplingFactor, stepsPerPulling, etc.
     val estimator: PartialEstimator[M],
     val downSamplingFactor: Double = 1,
     // TODO, remember to set all parameters for evaluator, i.e. label column and score column
@@ -34,24 +35,25 @@ class Arm[M <: Model[M]](
     this.results = Array.empty
     this.numPulls = 0
     this.numEvals = 0
-    // TODO making default model for every kind of model.
-    // this.model.
+    this.model = None
     this
   }
 
   def stripArm(): Unit = {
     this.data = null
-    // TODO define null model
-    // this.model = None
+    this.model = None
     this.abridgedHistoryValX = Array.empty
     this.abridgedHistoryValY = Array.empty
   }
 
   def pullArm(): Unit = {
     this.numPulls += 1
-    val partialModel = this.estimator.setDownSamplingFactor(downSamplingFactor)
-      .fit(this.data.trainingSet, this.model, this.stepsPerPulling)
-    this.model = partialModel
+    val partialModel = if (model == None) {
+      this.estimator.fit(data.trainingSet)
+    } else {
+      this.estimator.fit(data.trainingSet, model.get)
+    }
+    this.model = Some(partialModel)
   }
 
   def trainToCompletion(maxIter: Double): Unit = {
@@ -73,20 +75,24 @@ class Arm[M <: Model[M]](
   }
 
   def getResults(forceRecompute: Boolean = true, partition: Option[String] = None): Array[Double] = {
-    if (this.results == Array.empty || forceRecompute) {
-      this.numEvals += 1
-      if (partition == None || this.results == Array.empty) {
-        this.results = Array(evaluator.evaluate(model.transform(data.trainingSet)),
-          evaluator.evaluate(model.transform(data.validationSet)),
-          evaluator.evaluate(model.transform(data.testSet)))
-      } else if (partition == Some("train")) {
-        this.results(0) = evaluator.evaluate(model.transform(data.trainingSet))
-      } else if (partition == Some("validation")) {
-        this.results(1) = evaluator.evaluate(model.transform(data.validationSet))
-      } else if (partition == Some("test")) {
-        this.results(2) = evaluator.evaluate(model.transform(data.testSet))
-      } else {
-        // TODO
+    if (model.isEmpty) {
+      throw new Exception("model is empty")
+    } else {
+      if (this.results == Array.empty || forceRecompute) {
+        this.numEvals += 1
+        if (partition == None || this.results == Array.empty) {
+          this.results = Array(evaluator.evaluate(model.get.transform(data.trainingSet)),
+            evaluator.evaluate(model.get.transform(data.validationSet)),
+            evaluator.evaluate(model.get.transform(data.testSet)))
+        } else if (partition == Some("train")) {
+          this.results(0) = evaluator.evaluate(model.get.transform(data.trainingSet))
+        } else if (partition == Some("validation")) {
+          this.results(1) = evaluator.evaluate(model.get.transform(data.validationSet))
+        } else if (partition == Some("test")) {
+          this.results(2) = evaluator.evaluate(model.get.transform(data.testSet))
+        } else {
+          // TODO
+        }
       }
     }
     this.results

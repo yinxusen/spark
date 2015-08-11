@@ -1,16 +1,16 @@
 package org.apache.spark.ml.tuning.bandit
 
 import org.apache.spark.ml.param.shared.{HasOutputCol, HasInputCol}
-import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.ml.param.{IntParam, ParamMap, DoubleParam, Params}
 import org.apache.spark.ml.util.{Identifiable, SchemaUtils}
-import org.apache.spark.mllib.linalg.VectorUDT
-import org.apache.spark.mllib.linalg.Vector
+import org.apache.spark.mllib.linalg.{Vectors, VectorUDT, Vector}
 import org.apache.spark.mllib.regression.{RidgeRegressionWithSGD, LabeledPoint}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types.{DataTypes, StructType}
+import org.apache.spark.ml.regression.RegressionModel
+import org.apache.spark.mllib.linalg.BLAS._
 
 /**
  * Created by panda on 8/10/15.
@@ -35,7 +35,7 @@ trait LinearRidgeRegressionBase
 }
 
 class LinearRidgeRegression(override val uid: String)
-  extends PartialEstimator[LinearRegressionModel] with LinearRidgeRegressionBase {
+  extends PartialEstimator[LinearRidgeRegressionModel] with LinearRidgeRegressionBase {
 
   def this() = this(Identifiable.randomUID("linear ridge regression"))
 
@@ -46,36 +46,59 @@ class LinearRidgeRegression(override val uid: String)
   override def transformSchema(schema: StructType): StructType = {
     validateAndTransformSchema(schema)
   }
-  override def fit(dataset: DataFrame): LinearRegressionModel = {
-    ???
-  }
-
-  override def fit(
-      dataset: DataFrame,
-      initModel: LinearRegressionModel,
-      steps: Int = 1): LinearRegressionModel = {
+  override def fit(dataset: DataFrame): LinearRidgeRegressionModel = {
     val currentStep = $(step) + 1
     this.setStep(currentStep)
     val data = dataset.map { case Row(x: Vector, y: Double) => LabeledPoint(y, x)}
     val weight =
-      LinearRidgeRegression.singleSGDStep(data, currentStep, initModel.weights, $(step), steps)
-    new LinearRegressionModel(uid, weight, initModel.intercept)
+      LinearRidgeRegression.singleSGDStep(data, currentStep, None, $(step), $(stepsPerPulling))
+    new LinearRidgeRegressionModel(uid, weight, 0)
   }
 
-  override def copy(extra: ParamMap): LinearRidgeRegression = defaultCopy(extra)
+  override def fit(
+      dataset: DataFrame,
+      initModel: LinearRidgeRegressionModel): LinearRidgeRegressionModel = {
+    val currentStep = $(step) + 1
+    this.setStep(currentStep)
+    val data = dataset.map { case Row(x: Vector, y: Double) => LabeledPoint(y, x)}
+    val weight =
+      LinearRidgeRegression.singleSGDStep(data, currentStep, Some(initModel.weights), $(step), $(stepsPerPulling))
+    new LinearRidgeRegressionModel(uid, weight, initModel.intercept)
+  }
 
+  override def copy(extra: ParamMap): LinearRidgeRegressionModel = defaultCopy(extra)
+
+}
+
+class LinearRidgeRegressionModel(
+    override val uid: String,
+    val weights: Vector,
+    val intercept: Double)
+  extends RegressionModel[Vector, LinearRidgeRegressionModel]
+  with LinearRidgeRegressionBase {
+
+  override protected def predict(features: Vector): Double = {
+    dot(features, weights) + intercept
+  }
+
+  override def copy(extra: ParamMap): LinearRidgeRegressionModel = {
+    copyValues(new LinearRidgeRegressionModel(uid, weights, intercept), extra)
+  }
 }
 
 object LinearRidgeRegression {
   def singleSGDStep(
       data: RDD[LabeledPoint],
       currentStep: Int,
-      currentWeight: Vector,
+      currentWeight: Option[Vector],
       regularizer: Double,
       steps: Int): Vector = {
     val stepSize = 0.01 / math.sqrt(2 + currentStep)
-    val newModel =
-      RidgeRegressionWithSGD.train(data, steps, stepSize, regularizer, 0.1, currentWeight)
+    val newModel = if (currentWeight == None) {
+      RidgeRegressionWithSGD.train(data, steps, stepSize, regularizer, 0.1)
+    } else {
+      RidgeRegressionWithSGD.train(data, steps, stepSize, regularizer, 0.1, currentWeight.get)
+    }
     newModel.weights
   }
 }
