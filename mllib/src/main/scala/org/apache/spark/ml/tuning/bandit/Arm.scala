@@ -7,6 +7,7 @@ import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.sql.DataFrame
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * Created by panda on 7/31/15.
@@ -15,21 +16,22 @@ import scala.collection.mutable
 class Arm[M <: Model[M]](
     var data: Dataset,
     var model: M,
-    var results: (Double, Double, Double),
+    var results: Array[Double] = Array.empty,
     var numPulls: Int,
     var numEvals: Int,
     var abridgedHistoryValCompute: Boolean = false,
-    var abridgedHistoryValX: Array[Double] = Array.empty[Double],
-    var abridgedHistoryValY: Array[Double] = Array.empty[Double],
+    var abridgedHistoryValX: Array[Int] = Array.empty,
+    var abridgedHistoryValY: Array[Double] = Array.empty,
     var abridgedHistoryValAlpha: Double = 1.2,
     val modelType: String,
     val estimator: PartialEstimator[M],
     val downSamplingFactor: Double = 1,
+    // TODO, remember to set all parameters for evaluator, i.e. label column and score column
     val evaluator: Evaluator,
     val stepsPerPulling: Int) {
 
   def reset(): this.type = {
-    this.results = null
+    this.results = Array.empty
     this.numPulls = 0
     this.numEvals = 0
     // TODO making default model for every kind of model.
@@ -53,11 +55,41 @@ class Arm[M <: Model[M]](
   }
 
   def trainToCompletion(maxIter: Double): Unit = {
-
+    this.reset()
+    val valXArrayBuffer = new ArrayBuffer[Int]()
+    val valYArrayBuffer = new ArrayBuffer[Double]()
+    while (this.numPulls < maxIter) {
+      this.pullArm()
+      if (this.abridgedHistoryValCompute) {
+        if (this.abridgedHistoryValX.size == 0 || this.numPulls > valXArrayBuffer.last * this.abridgedHistoryValAlpha) {
+          valXArrayBuffer.append(this.numPulls)
+          val error = this.getResults(true, Some("validation"))(1)
+          valYArrayBuffer.append(error)
+        }
+      }
+    }
+    this.abridgedHistoryValX = valXArrayBuffer.toArray
+    this.abridgedHistoryValY = valYArrayBuffer.toArray
   }
 
-  def getResults(forceRecompute: Boolean = true, partition: String = None): (Double, Double, Double) = {
-    ???
+  def getResults(forceRecompute: Boolean = true, partition: Option[String] = None): Array[Double] = {
+    if (this.results == Array.empty || forceRecompute) {
+      this.numEvals += 1
+      if (partition == None || this.results == Array.empty) {
+        this.results = Array(evaluator.evaluate(model.transform(data.trainingSet)),
+          evaluator.evaluate(model.transform(data.validationSet)),
+          evaluator.evaluate(model.transform(data.testSet)))
+      } else if (partition == Some("train")) {
+        this.results(0) = evaluator.evaluate(model.transform(data.trainingSet))
+      } else if (partition == Some("validation")) {
+        this.results(1) = evaluator.evaluate(model.transform(data.validationSet))
+      } else if (partition == Some("test")) {
+        this.results(2) = evaluator.evaluate(model.transform(data.testSet))
+      } else {
+        // TODO
+      }
+    }
+    this.results
   }
 }
 
