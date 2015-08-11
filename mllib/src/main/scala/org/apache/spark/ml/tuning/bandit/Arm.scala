@@ -13,23 +13,20 @@ import scala.collection.mutable.ArrayBuffer
  * Created by panda on 7/31/15.
  */
 
+class AbridgedHistory(var compute: Boolean, var iterations: Array[Int], var errors: Array[Double], var alpha: Double)
+
 class Arm[M <: Model[M]](
     var data: Dataset,
     var model: Option[M],
     var results: Array[Double] = Array.empty,
     var numPulls: Int,
     var numEvals: Int,
-    var abridgedHistoryValCompute: Boolean = false,
-    var abridgedHistoryValX: Array[Int] = Array.empty,
-    var abridgedHistoryValY: Array[Double] = Array.empty,
-    var abridgedHistoryValAlpha: Double = 1.2,
     val modelType: String,
     // TODO remember to set all parameters, like downSamplingFactor, stepsPerPulling, etc.
     val estimator: PartialEstimator[M],
-    val downSamplingFactor: Double = 1,
     // TODO, remember to set all parameters for evaluator, i.e. label column and score column
     val evaluator: Evaluator,
-    val stepsPerPulling: Int) {
+    val abridgedHistory: AbridgedHistory = new AbridgedHistory(false, Array.empty, Array.empty, 1.2)) {
 
   def reset(): this.type = {
     this.results = Array.empty
@@ -42,8 +39,8 @@ class Arm[M <: Model[M]](
   def stripArm(): Unit = {
     this.data = null
     this.model = None
-    this.abridgedHistoryValX = Array.empty
-    this.abridgedHistoryValY = Array.empty
+    this.abridgedHistory.iterations = Array.empty
+    this.abridgedHistory.errors = Array.empty
   }
 
   def pullArm(): Unit = {
@@ -62,16 +59,16 @@ class Arm[M <: Model[M]](
     val valYArrayBuffer = new ArrayBuffer[Double]()
     while (this.numPulls < maxIter) {
       this.pullArm()
-      if (this.abridgedHistoryValCompute) {
-        if (this.abridgedHistoryValX.size == 0 || this.numPulls > valXArrayBuffer.last * this.abridgedHistoryValAlpha) {
+      if (this.abridgedHistory.compute) {
+        if (this.abridgedHistory.iterations.size == 0 || this.numPulls > valXArrayBuffer.last * this.abridgedHistory.alpha) {
           valXArrayBuffer.append(this.numPulls)
           val error = this.getResults(true, Some("validation"))(1)
           valYArrayBuffer.append(error)
         }
       }
     }
-    this.abridgedHistoryValX = valXArrayBuffer.toArray
-    this.abridgedHistoryValY = valYArrayBuffer.toArray
+    this.abridgedHistory.iterations = valXArrayBuffer.toArray
+    this.abridgedHistory.errors = valYArrayBuffer.toArray
   }
 
   def getResults(forceRecompute: Boolean = true, partition: Option[String] = None): Array[Double] = {
