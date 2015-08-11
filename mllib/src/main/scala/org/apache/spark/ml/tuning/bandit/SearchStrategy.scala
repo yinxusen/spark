@@ -18,7 +18,7 @@ abstract class SearchStrategy(
     allResults(armInfo) = arms
   }
 
-  def search(modelFamilies: String, maxIter: Int, data: DataFrame, arms: Map[ArmInfo, Arm]): Arm
+  def search(modelFamilies: Array[ModelFamily], maxIter: Int, arms: Map[(String, String), Arm]): Arm
 }
 
 class StaticSearchStrategy(
@@ -29,7 +29,6 @@ class StaticSearchStrategy(
   override def search(
       modelFamilies: Array[ModelFamily],
       maxIter: Int,
-      data: DataFrame,
       arms: Map[(String, String), Arm]): Arm = {
 
     assert(arms.keys.size != 0, "ERROR: No arms!")
@@ -40,6 +39,9 @@ class StaticSearchStrategy(
       armValues(i % numArms).pullArm()
       i += 1
     }
+
+    val bestArm = armValues.minBy(arm => arm.getResults(true, Some("validation"))(1))
+    bestArm
   }
 }
 
