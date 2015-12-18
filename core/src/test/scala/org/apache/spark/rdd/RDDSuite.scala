@@ -208,7 +208,7 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext {
     var shouldFail = true
     val rdd = new RDD[Int](sc, Nil) {
       override def getPartitions: Array[Partition] = Array(onlySplit)
-      override val getDependencies = List[Dependency[_]]()
+      override val getDependencies = List[Dependency[_, _]]()
       override def compute(split: Partition, context: TaskContext): Iterator[Int] = {
         throw new Exception("injected failure")
       }
@@ -960,11 +960,11 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext {
 
   /** A contrived RDD that allows the manual addition of dependencies after creation. */
   private class CyclicalDependencyRDD[T: ClassTag] extends RDD[T](sc, Nil) {
-    private val mutableDependencies: ArrayBuffer[Dependency[_]] = ArrayBuffer.empty
+    private val mutableDependencies: ArrayBuffer[Dependency[_, _]] = ArrayBuffer.empty
     override def compute(p: Partition, c: TaskContext): Iterator[T] = Iterator.empty
     override def getPartitions: Array[Partition] = Array.empty
-    override def getDependencies: Seq[Dependency[_]] = mutableDependencies
-    def addDependency(dep: Dependency[_]) {
+    override def getDependencies: Seq[Dependency[_, _]] = mutableDependencies
+    def addDependency(dep: Dependency[_, _]) {
       mutableDependencies += dep
     }
   }

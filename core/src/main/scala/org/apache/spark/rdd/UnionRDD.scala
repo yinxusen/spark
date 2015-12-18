@@ -72,8 +72,8 @@ class UnionRDD[T: ClassTag](
     array
   }
 
-  override def getDependencies: Seq[Dependency[_]] = {
-    val deps = new ArrayBuffer[Dependency[_]]
+  override def getDependencies: Seq[Dependency[_, _]] = {
+    val deps = new ArrayBuffer[Dependency[_, _]]
     var pos = 0
     for (rdd <- rdds) {
       deps += new RangeDependency(rdd, 0, pos, rdd.partitions.length)

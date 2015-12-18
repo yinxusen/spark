@@ -19,6 +19,7 @@ package org.apache.spark
 
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
+import org.apache.spark.scheduler.ProxyRDD
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.shuffle.ShuffleHandle
 
@@ -27,8 +28,9 @@ import org.apache.spark.shuffle.ShuffleHandle
  * Base class for dependencies.
  */
 @DeveloperApi
-abstract class Dependency[T] extends Serializable {
+abstract class Dependency[T, D <: Dependency[T, D]] extends Serializable {
   def rdd: RDD[T]
+  def copyWithNewRDD(newRDD: RDD[T]): D
 }
 
 
@@ -38,7 +40,7 @@ abstract class Dependency[T] extends Serializable {
  * of partitions of the parent RDD. Narrow dependencies allow for pipelined execution.
  */
 @DeveloperApi
-abstract class NarrowDependency[T](_rdd: RDD[T]) extends Dependency[T] {
+abstract class NarrowDependency[T](_rdd: RDD[T]) extends Dependency[T, NarrowDependency[T]] {
   /**
    * Get the parent partitions for a child partition.
    * @param partitionId a partition of the child RDD
@@ -47,6 +49,13 @@ abstract class NarrowDependency[T](_rdd: RDD[T]) extends Dependency[T] {
   def getParents(partitionId: Int): Seq[Int]
 
   override def rdd: RDD[T] = _rdd
+
+  /**
+   * The fake function here is to support the use of `NarrowDependency` in test suites.
+   */
+  override def copyWithNewRDD(rdd: RDD[T]): this.type = {
+    ???
+  }
 }
 
 
@@ -72,7 +81,7 @@ class ShuffleDependency[K, V, C](
     val keyOrdering: Option[Ordering[K]] = None,
     val aggregator: Option[Aggregator[K, V, C]] = None,
     val mapSideCombine: Boolean = false)
-  extends Dependency[Product2[K, V]] {
+  extends Dependency[Product2[K, V], ShuffleDependency[K, V, C]] {
 
   override def rdd: RDD[Product2[K, V]] = _rdd.asInstanceOf[RDD[Product2[K, V]]]
 
@@ -82,6 +91,22 @@ class ShuffleDependency[K, V, C](
     shuffleId, _rdd.partitions.size, this)
 
   _rdd.sparkContext.cleaner.foreach(_.registerShuffleForCleanup(this))
+
+  private def cloneWithNewPartitioner(newPartitioner: Partitioner): ShuffleDependency[K, V, C] = {
+    new ShuffleDependency[K, V, C](
+      _rdd, newPartitioner, serializer, keyOrdering, aggregator, mapSideCombine)
+  }
+
+  def getProxyRDD(
+      partitionStartIndices: Array[Int],
+      newPartitioner: Partitioner): ProxyRDD[K, V, C] = {
+    new ProxyRDD[K, V, C](cloneWithNewPartitioner(newPartitioner), partitionStartIndices)
+  }
+
+  override def copyWithNewRDD(newRDD: RDD[Product2[K, V]]): this.type = {
+    new ShuffleDependency[K, V, C](
+      newRDD, partitioner, serializer, keyOrdering, aggregator, mapSideCombine)
+  }
 }
 
 
@@ -92,6 +117,10 @@ class ShuffleDependency[K, V, C](
 @DeveloperApi
 class OneToOneDependency[T](rdd: RDD[T]) extends NarrowDependency[T](rdd) {
   override def getParents(partitionId: Int): List[Int] = List(partitionId)
+
+  override def copyWithNewRDD(newRDD: RDD[T]): this.type = {
+    new OneToOneDependency[T](newRDD)
+  }
 }
 
 
@@ -113,5 +142,9 @@ class RangeDependency[T](rdd: RDD[T], inStart: Int, outStart: Int, length: Int)
     } else {
       Nil
     }
+  }
+
+  override def copyWithNewRDD(newRDD: RDD[T]): this.type = {
+    new RangeDependency[T](newRDD, inStart, outStart, length)
   }
 }

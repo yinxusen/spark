@@ -53,7 +53,7 @@ class DAGSchedulerEventProcessLoopTester(dagScheduler: DAGScheduler)
 class MyRDD(
     sc: SparkContext,
     numPartitions: Int,
-    dependencies: List[Dependency[_]],
+    dependencies: List[Dependency[_, _]],
     locations: Seq[Seq[String]] = Nil) extends RDD[(Int, Int)](sc, dependencies) with Serializable {
   override def compute(split: Partition, context: TaskContext): Iterator[(Int, Int)] =
     throw new RuntimeException("should not be reached")

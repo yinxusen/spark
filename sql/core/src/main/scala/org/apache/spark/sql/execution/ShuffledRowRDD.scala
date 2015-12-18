@@ -55,7 +55,7 @@ class ShuffledRowRDD(
 
   private val part: Partitioner = new PartitionIdPassthrough(numPartitions)
 
-  override def getDependencies: Seq[Dependency[_]] = {
+  override def getDependencies: Seq[Dependency[_, _]] = {
     List(new ShuffleDependency[Int, InternalRow, InternalRow](prev, part, Some(serializer)))
   }
 

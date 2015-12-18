@@ -43,6 +43,10 @@ private[spark] class PruneDependency[T](rdd: RDD[T], @transient partitionFilterF
   override def getParents(partitionId: Int): List[Int] = {
     List(partitions(partitionId).asInstanceOf[PartitionPruningRDDPartition].parentSplit.index)
   }
+
+  override def copyWithNewRDD(newRDD: RDD[T]): this.type = {
+    new PruneDependency[T](newRDD, partitionFilterFunc)
+  }
 }
 
 

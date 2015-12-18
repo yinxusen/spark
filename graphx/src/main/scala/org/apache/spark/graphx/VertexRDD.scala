@@ -56,7 +56,7 @@ import org.apache.spark.graphx.impl.VertexRDDImpl
  */
 abstract class VertexRDD[VD](
     @transient sc: SparkContext,
-    @transient deps: Seq[Dependency[_]]) extends RDD[(VertexId, VD)](sc, deps) {
+    @transient deps: Seq[Dependency[_, _]]) extends RDD[(VertexId, VD)](sc, deps) {
 
   implicit protected def vdTag: ClassTag[VD]
 

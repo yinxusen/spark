@@ -73,7 +73,7 @@ import org.apache.spark.util.random.{BernoulliSampler, PoissonSampler, Bernoulli
  */
 abstract class RDD[T: ClassTag](
     @transient private var _sc: SparkContext,
-    @transient private var deps: Seq[Dependency[_]]
+    @transient private var deps: Seq[Dependency[_, _]]
   ) extends Serializable with Logging {
 
   if (classOf[RDD[_]].isAssignableFrom(elementClassTag.runtimeClass)) {
@@ -119,7 +119,7 @@ abstract class RDD[T: ClassTag](
    * Implemented by subclasses to return how this RDD depends on parent RDDs. This method will only
    * be called once, so it is safe to implement a time-consuming computation in it.
    */
-  protected def getDependencies: Seq[Dependency[_]] = deps
+  protected def getDependencies: Seq[Dependency[_, _]] = deps
 
   /**
    * Optionally overridden by subclasses to specify placement preferences.
@@ -210,7 +210,7 @@ abstract class RDD[T: ClassTag](
 
   // Our dependencies and partitions will be gotten by calling subclass's methods below, and will
   // be overwritten when we're checkpointed
-  private var dependencies_ : Seq[Dependency[_]] = null
+  private var dependencies_ : Seq[Dependency[_, _]] = null
   @transient private var partitions_ : Array[Partition] = null
 
   /** An Option holding our checkpoint RDD, if we are checkpointed */
@@ -220,7 +220,7 @@ abstract class RDD[T: ClassTag](
    * Get the list of dependencies of this RDD, taking into account whether the
    * RDD is checkpointed or not.
    */
-  final def dependencies: Seq[Dependency[_]] = {
+  final def dependencies: Seq[Dependency[_, _]] = {
     checkpointRDD.map(r => List(new OneToOneDependency(r))).getOrElse {
       if (dependencies_ == null) {
         dependencies_ = getDependencies

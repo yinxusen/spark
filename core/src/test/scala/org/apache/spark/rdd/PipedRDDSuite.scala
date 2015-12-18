@@ -166,7 +166,7 @@ class PipedRDDSuite extends SparkFunSuite with SharedSparkContext {
         classOf[Text], 2) {
         override def getPartitions: Array[Partition] = Array(generateFakeHadoopPartition())
 
-        override val getDependencies = List[Dependency[_]]()
+        override val getDependencies = List[Dependency[_, _]]()
 
         override def compute(theSplit: Partition, context: TaskContext) = {
           new InterruptibleIterator[(LongWritable, Text)](context, Iterator((new LongWritable(1),

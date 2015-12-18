@@ -44,7 +44,7 @@ class CacheManagerSuite extends SparkFunSuite with LocalSparkContext with Before
     split = new Partition { override def index: Int = 0 }
     rdd = new RDD[Int](sc, Nil) {
       override def getPartitions: Array[Partition] = Array(split)
-      override val getDependencies = List[Dependency[_]]()
+      override val getDependencies = List[Dependency[_, _]]()
       override def compute(split: Partition, context: TaskContext): Iterator[Int] =
         Array(1, 2, 3, 4).iterator
     }

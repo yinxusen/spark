@@ -97,7 +97,7 @@ private[spark] class CoalescedRDD[T: ClassTag](
     }
   }
 
-  override def getDependencies: Seq[Dependency[_]] = {
+  override def getDependencies: Seq[Dependency[_, _]] = {
     Seq(new NarrowDependency(prev) {
       def getParents(id: Int): Seq[Int] =
         partitions(id).asInstanceOf[CoalescedRDDPartition].parentsIndices

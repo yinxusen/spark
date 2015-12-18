@@ -547,6 +547,58 @@ class DAGScheduler(
     waiter
   }
 
+  /**
+   * Modify all shuffle outputs to `numPartitions` by visiting the DAG recursively so as to adjust
+   * shuffle input dynamically according to the output size.
+   */
+  private def rePartitionShuffleDepsInDAG(rdd: RDD[_], numPartitions: Option[Int] = None): RDD[_] = {
+    if (numPartitions.isEmpty) {
+      rdd
+    } else {
+      var root: Option[RDD[_]] = None
+      var prev: Option[RDD[_]] = None
+
+      val visited = new HashSet[RDD[_]]
+      val waitingForVisit = new Stack[RDD[_]]
+
+      def visit(prev: Option[RDD[_]], rdd: RDD[_]) {
+        if (!visited(rdd)) {
+          visited += rdd
+          // If no shuffle dependency exists in the RDD, then we pass it like a normal RDD.
+          // Otherwise, we create a new RDD with only non-shuffle dependencies, and proxy the
+          // shuffle behavior to a ProxyRDD.
+          if (!rdd.dependencies.exists(_.isInstanceOf[ShuffleDependency[_, _, _]])) {
+            for (dep <- rdd.dependencies) {
+              waitingForVisit.push(dep.rdd)
+            }
+          } else {
+            val newDeps = rdd.dependencies.map {
+              case shufDep: ShuffleDependency[_, _, _] =>
+                waitingForVisit.push(shufDep.rdd)
+                val basePartitionIndices = (0 until numPartitions.get).toArray
+                val proxy = shufDep.getProxyRDD(basePartitionIndices, new HashPartitioner(numPartitions.get))
+                new OneToOneDependency(proxy)
+              case narrowDep: NarrowDependency[_] =>
+                waitingForVisit.push(narrowDep.rdd)
+                narrowDep
+            }
+            val newRDD = new NonShuffledRDD(sc, newDeps, new HashPartitioner(numPartitions.get))
+            if (prev.isDefined) {
+              prev.get
+            }
+            rdd.newDependencies = Some(newDeps)
+          }
+        }
+      }
+
+      waitingForVisit.push(rdd)
+
+      while (waitingForVisit.nonEmpty) {
+        visit(waitingForVisit.pop())
+      }
+    }
+  }
+
   def runJob[T, U](
       rdd: RDD[T],
       func: (TaskContext, Iterator[T]) => U,
@@ -555,6 +607,10 @@ class DAGScheduler(
       resultHandler: (Int, U) => Unit,
       properties: Properties): Unit = {
     val start = System.nanoTime
+    // TODO Add configurable numPartitions here.
+    val numPartitions = sc.getConf.getOption("com.beaver.ShuffleOutputPartitions").map(_.toInt)
+    println(s"Repartition to $numPartitions")
+    rePartitionShuffleDepsInDAG(rdd, numPartitions)
     val waiter = submitJob(rdd, func, partitions, callSite, resultHandler, properties)
     waiter.awaitResult() match {
       case JobSucceeded =>
