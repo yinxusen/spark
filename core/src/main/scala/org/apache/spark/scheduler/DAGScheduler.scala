@@ -551,17 +551,18 @@ class DAGScheduler(
    * Modify all shuffle outputs to `numPartitions` by visiting the DAG recursively so as to adjust
    * shuffle input dynamically according to the output size.
    */
-  private def rePartitionShuffleDepsInDAG(rdd: RDD[_], numPartitions: Option[Int] = None): RDD[_] = {
+  private def repartitionDAG(rdd: RDD[_], numPartitions: Option[Int] = None): RDD[_] = {
     if (numPartitions.isEmpty) {
       rdd
     } else {
+      val substitutionMap = new scala.collection.mutable.HashMap[Int, Int]()
       var root: Option[RDD[_]] = None
       var prev: Option[RDD[_]] = None
 
       val visited = new HashSet[RDD[_]]
       val waitingForVisit = new Stack[RDD[_]]
 
-      def visit(prev: Option[RDD[_]], rdd: RDD[_]) {
+      def visit(rdd: RDD[_]) {
         if (!visited(rdd)) {
           visited += rdd
           // If no shuffle dependency exists in the RDD, then we pass it like a normal RDD.
@@ -583,8 +584,11 @@ class DAGScheduler(
                 narrowDep
             }
             val newRDD = new NonShuffledRDD(sc, newDeps, new HashPartitioner(numPartitions.get))
+            substitutionMap += ((rdd.id, newRDD.id))
             if (prev.isDefined) {
               prev.get
+            } else {
+              root = Some(newRDD)
             }
             rdd.newDependencies = Some(newDeps)
           }
@@ -594,8 +598,12 @@ class DAGScheduler(
       waitingForVisit.push(rdd)
 
       while (waitingForVisit.nonEmpty) {
-        visit(waitingForVisit.pop())
+        val currentRDD = waitingForVisit.pop()
+        visit(currentRDD)
+        prev = Some(currentRDD)
       }
+
+      if (root.isDefined) root.get else rdd
     }
   }
 
@@ -610,7 +618,7 @@ class DAGScheduler(
     // TODO Add configurable numPartitions here.
     val numPartitions = sc.getConf.getOption("com.beaver.ShuffleOutputPartitions").map(_.toInt)
     println(s"Repartition to $numPartitions")
-    rePartitionShuffleDepsInDAG(rdd, numPartitions)
+    repartitionDAG(rdd, numPartitions)
     val waiter = submitJob(rdd, func, partitions, callSite, resultHandler, properties)
     waiter.awaitResult() match {
       case JobSucceeded =>

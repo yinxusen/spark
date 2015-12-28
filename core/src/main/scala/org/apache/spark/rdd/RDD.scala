@@ -217,15 +217,32 @@ abstract class RDD[T: ClassTag](
   private def checkpointRDD: Option[CheckpointRDD[T]] = checkpointData.flatMap(_.checkpointRDD)
 
   /**
+   * New dependencies to modify user's DAG.
+   */
+  private var newDependencies_ : Seq[Dependency[_, _]] = null
+
+  private[core] def setNewDependencies(deps: Seq[Dependency[_, _]]): this.type = {
+    newDependencies_ = deps
+    this
+  }
+
+  /**
    * Get the list of dependencies of this RDD, taking into account whether the
    * RDD is checkpointed or not.
    */
   final def dependencies: Seq[Dependency[_, _]] = {
     checkpointRDD.map(r => List(new OneToOneDependency(r))).getOrElse {
-      if (dependencies_ == null) {
-        dependencies_ = getDependencies
+      // If `newDependencies_` is set, then we use `newDependencies_`. Otherwise, we use previous
+      // Spark logic to get dependencies.
+      // Note that `dependencies_` is always pointed to previous Spark dependencies.
+      if (newDependencies_ == null) {
+        if (dependencies_ == null) {
+          dependencies_ = getDependencies
+        }
+        dependencies_
+      } else {
+        newDependencies_
       }
-      dependencies_
     }
   }
 
