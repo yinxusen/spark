@@ -81,6 +81,9 @@ private abstract class BaseRRDD[T: ClassTag, U: ClassTag](
       return new Iterator[U] {
         def next(): U = {
           val obj = _nextObj
+          logDebug(s"xusen, we get a $obj from thread ${Thread.currentThread().getId}" +
+            s" with stream $dataStream")
+          logDebug(s"xusen, we have next obj ${hasNext()}")
           if (hasNext) {
             _nextObj = read()
           }
@@ -92,6 +95,8 @@ private abstract class BaseRRDD[T: ClassTag, U: ClassTag](
         def hasNext(): Boolean = {
           val hasMore = (_nextObj != null)
           if (!hasMore) {
+            logDebug(s"xusen, we need to close stream $dataStream in thread" +
+              s" ${Thread.currentThread().getId}")
             dataStream.close()
           }
           hasMore

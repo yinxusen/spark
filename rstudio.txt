@@ -1,0 +1,6 @@
+.libPaths(c(file.path(Sys.getenv("SPARK_HOME"), "R", "lib"), .libPaths()))
+library(SparkR)
+sc <- sparkR.init(master="local")
+sqlContext <- sparkRSQL.init(sc)
+x <- createDataFrame(sqlContext, iris)
+x$Species <- NULL

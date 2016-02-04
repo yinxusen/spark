@@ -490,6 +490,7 @@ abstract class RDD[T: ClassTag](
       withReplacement: Boolean,
       num: Int,
       seed: Long = Utils.random.nextLong): Array[T] = withScope {
+    logDebug(s"xusen, in the function of takeSample")
     val numStDev = 10.0
 
     require(num >= 0, "Negative number of elements requested")
@@ -500,7 +501,9 @@ abstract class RDD[T: ClassTag](
     if (num == 0) {
       new Array[T](0)
     } else {
+      logDebug(s"xusen, before the initial count")
       val initialCount = this.count()
+      logDebug(s"xusen, count of all samples is $initialCount")
       if (initialCount == 0) {
         new Array[T](0)
       } else {
@@ -511,6 +514,7 @@ abstract class RDD[T: ClassTag](
           val fraction = SamplingUtils.computeFractionForSampleSize(num, initialCount,
             withReplacement)
           var samples = this.sample(withReplacement, fraction, rand.nextInt()).collect()
+          logDebug(s"xusen, get initial samples")
 
           // If the first sample didn't turn out large enough, keep trying to take samples;
           // this shouldn't happen often because we use a big multiplier for the initial size
@@ -765,10 +769,17 @@ abstract class RDD[T: ClassTag](
         def hasNext: Boolean = (thisIter.hasNext, otherIter.hasNext) match {
           case (true, true) => true
           case (false, false) => false
-          case _ => throw new SparkException("Can only zip RDDs with " +
+          case _ =>
+            logDebug(s"xusen, we get ${thisIter.hasNext} and ${otherIter.hasNext}")
+            throw new SparkException("Can only zip RDDs with " +
             "same number of elements in each partition")
         }
-        def next(): (T, U) = (thisIter.next(), otherIter.next())
+        def next(): (T, U) = {
+          val thisOne = thisIter.next()
+          val otherOne = otherIter.next()
+          logDebug(s"xusen, we get a pair ($thisOne, $otherOne)")
+          (thisOne, otherOne)
+        }
       }
     }
   }

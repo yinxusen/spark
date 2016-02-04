@@ -17,7 +17,9 @@
 
 package org.apache.spark.ml.api.r
 
-import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.linalg.Vector
+import org.apache.spark.{Logging, SparkContext, SparkConf}
 import org.apache.spark.ml.clustering.{KMeansModel, KMeans}
 import org.apache.spark.ml.{Pipeline, PipelineModel}
 import org.apache.spark.ml.attribute._
@@ -26,7 +28,7 @@ import org.apache.spark.ml.feature.{VectorAssembler, RFormula}
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel}
 import org.apache.spark.sql.{Row, SQLContext, DataFrame}
 
-object SparkRWrappers {
+object SparkRWrappers extends Logging {
   def fitRModelFormula(
       value: String,
       df: DataFrame,
@@ -57,20 +59,61 @@ object SparkRWrappers {
       initMode: String,
       df: DataFrame,
       maxIter: Double,
-      initSteps: Double,
       k: Double,
       columns: String): KMeansModel = {
-    val assembler = new VectorAssembler().setInputCols(columns.split(",")).setOutputCol("features")
+    val assembler = new VectorAssembler().setInputCols(columns.split(" ")).setOutputCol("features")
+    logDebug(s"xusen, get assembler")
     val features = assembler.transform(df).select("features")
-    // scalastyle:off println
-    features.collect().foreach { case Row(v) => println(v) }
-    // scalastyle:on println
+    logDebug(s"xusen, get features of kmeans")
+    // features.count()
     val kMeans = new KMeans()
       .setInitMode(initMode)
       .setMaxIter(maxIter.toInt)
-      .setInitSteps(initSteps.toInt)
       .setK(k.toInt)
-    kMeans.fit(features)
+    logDebug(s"xusen, get kmeans estimator")
+    val model = kMeans.fit(features)
+    logDebug(s"xusen, fit kmeans model successfully")
+    model
+  }
+
+  case class VectorWithNorm(val vector: Vector, val norm: Double) extends Serializable {}
+
+  def fitKMeans2(
+      initMode: String,
+      df: DataFrame,
+      maxIter: Double,
+      k: Double,
+      columns: String): Int = {
+    /*
+    val assembler = new VectorAssembler().setInputCols(columns.split(" ")).setOutputCol("features")
+    logDebug(s"xusen, get assembler")
+    val features = assembler.transform(df).select("features")
+    val rdd = features.map { case Row(point: Vector) => point }.cache()
+    val norms = rdd.map(Vectors.norm(_, 2.0))
+    norms.cache()
+    val zippedData = rdd.zip(norms).map { case (v, norm) =>
+      VectorWithNorm(v, norm)
+    }
+    val res = zippedData.count().toInt
+    norms.unpersist()
+    res
+    */
+    logDebug("xusen, we enter into kmeans2")
+    val rdd = df.rdd.map { case Row(a: Double, b: Double, c: Double, d: Double) => a}.cache()
+    val rdd2 = rdd.map(x => x)
+    rdd.zip(rdd2).count().toInt
+  }
+
+  def fitKMeans3(
+      initMode: String,
+      df: DataFrame,
+      maxIter: Double,
+      k: Double,
+      columns: String): Int = {
+
+    logDebug("xusen, we enter into kmeans3")
+    val rdd = df.rdd.map { case Row(a: Double, b: Double, c: Double, d: Double) => a}
+    rdd.count().toInt
   }
 
   def getModelCoefficients(model: PipelineModel): Array[Double] = {
@@ -137,19 +180,11 @@ object SparkRWrappers {
     }
   }
 
-  // scalastyle:off println
-  def main(args: Array[String]): Unit = {
-    val conf = new SparkConf().setAppName("test-R").setMaster("local")
+  def main(args: Array[String]) {
+    val conf = new SparkConf().setAppName("test zip").setMaster("local[2]")
     val sc = new SparkContext(conf)
-    val sqlCtx = new SQLContext(sc)
-    import sqlCtx.implicits._
-    val initMode = "random"
-    val columns = "Sepal_Length,Sepal_Width,Petal_Length,Petal_Width"
-    val df = sc.textFile("iris.txt").map(_.split("\\s+"))
-      .map(ary => (ary(1).toDouble, ary(2).toDouble, ary(3).toDouble, ary(4).toDouble))
-      .toDF("Sepal_Length", "Sepal_Width", "Petal_Length", "Petal_Width")
-    val model = fitKMeans(initMode, df, 10, 10, 3, columns)
-    println(model)
+    sc.setLogLevel("DEBUG")
+    val data = sc.textFile("iris.txt").map(_.toDouble)
+    data.zip(data.map(x => x)).count()
   }
-  // scalastyle:on println
 }

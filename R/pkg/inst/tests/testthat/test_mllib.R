@@ -118,8 +118,7 @@ test_that("kmeans", {
   newIris <- iris
   newIris$Species <- NULL
   training <- suppressWarnings(createDataFrame(sqlContext, newIris))
-  model <- kmeans(x = training)
-  print("Is there any problems?")
+  model <- kmeans(training, 2)
   print(model)
   #expect_equal(typeof(take(select(prediction, "prediction"), 1)$prediction), "double")
 })

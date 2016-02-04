@@ -55,6 +55,18 @@ setMethod("glm", signature(formula = "formula", family = "ANY", data = "DataFram
             standardize = TRUE, solver = "auto") {
             family <- match.arg(family)
             formula <- paste(deparse(formula), collapse="")
+            cat(formula)
+            cat("\n")
+            cat(class(formula))
+            cat("\n")
+            cat(family)
+            cat("\n")
+            cat(class(family))
+            cat("\n")
+            cat(solver)
+            cat("\n")
+            cat(class(solver))
+            cat("\n")
             model <- callJStatic("org.apache.spark.ml.api.r.SparkRWrappers",
                                  "fitRModelFormula", formula, data@sdf, family, lambda,
                                  alpha, standardize, solver)
@@ -148,12 +160,12 @@ setClass("KMeansModel", representation(model = "jobj"))
 #'\dontrun{
 #' model <- kmeans(x, algorithm="random")
 #'}
-setMethod("kmeans", signature(x = "DataFrame"),
-          function(x) {
-            cat("Am I in the right function?")
-            columnNames <- "Sepal_Length,Sepal_Width,Petal_Length,Petal_Width"
-            model <- callJStatic("org.apache.spark.ml.api.r.SparkRWrappers",
-                                 "fitKMeans", "random", x@sdf, 10,
-                                 10, 2, columnNames)
-            return(new("KMeansModel", model = model))
-         })
+setMethod("kmeans", signature(x = "DataFrame", centers = "numeric"),
+          function(x, centers, iter.max = 10, algorithm = "random") {
+            columnNames <- columns(x)
+            #cat("iter.max is", iter.max, '\n')
+            #cat("centers is", centers, '\n')
+            model <- callJStatic("org.apache.spark.ml.api.r.SparkRWrappers", "fitKMeans2", algorithm,
+              x@sdf, iter.max, centers, "Sepal_Length Sepal_Width Petal_Length Petal_Width")
+            #return(new("KMeansModel", model = model))
+          })
