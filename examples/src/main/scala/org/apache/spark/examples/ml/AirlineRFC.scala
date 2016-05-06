@@ -22,6 +22,8 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.ml.classification.RandomForestClassifier
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature.RFormula
+import org.apache.spark.ml.param.ParamPair
+import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.functions.{col, lit}
 
@@ -33,11 +35,12 @@ object AirlineRFC {
     val sqlContext = new SQLContext(sc)
 
     // Paths
-    val amount = "0.1"
-    val origTrainPath = s"/Users/panda/data/airline/train-${amount}m.csv"
-    val origTestPath = s"/Users/panda/data/airline/test.csv"
-    val newTrainPath = s"/Users/panda/data/airline/spark1hot-train-${amount}m.parquet"
-    val newTestPath = s"/Users/panda/data/airline/spark1hot-test-${amount}m.parquet"
+    val path = if (args.length > 0) args(0) else "/Users/panda"
+    val amount = if (args.length > 1) args(1) else "0.1"
+    val origTrainPath = s"$path/data/airline/train-${amount}m.csv"
+    val origTestPath = s"$path/data/airline/test.csv"
+    val newTrainPath = s"$path/data/airline/spark1hot-train-${amount}m.parquet"
+    val newTestPath = s"$path/data/airline/spark1hot-test-${amount}m.parquet"
 
     // Read CSV as Spark DataFrames
     val loader = sqlContext.read.format("com.databricks.spark.csv").option("header", "true")
@@ -64,27 +67,30 @@ object AirlineRFC {
     val test = finalTestDF.cache()
     train.show(10)
 
-    // Train model
-    val numTrees = 500
-    val featureSubsetStrategy = "sqrt"
-    val impurity = "entropy"
-    val maxDepth = 5
-    val maxBins = 2000000
+    val rfc = new RandomForestClassifier()
+    val metrics = new BinaryClassificationEvaluator().setMetricName("areaUnderROC")
+
+    val grid = new ParamGridBuilder()
+      .addGrid(rfc.cacheNodeIds, Array(true, false))
+      .addGrid(rfc.maxBins, Array(200, 2000, 20000))
+      .addGrid(rfc.maxDepth, Array(3, 5, 10))
+      .addGrid(rfc.impurity, Array("entropy", "gini"))
+      .addGrid(rfc.featureSubsetStrategy, Array("1", "all", "onethird", "sqrt", "log2"))
+      .addGrid(rfc.numTrees, Array(50, 100, 250, 500))
+      .addGrid(rfc.subsamplingRate, Array(0.3, 0.5, 0.65, 0.85))
+      .baseOn(ParamPair(rfc.minInstancesPerNode, 10))
+      .build()
 
     val begin = System.nanoTime
 
-    val model = new RandomForestClassifier()
-      .setNumTrees(numTrees)
-      .setImpurity(impurity)
-      .setMaxDepth(maxDepth)
-      .setMaxBins(maxBins)
-      .setFeatureSubsetStrategy("1")
-      .fit(train)
+    val cv = new CrossValidator()
+      .setEstimator(rfc).setEvaluator(metrics).setEstimatorParamMaps(grid)
+
+    val model = cv.fit(train)
 
     val elapsed = (System.nanoTime - begin) / 1e9
     println(s"Elapsed time for training is $elapsed")
 
-    val metrics = new BinaryClassificationEvaluator().setMetricName("areaUnderROC")
     val testBegin = System.nanoTime
     println(s"AUC is ${metrics.evaluate(model.transform(test))}")
     val testElapsed = (System.nanoTime - testBegin) / 1e9
