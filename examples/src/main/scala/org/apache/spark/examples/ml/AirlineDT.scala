@@ -35,11 +35,12 @@ object AirlineDT {
     val sqlContext = new SQLContext(sc)
 
     // Paths
-    val amount = "0.1"
-    val origTrainPath = s"/Users/panda/data/airline/train-${amount}m.csv"
-    val origTestPath = s"/Users/panda/data/airline/test.csv"
-    val newTrainPath = s"/Users/panda/data/airline/spark1hot-train-${amount}m.parquet"
-    val newTestPath = s"/Users/panda/data/airline/spark1hot-test-${amount}m.parquet"
+    val path = if (args.length > 0) args(0) else "/Users/panda"
+    val amount = if (args.length > 1) args(1) else "0.1"
+    val origTrainPath = s"$path/data/airline/train-${amount}m.csv"
+    val origTestPath = s"$path/data/airline/test.csv"
+    val newTrainPath = s"$path/data/airline/spark1hot-train-${amount}m.parquet"
+    val newTestPath = s"$path/data/airline/spark1hot-test-${amount}m.parquet"
 
     // Read CSV as Spark DataFrames
     val loader = sqlContext.read.format("com.databricks.spark.csv").option("header", "true")
