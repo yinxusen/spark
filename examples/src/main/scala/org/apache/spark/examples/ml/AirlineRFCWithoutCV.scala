@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-// scalastyle:off
+// scalastyle:off println
 package org.apache.spark.examples.ml
 
 import org.apache.spark.{SparkConf, SparkContext}
@@ -27,11 +27,11 @@ import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.functions.{col, lit}
 
-object AirlineRFC {
+object AirlineRFCWithoutCV {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf().setAppName("RFCAirline").setMaster("local[8]")
     val sc = new SparkContext(conf)
-    sc.setLogLevel("INFO")
+    sc.setLogLevel("OFF")
     val sqlContext = new SQLContext(sc)
 
     // Paths
@@ -65,26 +65,26 @@ object AirlineRFC {
 
     val train = finalTrainDF.cache()
     val test = finalTestDF.cache()
-    train.show()
+    train.show(10)
+
+    val numTrees = 1
+    val featureSubsetStrategy = "sqrt"
+    val impurity = "entropy"
+    val maxDepth = 20
+    val maxBins = 100
 
     val rfc = new RandomForestClassifier()
+      .setFeatureSubsetStrategy(featureSubsetStrategy)
+      .setMaxBins(maxBins)
+      .setNumTrees(numTrees)
+      .setMaxDepth(maxDepth)
+      .setImpurity(impurity)
+
     val metrics = new BinaryClassificationEvaluator().setMetricName("areaUnderROC")
-
-    val grid = new ParamGridBuilder()
-      .addGrid(rfc.maxBins, Array(20000))
-      .addGrid(rfc.maxDepth, Array(20))
-      .addGrid(rfc.impurity, Array("gini"))
-      .addGrid(rfc.featureSubsetStrategy, Array("all")) // .addGrid(rfc.numTrees, Array(50, 100, 250, 500))
-      .baseOn(ParamPair(rfc.numTrees, 5))
-      .addGrid(rfc.subsamplingRate, Array(1.0))
-      .build()
-
-    val cv = new CrossValidator()
-      .setEstimator(rfc).setEvaluator(metrics).setEstimatorParamMaps(grid)
 
     val begin = System.nanoTime
 
-    val model = cv.fit(train)
+    val model = rfc.fit(train)
 
     val elapsed = (System.nanoTime - begin) / 1e9
     println(s"Elapsed time for training is $elapsed")
@@ -97,4 +97,4 @@ object AirlineRFC {
     sc.stop()
   }
 }
-// scalastyle:on
+// scalastyle:on println
