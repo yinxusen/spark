@@ -41,7 +41,8 @@ private[feature] trait StringIndexerBase extends Params with HasInputCol with Ha
   protected def validateAndTransformSchema(schema: StructType): StructType = {
     val inputColName = $(inputCol)
     val inputDataType = schema(inputColName).dataType
-    require(inputDataType == StringType || inputDataType.isInstanceOf[NumericType],
+    require(inputDataType == StringType || inputDataType.isInstanceOf[NumericType] ||
+      inputDataType.isInstanceOf[BooleanType],
       s"The input column $inputColName must be either string type or numeric type, " +
         s"but got $inputDataType.")
     val inputFields = schema.fields

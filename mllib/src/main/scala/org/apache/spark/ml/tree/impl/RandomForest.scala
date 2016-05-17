@@ -521,6 +521,7 @@ private[spark] object RandomForest extends Logging {
       input.mapPartitions { points =>
         // Construct a nodeStatsAggregators array to hold node aggregate stats,
         // each node will have a nodeStatsAggregator
+        logInfo(s"xusen, numNodes in each partition is $numNodes")
         val nodeStatsAggregators = Array.tabulate(numNodes) { nodeIndex =>
           val featuresForNode = nodeToFeaturesBc.value.flatMap { nodeToFeatures =>
             Some(nodeToFeatures(nodeIndex))
