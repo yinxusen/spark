@@ -34,7 +34,8 @@ import org.apache.spark.sql.functions.{col, lit}
 object AirlineDataToNumeric {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
-      .setAppName("RFCAirline").setMaster("local[8]").set("spark.executor.memory", "5g")
+      .setAppName("RFCAirline").setMaster("local[8]")
+      // .set("spark.executor.memory", "5g")
     val sc = new SparkContext(conf)
     sc.setLogLevel("INFO")
     val sqlContext = new SQLContext(sc)
@@ -90,12 +91,12 @@ object AirlineDataToNumeric {
 
     val grid = new ParamGridBuilder()
       .addGrid(rfc.maxBins, Array(2000))
-      .addGrid(rfc.maxDepth, Array(5))
+      .addGrid(rfc.maxDepth, Array(10))
       .addGrid(rfc.impurity, Array("gini"))
       // .addGrid(rfc.featureSubsetStrategy, Array("all"))
       // .addGrid(rfc.numTrees, Array(50, 100, 250, 500))
       .baseOn(ParamPair(rfc.numTrees, 500))
-      // .baseOn(ParamPair(rfc.maxMemoryInMB, 1))
+      .baseOn(ParamPair(rfc.maxMemoryInMB, 64))
       .addGrid(rfc.subsamplingRate, Array(1.0))
       .build()
 

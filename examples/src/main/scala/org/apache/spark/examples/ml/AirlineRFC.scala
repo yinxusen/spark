@@ -71,11 +71,10 @@ object AirlineRFC {
     val metrics = new BinaryClassificationEvaluator().setMetricName("areaUnderROC")
 
     val grid = new ParamGridBuilder()
-      .addGrid(rfc.maxBins, Array(20000))
+      .addGrid(rfc.maxBins, Array(50))
       .addGrid(rfc.maxDepth, Array(20))
-      .addGrid(rfc.impurity, Array("gini"))
-      .addGrid(rfc.featureSubsetStrategy, Array("all")) // .addGrid(rfc.numTrees, Array(50, 100, 250, 500))
-      .baseOn(ParamPair(rfc.numTrees, 5))
+      .addGrid(rfc.impurity, Array("entropy"))
+      .baseOn(ParamPair(rfc.numTrees, 500))
       .addGrid(rfc.subsamplingRate, Array(1.0))
       .build()
 
