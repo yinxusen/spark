@@ -19,7 +19,7 @@
 package org.apache.spark.examples.ml
 
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.ml.classification.{DecisionTreeClassifier, RandomForestClassifier}
+import org.apache.spark.ml.classification.{DecisionTreeClassifier, RandomForestClassificationModel, RandomForestClassifier}
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature.{RFormula, StringIndexer}
 import org.apache.spark.ml.feature.VectorAssembler
@@ -91,12 +91,12 @@ object AirlineDataToNumeric {
 
     val grid = new ParamGridBuilder()
       .addGrid(rfc.maxBins, Array(2000))
-      .addGrid(rfc.maxDepth, Array(10))
+      .addGrid(rfc.maxDepth, Array(5))
       .addGrid(rfc.impurity, Array("gini"))
       // .addGrid(rfc.featureSubsetStrategy, Array("all"))
       // .addGrid(rfc.numTrees, Array(50, 100, 250, 500))
       .baseOn(ParamPair(rfc.numTrees, 500))
-      .baseOn(ParamPair(rfc.maxMemoryInMB, 64))
+      .baseOn(ParamPair(rfc.maxMemoryInMB, 32))
       .addGrid(rfc.subsamplingRate, Array(1.0))
       .build()
 
@@ -106,6 +106,16 @@ object AirlineDataToNumeric {
     val begin = System.nanoTime
 
     val model = cv.fit(train)
+
+    val importance =
+      model.bestModel.asInstanceOf[RandomForestClassificationModel].featureImportances
+
+    val trees = model.bestModel.asInstanceOf[RandomForestClassificationModel].trees
+    val weights = model.bestModel.asInstanceOf[RandomForestClassificationModel].treeWeights
+
+    println(s"xusen, importance is $importance")
+    println(s"xusen, trees are\n${trees.map(_.toDebugString).mkString("\n")}")
+    println(s"xusen, tree weights are ${weights}")
 
     val elapsed = (System.nanoTime - begin) / 1e9
     println(s"Elapsed time for training is $elapsed")

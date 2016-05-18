@@ -1,0 +1,1054 @@
+16/05/17 18:06:57 WARN BLAS: Failed to load implementation from: com.github.fommil.netlib.NativeSystemBLAS
+16/05/17 18:06:57 WARN BLAS: Failed to load implementation from: com.github.fommil.netlib.NativeRefBLAS
+16/05/17 18:06:57 INFO CodeGenerator: Code generated in 13.438034 ms
+16/05/17 18:06:57 INFO CodeGenerator: Code generated in 11.50674 ms
+16/05/17 18:06:57 INFO SparkContext: Starting job: take at Classifier.scala:111
+16/05/17 18:06:57 INFO DAGScheduler: Registering RDD 148 (take at Classifier.scala:111)
+16/05/17 18:06:57 INFO DAGScheduler: Got job 14 (take at Classifier.scala:111) with 1 output partitions
+16/05/17 18:06:57 INFO DAGScheduler: Final stage: ResultStage 24 (take at Classifier.scala:111)
+16/05/17 18:06:57 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 23)
+16/05/17 18:06:57 INFO DAGScheduler: Missing parents: List(ShuffleMapStage 23)
+16/05/17 18:06:57 INFO DAGScheduler: Submitting ShuffleMapStage 23 (MapPartitionsRDD[148] at take at Classifier.scala:111), which has no missing parents
+16/05/17 18:06:57 INFO MemoryStore: Block broadcast_47 stored as values in memory (estimated size 135.9 KB, free 1218.1 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block broadcast_47_piece0 stored as bytes in memory (estimated size 67.1 KB, free 1218.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added broadcast_47_piece0 in memory on 9.30.123.230:60007 (size: 67.1 KB, free: 1220.3 MB)
+16/05/17 18:06:57 INFO SparkContext: Created broadcast 47 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:06:57 INFO DAGScheduler: Submitting 10 missing tasks from ShuffleMapStage 23 (MapPartitionsRDD[148] at take at Classifier.scala:111)
+16/05/17 18:06:57 INFO TaskSchedulerImpl: Adding task set 23.0 with 10 tasks
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 0.0 in stage 23.0 (TID 77, localhost, partition 0, PROCESS_LOCAL, 6209 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 1.0 in stage 23.0 (TID 78, localhost, partition 1, PROCESS_LOCAL, 6209 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 2.0 in stage 23.0 (TID 79, localhost, partition 2, PROCESS_LOCAL, 5728 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 3.0 in stage 23.0 (TID 80, localhost, partition 3, PROCESS_LOCAL, 5728 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 4.0 in stage 23.0 (TID 81, localhost, partition 4, PROCESS_LOCAL, 5728 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 5.0 in stage 23.0 (TID 82, localhost, partition 5, PROCESS_LOCAL, 5728 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 6.0 in stage 23.0 (TID 83, localhost, partition 6, PROCESS_LOCAL, 5728 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 7.0 in stage 23.0 (TID 84, localhost, partition 7, PROCESS_LOCAL, 5728 bytes)
+16/05/17 18:06:57 INFO Executor: Running task 3.0 in stage 23.0 (TID 80)
+16/05/17 18:06:57 INFO Executor: Running task 1.0 in stage 23.0 (TID 78)
+16/05/17 18:06:57 INFO Executor: Running task 4.0 in stage 23.0 (TID 81)
+16/05/17 18:06:57 INFO Executor: Running task 5.0 in stage 23.0 (TID 82)
+16/05/17 18:06:57 INFO Executor: Running task 0.0 in stage 23.0 (TID 77)
+16/05/17 18:06:57 INFO Executor: Running task 2.0 in stage 23.0 (TID 79)
+16/05/17 18:06:57 INFO Executor: Running task 6.0 in stage 23.0 (TID 83)
+16/05/17 18:06:57 INFO Executor: Running task 7.0 in stage 23.0 (TID 84)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_119_3 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO FileScanRDD: Reading File path: file:///root/data/airline/train-0.1m.csv, range: 4194304-4888314, partition values: [empty row]
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_119_0 locally
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_119_3 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_119_4 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_119_7 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_119_4 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_119_7 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_119_5 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_119_6 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_119_5 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_119_6 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_119_2 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_119_2 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_142_7 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_142_2 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_142_5 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_142_3 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_142_4 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_142_7 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_142_2 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_142_5 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_142_3 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_142_4 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_142_6 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_142_6 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO CodeGenerator: Code generated in 12.694145 ms
+16/05/17 18:06:57 INFO Executor: Finished task 7.0 in stage 23.0 (TID 84). 4631 bytes result sent to driver
+16/05/17 18:06:57 INFO Executor: Finished task 4.0 in stage 23.0 (TID 81). 4631 bytes result sent to driver
+16/05/17 18:06:57 INFO Executor: Finished task 6.0 in stage 23.0 (TID 83). 4631 bytes result sent to driver
+16/05/17 18:06:57 INFO Executor: Finished task 3.0 in stage 23.0 (TID 80). 4631 bytes result sent to driver
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 8.0 in stage 23.0 (TID 85, localhost, partition 8, PROCESS_LOCAL, 5728 bytes)
+16/05/17 18:06:57 INFO Executor: Running task 8.0 in stage 23.0 (TID 85)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 9.0 in stage 23.0 (TID 86, localhost, partition 9, PROCESS_LOCAL, 5728 bytes)
+16/05/17 18:06:57 INFO Executor: Running task 9.0 in stage 23.0 (TID 86)
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 7.0 in stage 23.0 (TID 84) in 76 ms on localhost (1/10)
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 6.0 in stage 23.0 (TID 83) in 77 ms on localhost (2/10)
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 3.0 in stage 23.0 (TID 80) in 79 ms on localhost (3/10)
+16/05/17 18:06:57 INFO Executor: Finished task 5.0 in stage 23.0 (TID 82). 4631 bytes result sent to driver
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 4.0 in stage 23.0 (TID 81) in 80 ms on localhost (4/10)
+16/05/17 18:06:57 INFO Executor: Finished task 2.0 in stage 23.0 (TID 79). 4631 bytes result sent to driver
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 5.0 in stage 23.0 (TID 82) in 80 ms on localhost (5/10)
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 2.0 in stage 23.0 (TID 79) in 84 ms on localhost (6/10)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_119_9 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_119_9 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_119_8 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_119_8 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_142_9 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_142_9 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_142_8 stored as values in memory (estimated size 16.0 B, free 1218.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_142_8 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1220.3 MB)
+16/05/17 18:06:57 INFO Executor: Finished task 9.0 in stage 23.0 (TID 86). 4631 bytes result sent to driver
+16/05/17 18:06:57 INFO Executor: Finished task 8.0 in stage 23.0 (TID 85). 4631 bytes result sent to driver
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 9.0 in stage 23.0 (TID 86) in 16 ms on localhost (7/10)
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 8.0 in stage 23.0 (TID 85) in 18 ms on localhost (8/10)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_119_1 stored as values in memory (estimated size 2.1 MB, free 1216.0 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_119_1 in memory on 9.30.123.230:60007 (size: 2.1 MB, free: 1218.1 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_142_1 stored as values in memory (estimated size 1446.1 KB, free 1214.5 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_142_1 in memory on 9.30.123.230:60007 (size: 1446.1 KB, free: 1216.7 MB)
+16/05/17 18:06:57 INFO Executor: Finished task 1.0 in stage 23.0 (TID 78). 5105 bytes result sent to driver
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 1.0 in stage 23.0 (TID 78) in 347 ms on localhost (9/10)
+16/05/17 18:06:57 INFO MemoryStore: Block rdd_142_0 stored as values in memory (estimated size 8.5 MB, free 1206.1 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added rdd_142_0 in memory on 9.30.123.230:60007 (size: 8.5 MB, free: 1208.2 MB)
+16/05/17 18:06:57 INFO Executor: Finished task 0.0 in stage 23.0 (TID 77). 5368 bytes result sent to driver
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 0.0 in stage 23.0 (TID 77) in 381 ms on localhost (10/10)
+16/05/17 18:06:57 INFO TaskSchedulerImpl: Removed TaskSet 23.0, whose tasks have all completed, from pool
+16/05/17 18:06:57 INFO DAGScheduler: ShuffleMapStage 23 (take at Classifier.scala:111) finished in 0.382 s
+16/05/17 18:06:57 INFO DAGScheduler: looking for newly runnable stages
+16/05/17 18:06:57 INFO DAGScheduler: running: Set()
+16/05/17 18:06:57 INFO DAGScheduler: waiting: Set(ResultStage 24)
+16/05/17 18:06:57 INFO DAGScheduler: failed: Set()
+16/05/17 18:06:57 INFO DAGScheduler: Submitting ResultStage 24 (MapPartitionsRDD[151] at take at Classifier.scala:111), which has no missing parents
+16/05/17 18:06:57 INFO MemoryStore: Block broadcast_48 stored as values in memory (estimated size 7.4 KB, free 1206.0 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block broadcast_48_piece0 stored as bytes in memory (estimated size 3.9 KB, free 1206.0 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added broadcast_48_piece0 in memory on 9.30.123.230:60007 (size: 3.9 KB, free: 1208.2 MB)
+16/05/17 18:06:57 INFO SparkContext: Created broadcast 48 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:06:57 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 24 (MapPartitionsRDD[151] at take at Classifier.scala:111)
+16/05/17 18:06:57 INFO TaskSchedulerImpl: Adding task set 24.0 with 1 tasks
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 0.0 in stage 24.0 (TID 87, localhost, partition 0, ANY, 5190 bytes)
+16/05/17 18:06:57 INFO Executor: Running task 0.0 in stage 24.0 (TID 87)
+16/05/17 18:06:57 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:06:57 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 1 ms
+16/05/17 18:06:57 INFO Executor: Finished task 0.0 in stage 24.0 (TID 87). 1843 bytes result sent to driver
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 0.0 in stage 24.0 (TID 87) in 13 ms on localhost (1/1)
+16/05/17 18:06:57 INFO TaskSchedulerImpl: Removed TaskSet 24.0, whose tasks have all completed, from pool
+16/05/17 18:06:57 INFO DAGScheduler: ResultStage 24 (take at Classifier.scala:111) finished in 0.013 s
+16/05/17 18:06:57 INFO DAGScheduler: Job 14 finished: take at Classifier.scala:111, took 0.432476 s
+16/05/17 18:06:57 INFO CodeGenerator: Code generated in 6.380095 ms
+16/05/17 18:06:57 INFO RandomForestClassifier: org.apache.spark.ml.classification.RandomForestClassifier inferred 2 classes for labelCol=rfc_c00d5d13ba7a__labelCol since numClasses was not specified in the column metadata.
+16/05/17 18:06:57 INFO CodeGenerator: Code generated in 15.695461 ms
+16/05/17 18:06:57 INFO Instrumentation: RandomForestClassifier-rfc_c00d5d13ba7a-502507879-1: training: numPartitions=10 storageLevel=StorageLevel(disk=false, memory=false, offheap=false, deserialized=false, replication=1)
+16/05/17 18:06:57 INFO Instrumentation: RandomForestClassifier-rfc_c00d5d13ba7a-502507879-1: {"subsamplingRate":1.0,"impurity":"gini","maxDepth":10,"maxMemoryInMB":64,"maxBins":2000,"numTrees":500}
+16/05/17 18:06:57 INFO SparkContext: Starting job: take at DecisionTreeMetadata.scala:112
+16/05/17 18:06:57 INFO DAGScheduler: Got job 15 (take at DecisionTreeMetadata.scala:112) with 1 output partitions
+16/05/17 18:06:57 INFO DAGScheduler: Final stage: ResultStage 25 (take at DecisionTreeMetadata.scala:112)
+16/05/17 18:06:57 INFO DAGScheduler: Parents of final stage: List()
+16/05/17 18:06:57 INFO DAGScheduler: Missing parents: List()
+16/05/17 18:06:57 INFO DAGScheduler: Submitting ResultStage 25 (MapPartitionsRDD[158] at map at DecisionTreeMetadata.scala:112), which has no missing parents
+16/05/17 18:06:57 INFO MemoryStore: Block broadcast_49 stored as values in memory (estimated size 140.5 KB, free 1205.9 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block broadcast_49_piece0 stored as bytes in memory (estimated size 68.3 KB, free 1205.8 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added broadcast_49_piece0 in memory on 9.30.123.230:60007 (size: 68.3 KB, free: 1208.2 MB)
+16/05/17 18:06:57 INFO SparkContext: Created broadcast 49 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:06:57 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 25 (MapPartitionsRDD[158] at map at DecisionTreeMetadata.scala:112)
+16/05/17 18:06:57 INFO TaskSchedulerImpl: Adding task set 25.0 with 1 tasks
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 0.0 in stage 25.0 (TID 88, localhost, partition 0, PROCESS_LOCAL, 6274 bytes)
+16/05/17 18:06:57 INFO Executor: Running task 0.0 in stage 25.0 (TID 88)
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_0 locally
+16/05/17 18:06:57 INFO CodeGenerator: Code generated in 12.743958 ms
+16/05/17 18:06:57 INFO CodeGenerator: Code generated in 7.963817 ms
+16/05/17 18:06:57 WARN Executor: 1 block locks were not released by TID = 88:
+[rdd_142_0]
+16/05/17 18:06:57 INFO Executor: Finished task 0.0 in stage 25.0 (TID 88). 4536 bytes result sent to driver
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 0.0 in stage 25.0 (TID 88) in 44 ms on localhost (1/1)
+16/05/17 18:06:57 INFO TaskSchedulerImpl: Removed TaskSet 25.0, whose tasks have all completed, from pool
+16/05/17 18:06:57 INFO DAGScheduler: ResultStage 25 (take at DecisionTreeMetadata.scala:112) finished in 0.044 s
+16/05/17 18:06:57 INFO DAGScheduler: Job 15 finished: take at DecisionTreeMetadata.scala:112, took 0.054626 s
+16/05/17 18:06:57 INFO SparkContext: Starting job: count at DecisionTreeMetadata.scala:116
+16/05/17 18:06:57 INFO DAGScheduler: Got job 16 (count at DecisionTreeMetadata.scala:116) with 10 output partitions
+16/05/17 18:06:57 INFO DAGScheduler: Final stage: ResultStage 26 (count at DecisionTreeMetadata.scala:116)
+16/05/17 18:06:57 INFO DAGScheduler: Parents of final stage: List()
+16/05/17 18:06:57 INFO DAGScheduler: Missing parents: List()
+16/05/17 18:06:57 INFO DAGScheduler: Submitting ResultStage 26 (MapPartitionsRDD[157] at retag at RandomForest.scala:103), which has no missing parents
+16/05/17 18:06:57 INFO MemoryStore: Block broadcast_50 stored as values in memory (estimated size 140.2 KB, free 1205.7 MB)
+16/05/17 18:06:57 INFO MemoryStore: Block broadcast_50_piece0 stored as bytes in memory (estimated size 68.1 KB, free 1205.6 MB)
+16/05/17 18:06:57 INFO BlockManagerInfo: Added broadcast_50_piece0 in memory on 9.30.123.230:60007 (size: 68.1 KB, free: 1208.1 MB)
+16/05/17 18:06:57 INFO SparkContext: Created broadcast 50 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:06:57 INFO DAGScheduler: Submitting 10 missing tasks from ResultStage 26 (MapPartitionsRDD[157] at retag at RandomForest.scala:103)
+16/05/17 18:06:57 INFO TaskSchedulerImpl: Adding task set 26.0 with 10 tasks
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 0.0 in stage 26.0 (TID 89, localhost, partition 0, PROCESS_LOCAL, 6191 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 1.0 in stage 26.0 (TID 90, localhost, partition 1, PROCESS_LOCAL, 6191 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 2.0 in stage 26.0 (TID 91, localhost, partition 2, PROCESS_LOCAL, 5710 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 3.0 in stage 26.0 (TID 92, localhost, partition 3, PROCESS_LOCAL, 5710 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 4.0 in stage 26.0 (TID 93, localhost, partition 4, PROCESS_LOCAL, 5710 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 5.0 in stage 26.0 (TID 94, localhost, partition 5, PROCESS_LOCAL, 5710 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 6.0 in stage 26.0 (TID 95, localhost, partition 6, PROCESS_LOCAL, 5710 bytes)
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 7.0 in stage 26.0 (TID 96, localhost, partition 7, PROCESS_LOCAL, 5710 bytes)
+16/05/17 18:06:57 INFO Executor: Running task 0.0 in stage 26.0 (TID 89)
+16/05/17 18:06:57 INFO Executor: Running task 2.0 in stage 26.0 (TID 91)
+16/05/17 18:06:57 INFO Executor: Running task 1.0 in stage 26.0 (TID 90)
+16/05/17 18:06:57 INFO Executor: Running task 3.0 in stage 26.0 (TID 92)
+16/05/17 18:06:57 INFO Executor: Running task 5.0 in stage 26.0 (TID 94)
+16/05/17 18:06:57 INFO Executor: Running task 6.0 in stage 26.0 (TID 95)
+16/05/17 18:06:57 INFO Executor: Running task 4.0 in stage 26.0 (TID 93)
+16/05/17 18:06:57 INFO Executor: Running task 7.0 in stage 26.0 (TID 96)
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_5 locally
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_7 locally
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_0 locally
+16/05/17 18:06:57 INFO Executor: Finished task 5.0 in stage 26.0 (TID 94). 4506 bytes result sent to driver
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_2 locally
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 8.0 in stage 26.0 (TID 97, localhost, partition 8, PROCESS_LOCAL, 5710 bytes)
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_6 locally
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_4 locally
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 5.0 in stage 26.0 (TID 94) in 19 ms on localhost (1/10)
+16/05/17 18:06:57 INFO Executor: Running task 8.0 in stage 26.0 (TID 97)
+16/05/17 18:06:57 INFO Executor: Finished task 2.0 in stage 26.0 (TID 91). 4506 bytes result sent to driver
+16/05/17 18:06:57 INFO Executor: Finished task 6.0 in stage 26.0 (TID 95). 4506 bytes result sent to driver
+16/05/17 18:06:57 INFO TaskSetManager: Starting task 9.0 in stage 26.0 (TID 98, localhost, partition 9, PROCESS_LOCAL, 5710 bytes)
+16/05/17 18:06:57 INFO Executor: Finished task 4.0 in stage 26.0 (TID 93). 4506 bytes result sent to driver
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_1 locally
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 2.0 in stage 26.0 (TID 91) in 24 ms on localhost (2/10)
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 6.0 in stage 26.0 (TID 95) in 22 ms on localhost (3/10)
+16/05/17 18:06:57 INFO Executor: Finished task 7.0 in stage 26.0 (TID 96). 4506 bytes result sent to driver
+16/05/17 18:06:57 INFO Executor: Running task 9.0 in stage 26.0 (TID 98)
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 4.0 in stage 26.0 (TID 93) in 24 ms on localhost (4/10)
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 7.0 in stage 26.0 (TID 96) in 25 ms on localhost (5/10)
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_8 locally
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_3 locally
+16/05/17 18:06:57 INFO Executor: Finished task 8.0 in stage 26.0 (TID 97). 4506 bytes result sent to driver
+16/05/17 18:06:57 INFO Executor: Finished task 3.0 in stage 26.0 (TID 92). 4506 bytes result sent to driver
+16/05/17 18:06:57 INFO BlockManager: Found block rdd_142_9 locally
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 8.0 in stage 26.0 (TID 97) in 13 ms on localhost (6/10)
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 3.0 in stage 26.0 (TID 92) in 33 ms on localhost (7/10)
+16/05/17 18:06:57 INFO Executor: Finished task 9.0 in stage 26.0 (TID 98). 4506 bytes result sent to driver
+16/05/17 18:06:57 INFO TaskSetManager: Finished task 9.0 in stage 26.0 (TID 98) in 13 ms on localhost (8/10)
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2263
+16/05/17 18:06:57 INFO BlockManagerInfo: Removed broadcast_47_piece0 on 9.30.123.230:60007 in memory (size: 67.1 KB, free: 1208.2 MB)
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2252
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2257
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2260
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2262
+16/05/17 18:06:57 INFO BlockManagerInfo: Removed broadcast_49_piece0 on 9.30.123.230:60007 in memory (size: 68.3 KB, free: 1208.2 MB)
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2254
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2258
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2256
+16/05/17 18:06:57 INFO BlockManagerInfo: Removed broadcast_48_piece0 on 9.30.123.230:60007 in memory (size: 3.9 KB, free: 1208.2 MB)
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2251
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2253
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2255
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2259
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned accumulator 2261
+16/05/17 18:06:57 INFO ContextCleaner: Cleaned shuffle 9
+16/05/17 18:06:58 INFO Executor: Finished task 1.0 in stage 26.0 (TID 90). 4660 bytes result sent to driver
+16/05/17 18:06:58 INFO TaskSetManager: Finished task 1.0 in stage 26.0 (TID 90) in 109 ms on localhost (9/10)
+16/05/17 18:06:58 INFO Executor: Finished task 0.0 in stage 26.0 (TID 89). 4660 bytes result sent to driver
+16/05/17 18:06:58 INFO TaskSetManager: Finished task 0.0 in stage 26.0 (TID 89) in 173 ms on localhost (10/10)
+16/05/17 18:06:58 INFO TaskSchedulerImpl: Removed TaskSet 26.0, whose tasks have all completed, from pool
+16/05/17 18:06:58 INFO DAGScheduler: ResultStage 26 (count at DecisionTreeMetadata.scala:116) finished in 0.174 s
+16/05/17 18:06:58 INFO DAGScheduler: Job 16 finished: count at DecisionTreeMetadata.scala:116, took 0.184425 s
+16/05/17 18:06:58 INFO Instrumentation: RandomForestClassifier-rfc_c00d5d13ba7a-502507879-1: {"numFeatures":8}
+16/05/17 18:06:58 INFO Instrumentation: RandomForestClassifier-rfc_c00d5d13ba7a-502507879-1: {"numClasses":2}
+16/05/17 18:06:58 INFO SparkContext: Starting job: collectAsMap at RandomForest.scala:895
+16/05/17 18:06:58 INFO DAGScheduler: Job 17 finished: collectAsMap at RandomForest.scala:895, took 0.000042 s
+16/05/17 18:06:58 INFO MemoryStore: Block broadcast_51 stored as values in memory (estimated size 58.3 KB, free 1206.0 MB)
+16/05/17 18:06:58 INFO MemoryStore: Block broadcast_51_piece0 stored as bytes in memory (estimated size 6.0 KB, free 1206.0 MB)
+16/05/17 18:06:58 INFO BlockManagerInfo: Added broadcast_51_piece0 in memory on 9.30.123.230:60007 (size: 6.0 KB, free: 1208.2 MB)
+16/05/17 18:06:58 INFO SparkContext: Created broadcast 51 from broadcast at RandomForest.scala:500
+16/05/17 18:06:58 INFO SparkContext: Starting job: collectAsMap at RandomForest.scala:551
+16/05/17 18:06:58 INFO DAGScheduler: Registering RDD 165 (mapPartitions at RandomForest.scala:521)
+16/05/17 18:06:58 INFO DAGScheduler: Got job 18 (collectAsMap at RandomForest.scala:551) with 10 output partitions
+16/05/17 18:06:58 INFO DAGScheduler: Final stage: ResultStage 28 (collectAsMap at RandomForest.scala:551)
+16/05/17 18:06:58 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 27)
+16/05/17 18:06:58 INFO DAGScheduler: Missing parents: List(ShuffleMapStage 27)
+16/05/17 18:06:58 INFO DAGScheduler: Submitting ShuffleMapStage 27 (MapPartitionsRDD[165] at mapPartitions at RandomForest.scala:521), which has no missing parents
+16/05/17 18:06:58 INFO MemoryStore: Block broadcast_52 stored as values in memory (estimated size 186.3 KB, free 1205.8 MB)
+16/05/17 18:06:58 INFO MemoryStore: Block broadcast_52_piece0 stored as bytes in memory (estimated size 80.3 KB, free 1205.7 MB)
+16/05/17 18:06:58 INFO BlockManagerInfo: Added broadcast_52_piece0 in memory on 9.30.123.230:60007 (size: 80.3 KB, free: 1208.2 MB)
+16/05/17 18:06:58 INFO SparkContext: Created broadcast 52 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:06:58 INFO DAGScheduler: Submitting 10 missing tasks from ShuffleMapStage 27 (MapPartitionsRDD[165] at mapPartitions at RandomForest.scala:521)
+16/05/17 18:06:58 INFO TaskSchedulerImpl: Adding task set 27.0 with 10 tasks
+16/05/17 18:06:58 INFO TaskSetManager: Starting task 0.0 in stage 27.0 (TID 99, localhost, partition 0, PROCESS_LOCAL, 6271 bytes)
+16/05/17 18:06:58 INFO TaskSetManager: Starting task 1.0 in stage 27.0 (TID 100, localhost, partition 1, PROCESS_LOCAL, 6271 bytes)
+16/05/17 18:06:58 INFO TaskSetManager: Starting task 2.0 in stage 27.0 (TID 101, localhost, partition 2, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:06:58 INFO TaskSetManager: Starting task 3.0 in stage 27.0 (TID 102, localhost, partition 3, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:06:58 INFO TaskSetManager: Starting task 4.0 in stage 27.0 (TID 103, localhost, partition 4, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:06:58 INFO TaskSetManager: Starting task 5.0 in stage 27.0 (TID 104, localhost, partition 5, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:06:58 INFO TaskSetManager: Starting task 6.0 in stage 27.0 (TID 105, localhost, partition 6, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:06:58 INFO TaskSetManager: Starting task 7.0 in stage 27.0 (TID 106, localhost, partition 7, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:06:58 INFO Executor: Running task 3.0 in stage 27.0 (TID 102)
+16/05/17 18:06:58 INFO Executor: Running task 2.0 in stage 27.0 (TID 101)
+16/05/17 18:06:58 INFO Executor: Running task 6.0 in stage 27.0 (TID 105)
+16/05/17 18:06:58 INFO Executor: Running task 1.0 in stage 27.0 (TID 100)
+16/05/17 18:06:58 INFO Executor: Running task 4.0 in stage 27.0 (TID 103)
+16/05/17 18:06:58 INFO Executor: Running task 7.0 in stage 27.0 (TID 106)
+16/05/17 18:06:58 INFO Executor: Running task 5.0 in stage 27.0 (TID 104)
+16/05/17 18:06:58 INFO Executor: Running task 0.0 in stage 27.0 (TID 99)
+16/05/17 18:06:58 INFO BlockManager: Found block rdd_142_7 locally
+16/05/17 18:06:58 INFO BlockManager: Found block rdd_142_2 locally
+16/05/17 18:06:58 INFO BlockManager: Found block rdd_142_3 locally
+16/05/17 18:06:58 INFO BlockManager: Found block rdd_142_4 locally
+16/05/17 18:06:58 INFO BlockManager: Found block rdd_142_6 locally
+16/05/17 18:06:58 INFO BlockManager: Found block rdd_142_5 locally
+16/05/17 18:06:58 INFO BlockManager: Found block rdd_142_1 locally
+16/05/17 18:06:58 INFO BlockManager: Found block rdd_142_0 locally
+16/05/17 18:06:58 INFO MemoryStore: Block rdd_164_4 stored as values in memory (estimated size 16.0 B, free 1205.7 MB)
+16/05/17 18:06:58 INFO MemoryStore: Block rdd_164_3 stored as values in memory (estimated size 16.0 B, free 1205.7 MB)
+16/05/17 18:06:58 INFO BlockManagerInfo: Added rdd_164_3 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1208.2 MB)
+16/05/17 18:06:58 INFO BlockManagerInfo: Added rdd_164_4 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1208.2 MB)
+16/05/17 18:06:58 INFO MemoryStore: Block rdd_164_7 stored as values in memory (estimated size 16.0 B, free 1205.7 MB)
+16/05/17 18:06:58 INFO MemoryStore: Block rdd_164_2 stored as values in memory (estimated size 16.0 B, free 1205.7 MB)
+16/05/17 18:06:58 INFO MemoryStore: Block rdd_164_6 stored as values in memory (estimated size 16.0 B, free 1205.7 MB)
+16/05/17 18:06:58 INFO MemoryStore: Block rdd_164_5 stored as values in memory (estimated size 16.0 B, free 1205.7 MB)
+16/05/17 18:06:58 INFO BlockManagerInfo: Added rdd_164_7 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1208.2 MB)
+16/05/17 18:06:58 INFO BlockManagerInfo: Added rdd_164_2 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1208.2 MB)
+16/05/17 18:06:58 INFO RandomForest: xusen, numNodes in each partition is 500
+16/05/17 18:06:58 INFO RandomForest: xusen, numNodes in each partition is 500
+16/05/17 18:06:58 INFO RandomForest: xusen, numNodes in each partition is 500
+16/05/17 18:06:58 INFO BlockManagerInfo: Added rdd_164_6 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1208.2 MB)
+16/05/17 18:06:58 INFO RandomForest: xusen, numNodes in each partition is 500
+16/05/17 18:06:58 INFO RandomForest: xusen, numNodes in each partition is 500
+16/05/17 18:06:58 INFO BlockManagerInfo: Added rdd_164_5 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1208.2 MB)
+16/05/17 18:06:58 INFO RandomForest: xusen, numNodes in each partition is 500
+16/05/17 18:06:58 INFO Executor: Finished task 7.0 in stage 27.0 (TID 106). 5604 bytes result sent to driver
+16/05/17 18:06:58 INFO TaskSetManager: Starting task 8.0 in stage 27.0 (TID 107, localhost, partition 8, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:06:58 INFO Executor: Running task 8.0 in stage 27.0 (TID 107)
+16/05/17 18:06:58 INFO TaskSetManager: Finished task 7.0 in stage 27.0 (TID 106) in 252 ms on localhost (1/10)
+16/05/17 18:06:58 INFO Executor: Finished task 2.0 in stage 27.0 (TID 101). 5604 bytes result sent to driver
+16/05/17 18:06:58 INFO TaskSetManager: Starting task 9.0 in stage 27.0 (TID 108, localhost, partition 9, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:06:58 INFO TaskSetManager: Finished task 2.0 in stage 27.0 (TID 101) in 257 ms on localhost (2/10)
+16/05/17 18:06:58 INFO Executor: Running task 9.0 in stage 27.0 (TID 108)
+16/05/17 18:06:58 INFO Executor: Finished task 3.0 in stage 27.0 (TID 102). 5604 bytes result sent to driver
+16/05/17 18:06:58 INFO Executor: Finished task 6.0 in stage 27.0 (TID 105). 5604 bytes result sent to driver
+16/05/17 18:06:58 INFO Executor: Finished task 4.0 in stage 27.0 (TID 103). 5604 bytes result sent to driver
+16/05/17 18:06:58 INFO TaskSetManager: Finished task 3.0 in stage 27.0 (TID 102) in 265 ms on localhost (3/10)
+16/05/17 18:06:58 INFO TaskSetManager: Finished task 6.0 in stage 27.0 (TID 105) in 264 ms on localhost (4/10)
+16/05/17 18:06:58 INFO TaskSetManager: Finished task 4.0 in stage 27.0 (TID 103) in 265 ms on localhost (5/10)
+16/05/17 18:06:58 INFO Executor: Finished task 5.0 in stage 27.0 (TID 104). 5604 bytes result sent to driver
+16/05/17 18:06:58 INFO TaskSetManager: Finished task 5.0 in stage 27.0 (TID 104) in 267 ms on localhost (6/10)
+16/05/17 18:06:58 INFO BlockManager: Found block rdd_142_8 locally
+16/05/17 18:06:58 INFO BlockManager: Found block rdd_142_9 locally
+16/05/17 18:06:58 INFO MemoryStore: Block rdd_164_8 stored as values in memory (estimated size 16.0 B, free 1205.7 MB)
+16/05/17 18:06:58 INFO BlockManagerInfo: Added rdd_164_8 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1208.2 MB)
+16/05/17 18:06:58 INFO RandomForest: xusen, numNodes in each partition is 500
+16/05/17 18:06:58 INFO MemoryStore: Block rdd_164_9 stored as values in memory (estimated size 16.0 B, free 1205.7 MB)
+16/05/17 18:06:58 INFO BlockManagerInfo: Added rdd_164_9 in memory on 9.30.123.230:60007 (size: 16.0 B, free: 1208.2 MB)
+16/05/17 18:06:58 INFO RandomForest: xusen, numNodes in each partition is 500
+16/05/17 18:06:58 INFO Executor: Finished task 9.0 in stage 27.0 (TID 108). 5604 bytes result sent to driver
+16/05/17 18:06:58 INFO Executor: Finished task 8.0 in stage 27.0 (TID 107). 5604 bytes result sent to driver
+16/05/17 18:06:58 INFO TaskSetManager: Finished task 9.0 in stage 27.0 (TID 108) in 70 ms on localhost (7/10)
+16/05/17 18:06:58 INFO TaskSetManager: Finished task 8.0 in stage 27.0 (TID 107) in 72 ms on localhost (8/10)
+16/05/17 18:06:59 INFO MemoryStore: Block rdd_164_1 stored as values in memory (estimated size 36.9 MB, free 1168.8 MB)
+16/05/17 18:06:59 INFO BlockManagerInfo: Added rdd_164_1 in memory on 9.30.123.230:60007 (size: 36.9 MB, free: 1171.3 MB)
+16/05/17 18:06:59 INFO RandomForest: xusen, numNodes in each partition is 500
+16/05/17 18:06:59 INFO ContextCleaner: Cleaned shuffle 10
+16/05/17 18:07:00 INFO Executor: Finished task 1.0 in stage 27.0 (TID 100). 5758 bytes result sent to driver
+16/05/17 18:07:00 INFO TaskSetManager: Finished task 1.0 in stage 27.0 (TID 100) in 2221 ms on localhost (9/10)
+16/05/17 18:07:01 INFO MemoryStore: Block rdd_164_0 stored as values in memory (estimated size 223.7 MB, free 945.1 MB)
+16/05/17 18:07:01 INFO BlockManagerInfo: Added rdd_164_0 in memory on 9.30.123.230:60007 (size: 223.7 MB, free: 947.5 MB)
+16/05/17 18:07:01 INFO RandomForest: xusen, numNodes in each partition is 500
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_50_piece0 on 9.30.123.230:60007 in memory (size: 68.1 KB, free: 947.6 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_46_piece0 on 9.30.123.230:60007 in memory (size: 62.0 KB, free: 947.6 MB)
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 2201
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_42_piece0 on 9.30.123.230:60007 in memory (size: 7.0 KB, free: 947.7 MB)
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned shuffle 8
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1971
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1970
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1969
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1968
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_41_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.7 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_40_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.7 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_34_piece0 on 9.30.123.230:60007 in memory (size: 7.1 KB, free: 947.7 MB)
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned shuffle 6
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1523
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1522
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1521
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1520
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_33_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.7 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_32_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.7 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_30_piece0 on 9.30.123.230:60007 in memory (size: 7.0 KB, free: 947.7 MB)
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned shuffle 5
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1299
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1298
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1297
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 1296
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_29_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.7 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_28_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.7 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_22_piece0 on 9.30.123.230:60007 in memory (size: 7.0 KB, free: 947.8 MB)
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned shuffle 3
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 851
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 850
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 849
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 848
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_21_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.8 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_20_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.8 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_16_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.8 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_10_piece0 on 9.30.123.230:60007 in memory (size: 7.7 KB, free: 947.8 MB)
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned shuffle 0
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 179
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 178
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 177
+16/05/17 18:07:03 INFO ContextCleaner: Cleaned accumulator 176
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_9_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.8 MB)
+16/05/17 18:07:03 INFO BlockManagerInfo: Removed broadcast_8_piece0 on 9.30.123.230:60007 in memory (size: 14.5 KB, free: 947.8 MB)
+16/05/17 18:07:06 INFO Executor: Finished task 0.0 in stage 27.0 (TID 99). 5758 bytes result sent to driver
+16/05/17 18:07:06 INFO TaskSetManager: Finished task 0.0 in stage 27.0 (TID 99) in 7877 ms on localhost (10/10)
+16/05/17 18:07:06 INFO TaskSchedulerImpl: Removed TaskSet 27.0, whose tasks have all completed, from pool
+16/05/17 18:07:06 INFO DAGScheduler: ShuffleMapStage 27 (mapPartitions at RandomForest.scala:521) finished in 7.878 s
+16/05/17 18:07:06 INFO DAGScheduler: looking for newly runnable stages
+16/05/17 18:07:06 INFO DAGScheduler: running: Set()
+16/05/17 18:07:06 INFO DAGScheduler: waiting: Set(ResultStage 28)
+16/05/17 18:07:06 INFO DAGScheduler: failed: Set()
+16/05/17 18:07:06 INFO DAGScheduler: Submitting ResultStage 28 (MapPartitionsRDD[167] at map at RandomForest.scala:541), which has no missing parents
+16/05/17 18:07:06 INFO MemoryStore: Block broadcast_53 stored as values in memory (estimated size 17.9 KB, free 947.3 MB)
+16/05/17 18:07:06 INFO MemoryStore: Block broadcast_53_piece0 stored as bytes in memory (estimated size 2.6 KB, free 947.3 MB)
+16/05/17 18:07:06 INFO BlockManagerInfo: Added broadcast_53_piece0 in memory on 9.30.123.230:60007 (size: 2.6 KB, free: 947.8 MB)
+16/05/17 18:07:06 INFO SparkContext: Created broadcast 53 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:07:06 INFO DAGScheduler: Submitting 10 missing tasks from ResultStage 28 (MapPartitionsRDD[167] at map at RandomForest.scala:541)
+16/05/17 18:07:06 INFO TaskSchedulerImpl: Adding task set 28.0 with 10 tasks
+16/05/17 18:07:06 INFO TaskSetManager: Starting task 0.0 in stage 28.0 (TID 109, localhost, partition 0, ANY, 5147 bytes)
+16/05/17 18:07:06 INFO TaskSetManager: Starting task 1.0 in stage 28.0 (TID 110, localhost, partition 1, ANY, 5147 bytes)
+16/05/17 18:07:06 INFO TaskSetManager: Starting task 2.0 in stage 28.0 (TID 111, localhost, partition 2, ANY, 5147 bytes)
+16/05/17 18:07:06 INFO TaskSetManager: Starting task 3.0 in stage 28.0 (TID 112, localhost, partition 3, ANY, 5147 bytes)
+16/05/17 18:07:06 INFO TaskSetManager: Starting task 4.0 in stage 28.0 (TID 113, localhost, partition 4, ANY, 5147 bytes)
+16/05/17 18:07:06 INFO TaskSetManager: Starting task 5.0 in stage 28.0 (TID 114, localhost, partition 5, ANY, 5147 bytes)
+16/05/17 18:07:06 INFO TaskSetManager: Starting task 6.0 in stage 28.0 (TID 115, localhost, partition 6, ANY, 5147 bytes)
+16/05/17 18:07:06 INFO TaskSetManager: Starting task 7.0 in stage 28.0 (TID 116, localhost, partition 7, ANY, 5147 bytes)
+16/05/17 18:07:06 INFO Executor: Running task 1.0 in stage 28.0 (TID 110)
+16/05/17 18:07:06 INFO Executor: Running task 0.0 in stage 28.0 (TID 109)
+16/05/17 18:07:06 INFO Executor: Running task 3.0 in stage 28.0 (TID 112)
+16/05/17 18:07:06 INFO Executor: Running task 2.0 in stage 28.0 (TID 111)
+16/05/17 18:07:06 INFO Executor: Running task 4.0 in stage 28.0 (TID 113)
+16/05/17 18:07:06 INFO Executor: Running task 5.0 in stage 28.0 (TID 114)
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:06 INFO Executor: Running task 6.0 in stage 28.0 (TID 115)
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:06 INFO Executor: Running task 7.0 in stage 28.0 (TID 116)
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:06 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 4 ms
+16/05/17 18:07:07 INFO Executor: Finished task 6.0 in stage 28.0 (TID 115). 456550 bytes result sent to driver
+16/05/17 18:07:07 INFO TaskSetManager: Starting task 8.0 in stage 28.0 (TID 117, localhost, partition 8, ANY, 5147 bytes)
+16/05/17 18:07:07 INFO Executor: Running task 8.0 in stage 28.0 (TID 117)
+16/05/17 18:07:07 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:07 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:07 INFO Executor: Finished task 1.0 in stage 28.0 (TID 110). 414164 bytes result sent to driver
+16/05/17 18:07:07 INFO TaskSetManager: Starting task 9.0 in stage 28.0 (TID 118, localhost, partition 9, ANY, 5147 bytes)
+16/05/17 18:07:07 INFO Executor: Running task 9.0 in stage 28.0 (TID 118)
+16/05/17 18:07:07 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:07 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:07 INFO Executor: Finished task 4.0 in stage 28.0 (TID 113). 442551 bytes result sent to driver
+16/05/17 18:07:07 INFO Executor: Finished task 7.0 in stage 28.0 (TID 116). 442111 bytes result sent to driver
+16/05/17 18:07:07 INFO Executor: Finished task 0.0 in stage 28.0 (TID 109). 522284 bytes result sent to driver
+16/05/17 18:07:07 INFO TaskSetManager: Finished task 6.0 in stage 28.0 (TID 115) in 1067 ms on localhost (1/10)
+16/05/17 18:07:07 INFO TaskSetManager: Finished task 4.0 in stage 28.0 (TID 113) in 1070 ms on localhost (2/10)
+16/05/17 18:07:07 INFO TaskSetManager: Finished task 1.0 in stage 28.0 (TID 110) in 1072 ms on localhost (3/10)
+16/05/17 18:07:07 INFO TaskSetManager: Finished task 7.0 in stage 28.0 (TID 116) in 1079 ms on localhost (4/10)
+16/05/17 18:07:07 INFO Executor: Finished task 3.0 in stage 28.0 (TID 112). 468777 bytes result sent to driver
+16/05/17 18:07:07 INFO TaskSetManager: Finished task 3.0 in stage 28.0 (TID 112) in 1109 ms on localhost (5/10)
+16/05/17 18:07:07 INFO Executor: Finished task 5.0 in stage 28.0 (TID 114). 510067 bytes result sent to driver
+16/05/17 18:07:07 INFO TaskSetManager: Finished task 0.0 in stage 28.0 (TID 109) in 1127 ms on localhost (6/10)
+16/05/17 18:07:07 INFO TaskSetManager: Finished task 5.0 in stage 28.0 (TID 114) in 1145 ms on localhost (7/10)
+16/05/17 18:07:07 INFO Executor: Finished task 2.0 in stage 28.0 (TID 111). 477275 bytes result sent to driver
+16/05/17 18:07:07 INFO TaskSetManager: Finished task 2.0 in stage 28.0 (TID 111) in 1214 ms on localhost (8/10)
+16/05/17 18:07:07 INFO Executor: Finished task 9.0 in stage 28.0 (TID 118). 425950 bytes result sent to driver
+16/05/17 18:07:07 INFO TaskSetManager: Finished task 9.0 in stage 28.0 (TID 118) in 505 ms on localhost (9/10)
+16/05/17 18:07:07 INFO Executor: Finished task 8.0 in stage 28.0 (TID 117). 547418 bytes result sent to driver
+16/05/17 18:07:07 INFO DAGScheduler: ResultStage 28 (collectAsMap at RandomForest.scala:551) finished in 1.552 s
+16/05/17 18:07:07 INFO DAGScheduler: Job 18 finished: collectAsMap at RandomForest.scala:551, took 9.453391 s
+16/05/17 18:07:07 INFO TaskSetManager: Finished task 8.0 in stage 28.0 (TID 117) in 583 ms on localhost (10/10)
+16/05/17 18:07:07 INFO TaskSchedulerImpl: Removed TaskSet 28.0, whose tasks have all completed, from pool
+16/05/17 18:07:07 INFO MemoryStore: Block broadcast_54 stored as values in memory (estimated size 119.2 KB, free 947.2 MB)
+16/05/17 18:07:07 INFO MemoryStore: Block broadcast_54_piece0 stored as bytes in memory (estimated size 11.7 KB, free 947.2 MB)
+16/05/17 18:07:07 INFO BlockManagerInfo: Added broadcast_54_piece0 in memory on 9.30.123.230:60007 (size: 11.7 KB, free: 947.8 MB)
+16/05/17 18:07:07 INFO SparkContext: Created broadcast 54 from broadcast at RandomForest.scala:500
+16/05/17 18:07:07 INFO SparkContext: Starting job: collectAsMap at RandomForest.scala:551
+16/05/17 18:07:07 INFO DAGScheduler: Registering RDD 168 (mapPartitions at RandomForest.scala:521)
+16/05/17 18:07:07 INFO DAGScheduler: Got job 19 (collectAsMap at RandomForest.scala:551) with 10 output partitions
+16/05/17 18:07:07 INFO DAGScheduler: Final stage: ResultStage 30 (collectAsMap at RandomForest.scala:551)
+16/05/17 18:07:07 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 29)
+16/05/17 18:07:07 INFO DAGScheduler: Missing parents: List(ShuffleMapStage 29)
+16/05/17 18:07:07 INFO DAGScheduler: Submitting ShuffleMapStage 29 (MapPartitionsRDD[168] at mapPartitions at RandomForest.scala:521), which has no missing parents
+16/05/17 18:07:08 INFO MemoryStore: Block broadcast_55 stored as values in memory (estimated size 4.7 MB, free 942.5 MB)
+16/05/17 18:07:08 INFO MemoryStore: Block broadcast_55_piece0 stored as bytes in memory (estimated size 1823.1 KB, free 940.7 MB)
+16/05/17 18:07:08 INFO BlockManagerInfo: Added broadcast_55_piece0 in memory on 9.30.123.230:60007 (size: 1823.1 KB, free: 946.0 MB)
+16/05/17 18:07:08 INFO SparkContext: Created broadcast 55 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:07:08 INFO DAGScheduler: Submitting 10 missing tasks from ShuffleMapStage 29 (MapPartitionsRDD[168] at mapPartitions at RandomForest.scala:521)
+16/05/17 18:07:08 INFO TaskSchedulerImpl: Adding task set 29.0 with 10 tasks
+16/05/17 18:07:08 INFO TaskSetManager: Starting task 0.0 in stage 29.0 (TID 119, localhost, partition 0, PROCESS_LOCAL, 6271 bytes)
+16/05/17 18:07:08 INFO TaskSetManager: Starting task 1.0 in stage 29.0 (TID 120, localhost, partition 1, PROCESS_LOCAL, 6271 bytes)
+16/05/17 18:07:08 INFO TaskSetManager: Starting task 2.0 in stage 29.0 (TID 121, localhost, partition 2, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:08 INFO TaskSetManager: Starting task 3.0 in stage 29.0 (TID 122, localhost, partition 3, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:08 INFO TaskSetManager: Starting task 4.0 in stage 29.0 (TID 123, localhost, partition 4, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:08 INFO TaskSetManager: Starting task 5.0 in stage 29.0 (TID 124, localhost, partition 5, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:08 INFO TaskSetManager: Starting task 6.0 in stage 29.0 (TID 125, localhost, partition 6, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:08 INFO TaskSetManager: Starting task 7.0 in stage 29.0 (TID 126, localhost, partition 7, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:08 INFO Executor: Running task 1.0 in stage 29.0 (TID 120)
+16/05/17 18:07:08 INFO Executor: Running task 2.0 in stage 29.0 (TID 121)
+16/05/17 18:07:08 INFO Executor: Running task 5.0 in stage 29.0 (TID 124)
+16/05/17 18:07:08 INFO Executor: Running task 4.0 in stage 29.0 (TID 123)
+16/05/17 18:07:08 INFO Executor: Running task 6.0 in stage 29.0 (TID 125)
+16/05/17 18:07:08 INFO Executor: Running task 7.0 in stage 29.0 (TID 126)
+16/05/17 18:07:08 INFO Executor: Running task 0.0 in stage 29.0 (TID 119)
+16/05/17 18:07:08 INFO Executor: Running task 3.0 in stage 29.0 (TID 122)
+16/05/17 18:07:08 INFO BlockManager: Found block rdd_164_0 locally
+16/05/17 18:07:08 INFO RandomForest: xusen, numNodes in each partition is 1000
+16/05/17 18:07:08 INFO BlockManager: Found block rdd_164_2 locally
+16/05/17 18:07:08 INFO RandomForest: xusen, numNodes in each partition is 1000
+16/05/17 18:07:08 INFO BlockManager: Found block rdd_164_3 locally
+16/05/17 18:07:08 INFO RandomForest: xusen, numNodes in each partition is 1000
+16/05/17 18:07:08 INFO BlockManager: Found block rdd_164_6 locally
+16/05/17 18:07:08 INFO RandomForest: xusen, numNodes in each partition is 1000
+16/05/17 18:07:08 INFO BlockManager: Found block rdd_164_5 locally
+16/05/17 18:07:08 INFO RandomForest: xusen, numNodes in each partition is 1000
+16/05/17 18:07:08 INFO BlockManager: Found block rdd_164_1 locally
+16/05/17 18:07:08 INFO RandomForest: xusen, numNodes in each partition is 1000
+16/05/17 18:07:08 INFO BlockManager: Found block rdd_164_4 locally
+16/05/17 18:07:08 INFO RandomForest: xusen, numNodes in each partition is 1000
+16/05/17 18:07:08 INFO BlockManager: Found block rdd_164_7 locally
+16/05/17 18:07:08 INFO RandomForest: xusen, numNodes in each partition is 1000
+16/05/17 18:07:08 INFO Executor: Finished task 2.0 in stage 29.0 (TID 121). 5121 bytes result sent to driver
+16/05/17 18:07:08 INFO TaskSetManager: Starting task 8.0 in stage 29.0 (TID 127, localhost, partition 8, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:08 INFO TaskSetManager: Finished task 2.0 in stage 29.0 (TID 121) in 538 ms on localhost (1/10)
+16/05/17 18:07:08 INFO Executor: Finished task 3.0 in stage 29.0 (TID 122). 5121 bytes result sent to driver
+16/05/17 18:07:08 INFO Executor: Running task 8.0 in stage 29.0 (TID 127)
+16/05/17 18:07:08 INFO TaskSetManager: Starting task 9.0 in stage 29.0 (TID 128, localhost, partition 9, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:08 INFO Executor: Running task 9.0 in stage 29.0 (TID 128)
+16/05/17 18:07:08 INFO TaskSetManager: Finished task 3.0 in stage 29.0 (TID 122) in 549 ms on localhost (2/10)
+16/05/17 18:07:08 INFO Executor: Finished task 4.0 in stage 29.0 (TID 123). 5121 bytes result sent to driver
+16/05/17 18:07:08 INFO TaskSetManager: Finished task 4.0 in stage 29.0 (TID 123) in 591 ms on localhost (3/10)
+16/05/17 18:07:08 INFO Executor: Finished task 5.0 in stage 29.0 (TID 124). 5121 bytes result sent to driver
+16/05/17 18:07:08 INFO TaskSetManager: Finished task 5.0 in stage 29.0 (TID 124) in 611 ms on localhost (4/10)
+16/05/17 18:07:08 INFO Executor: Finished task 7.0 in stage 29.0 (TID 126). 5121 bytes result sent to driver
+16/05/17 18:07:08 INFO TaskSetManager: Finished task 7.0 in stage 29.0 (TID 126) in 641 ms on localhost (5/10)
+16/05/17 18:07:08 INFO Executor: Finished task 6.0 in stage 29.0 (TID 125). 5121 bytes result sent to driver
+16/05/17 18:07:08 INFO TaskSetManager: Finished task 6.0 in stage 29.0 (TID 125) in 660 ms on localhost (6/10)
+16/05/17 18:07:09 INFO BlockManager: Found block rdd_164_8 locally
+16/05/17 18:07:09 INFO RandomForest: xusen, numNodes in each partition is 1000
+16/05/17 18:07:09 INFO BlockManager: Found block rdd_164_9 locally
+16/05/17 18:07:09 INFO RandomForest: xusen, numNodes in each partition is 1000
+16/05/17 18:07:09 INFO Executor: Finished task 8.0 in stage 29.0 (TID 127). 5121 bytes result sent to driver
+16/05/17 18:07:09 INFO TaskSetManager: Finished task 8.0 in stage 29.0 (TID 127) in 375 ms on localhost (7/10)
+16/05/17 18:07:09 INFO Executor: Finished task 9.0 in stage 29.0 (TID 128). 5121 bytes result sent to driver
+16/05/17 18:07:09 INFO TaskSetManager: Finished task 9.0 in stage 29.0 (TID 128) in 416 ms on localhost (8/10)
+16/05/17 18:07:10 INFO Executor: Finished task 1.0 in stage 29.0 (TID 120). 5202 bytes result sent to driver
+16/05/17 18:07:10 INFO TaskSetManager: Finished task 1.0 in stage 29.0 (TID 120) in 2417 ms on localhost (9/10)
+16/05/17 18:07:18 INFO Executor: Finished task 0.0 in stage 29.0 (TID 119). 5202 bytes result sent to driver
+16/05/17 18:07:18 INFO TaskSetManager: Finished task 0.0 in stage 29.0 (TID 119) in 10243 ms on localhost (10/10)
+16/05/17 18:07:18 INFO TaskSchedulerImpl: Removed TaskSet 29.0, whose tasks have all completed, from pool
+16/05/17 18:07:18 INFO DAGScheduler: ShuffleMapStage 29 (mapPartitions at RandomForest.scala:521) finished in 10.244 s
+16/05/17 18:07:18 INFO DAGScheduler: looking for newly runnable stages
+16/05/17 18:07:18 INFO DAGScheduler: running: Set()
+16/05/17 18:07:18 INFO DAGScheduler: waiting: Set(ResultStage 30)
+16/05/17 18:07:18 INFO DAGScheduler: failed: Set()
+16/05/17 18:07:18 INFO DAGScheduler: Submitting ResultStage 30 (MapPartitionsRDD[170] at map at RandomForest.scala:541), which has no missing parents
+16/05/17 18:07:18 INFO MemoryStore: Block broadcast_56 stored as values in memory (estimated size 86.1 KB, free 940.6 MB)
+16/05/17 18:07:18 INFO MemoryStore: Block broadcast_56_piece0 stored as bytes in memory (estimated size 25.9 KB, free 940.6 MB)
+16/05/17 18:07:18 INFO BlockManagerInfo: Added broadcast_56_piece0 in memory on 9.30.123.230:60007 (size: 25.9 KB, free: 946.0 MB)
+16/05/17 18:07:18 INFO SparkContext: Created broadcast 56 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:07:18 INFO DAGScheduler: Submitting 10 missing tasks from ResultStage 30 (MapPartitionsRDD[170] at map at RandomForest.scala:541)
+16/05/17 18:07:18 INFO TaskSchedulerImpl: Adding task set 30.0 with 10 tasks
+16/05/17 18:07:18 INFO TaskSetManager: Starting task 0.0 in stage 30.0 (TID 129, localhost, partition 0, ANY, 5147 bytes)
+16/05/17 18:07:18 INFO TaskSetManager: Starting task 1.0 in stage 30.0 (TID 130, localhost, partition 1, ANY, 5147 bytes)
+16/05/17 18:07:18 INFO TaskSetManager: Starting task 2.0 in stage 30.0 (TID 131, localhost, partition 2, ANY, 5147 bytes)
+16/05/17 18:07:18 INFO TaskSetManager: Starting task 3.0 in stage 30.0 (TID 132, localhost, partition 3, ANY, 5147 bytes)
+16/05/17 18:07:18 INFO TaskSetManager: Starting task 4.0 in stage 30.0 (TID 133, localhost, partition 4, ANY, 5147 bytes)
+16/05/17 18:07:18 INFO TaskSetManager: Starting task 5.0 in stage 30.0 (TID 134, localhost, partition 5, ANY, 5147 bytes)
+16/05/17 18:07:18 INFO TaskSetManager: Starting task 6.0 in stage 30.0 (TID 135, localhost, partition 6, ANY, 5147 bytes)
+16/05/17 18:07:18 INFO TaskSetManager: Starting task 7.0 in stage 30.0 (TID 136, localhost, partition 7, ANY, 5147 bytes)
+16/05/17 18:07:18 INFO Executor: Running task 0.0 in stage 30.0 (TID 129)
+16/05/17 18:07:18 INFO Executor: Running task 4.0 in stage 30.0 (TID 133)
+16/05/17 18:07:18 INFO Executor: Running task 7.0 in stage 30.0 (TID 136)
+16/05/17 18:07:18 INFO Executor: Running task 6.0 in stage 30.0 (TID 135)
+16/05/17 18:07:18 INFO Executor: Running task 2.0 in stage 30.0 (TID 131)
+16/05/17 18:07:18 INFO Executor: Running task 3.0 in stage 30.0 (TID 132)
+16/05/17 18:07:18 INFO Executor: Running task 5.0 in stage 30.0 (TID 134)
+16/05/17 18:07:18 INFO Executor: Running task 1.0 in stage 30.0 (TID 130)
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:18 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:19 INFO Executor: Finished task 3.0 in stage 30.0 (TID 132). 677085 bytes result sent to driver
+16/05/17 18:07:19 INFO TaskSetManager: Starting task 8.0 in stage 30.0 (TID 137, localhost, partition 8, ANY, 5147 bytes)
+16/05/17 18:07:19 INFO Executor: Running task 8.0 in stage 30.0 (TID 137)
+16/05/17 18:07:19 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:19 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:19 INFO TaskSetManager: Finished task 3.0 in stage 30.0 (TID 132) in 870 ms on localhost (1/10)
+16/05/17 18:07:19 INFO Executor: Finished task 1.0 in stage 30.0 (TID 130). 683215 bytes result sent to driver
+16/05/17 18:07:19 INFO TaskSetManager: Starting task 9.0 in stage 30.0 (TID 138, localhost, partition 9, ANY, 5147 bytes)
+16/05/17 18:07:19 INFO Executor: Finished task 0.0 in stage 30.0 (TID 129). 774385 bytes result sent to driver
+16/05/17 18:07:19 INFO Executor: Running task 9.0 in stage 30.0 (TID 138)
+16/05/17 18:07:19 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:19 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:19 INFO TaskSetManager: Finished task 1.0 in stage 30.0 (TID 130) in 935 ms on localhost (2/10)
+16/05/17 18:07:19 INFO TaskSetManager: Finished task 0.0 in stage 30.0 (TID 129) in 1008 ms on localhost (3/10)
+16/05/17 18:07:19 INFO Executor: Finished task 6.0 in stage 30.0 (TID 135). 814912 bytes result sent to driver
+16/05/17 18:07:19 INFO Executor: Finished task 4.0 in stage 30.0 (TID 133). 895510 bytes result sent to driver
+16/05/17 18:07:19 INFO Executor: Finished task 7.0 in stage 30.0 (TID 136). 731818 bytes result sent to driver
+16/05/17 18:07:19 INFO Executor: Finished task 5.0 in stage 30.0 (TID 134). 719448 bytes result sent to driver
+16/05/17 18:07:19 INFO TaskSetManager: Finished task 6.0 in stage 30.0 (TID 135) in 1098 ms on localhost (4/10)
+16/05/17 18:07:19 INFO TaskSetManager: Finished task 7.0 in stage 30.0 (TID 136) in 1104 ms on localhost (5/10)
+16/05/17 18:07:19 INFO TaskSetManager: Finished task 4.0 in stage 30.0 (TID 133) in 1111 ms on localhost (6/10)
+16/05/17 18:07:19 INFO TaskSetManager: Finished task 5.0 in stage 30.0 (TID 134) in 1126 ms on localhost (7/10)
+16/05/17 18:07:19 INFO Executor: Finished task 2.0 in stage 30.0 (TID 131). 811536 bytes result sent to driver
+16/05/17 18:07:19 INFO TaskSetManager: Finished task 2.0 in stage 30.0 (TID 131) in 1213 ms on localhost (8/10)
+16/05/17 18:07:20 INFO Executor: Finished task 9.0 in stage 30.0 (TID 138). 815259 bytes result sent to driver
+16/05/17 18:07:20 INFO TaskSetManager: Finished task 9.0 in stage 30.0 (TID 138) in 972 ms on localhost (9/10)
+16/05/17 18:07:20 INFO Executor: Finished task 8.0 in stage 30.0 (TID 137). 951237 bytes result sent to driver
+16/05/17 18:07:20 INFO TaskSetManager: Finished task 8.0 in stage 30.0 (TID 137) in 1075 ms on localhost (10/10)
+16/05/17 18:07:20 INFO TaskSchedulerImpl: Removed TaskSet 30.0, whose tasks have all completed, from pool
+16/05/17 18:07:20 INFO DAGScheduler: ResultStage 30 (collectAsMap at RandomForest.scala:551) finished in 1.913 s
+16/05/17 18:07:20 INFO DAGScheduler: Job 19 finished: collectAsMap at RandomForest.scala:551, took 12.403605 s
+16/05/17 18:07:20 INFO MemoryStore: Block broadcast_57 stored as values in memory (estimated size 241.8 KB, free 940.3 MB)
+16/05/17 18:07:20 INFO MemoryStore: Block broadcast_57_piece0 stored as bytes in memory (estimated size 23.5 KB, free 940.3 MB)
+16/05/17 18:07:20 INFO BlockManagerInfo: Added broadcast_57_piece0 in memory on 9.30.123.230:60007 (size: 23.5 KB, free: 946.0 MB)
+16/05/17 18:07:20 INFO SparkContext: Created broadcast 57 from broadcast at RandomForest.scala:500
+16/05/17 18:07:21 INFO SparkContext: Starting job: collectAsMap at RandomForest.scala:551
+16/05/17 18:07:21 INFO DAGScheduler: Registering RDD 171 (mapPartitions at RandomForest.scala:521)
+16/05/17 18:07:21 INFO DAGScheduler: Got job 20 (collectAsMap at RandomForest.scala:551) with 10 output partitions
+16/05/17 18:07:21 INFO DAGScheduler: Final stage: ResultStage 32 (collectAsMap at RandomForest.scala:551)
+16/05/17 18:07:21 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 31)
+16/05/17 18:07:21 INFO DAGScheduler: Missing parents: List(ShuffleMapStage 31)
+16/05/17 18:07:21 INFO DAGScheduler: Submitting ShuffleMapStage 31 (MapPartitionsRDD[171] at mapPartitions at RandomForest.scala:521), which has no missing parents
+16/05/17 18:07:21 INFO MemoryStore: Block broadcast_58 stored as values in memory (estimated size 12.2 MB, free 928.1 MB)
+16/05/17 18:07:21 INFO MemoryStore: Block broadcast_58_piece0 stored as bytes in memory (estimated size 4.0 MB, free 924.1 MB)
+16/05/17 18:07:21 INFO BlockManagerInfo: Added broadcast_58_piece0 in memory on 9.30.123.230:60007 (size: 4.0 MB, free: 942.0 MB)
+16/05/17 18:07:21 INFO MemoryStore: Block broadcast_58_piece1 stored as bytes in memory (estimated size 707.8 KB, free 923.4 MB)
+16/05/17 18:07:21 INFO BlockManagerInfo: Added broadcast_58_piece1 in memory on 9.30.123.230:60007 (size: 707.8 KB, free: 941.3 MB)
+16/05/17 18:07:21 INFO SparkContext: Created broadcast 58 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:07:21 INFO DAGScheduler: Submitting 10 missing tasks from ShuffleMapStage 31 (MapPartitionsRDD[171] at mapPartitions at RandomForest.scala:521)
+16/05/17 18:07:21 INFO TaskSchedulerImpl: Adding task set 31.0 with 10 tasks
+16/05/17 18:07:21 INFO TaskSetManager: Starting task 0.0 in stage 31.0 (TID 139, localhost, partition 0, PROCESS_LOCAL, 6271 bytes)
+16/05/17 18:07:21 INFO TaskSetManager: Starting task 1.0 in stage 31.0 (TID 140, localhost, partition 1, PROCESS_LOCAL, 6271 bytes)
+16/05/17 18:07:21 INFO TaskSetManager: Starting task 2.0 in stage 31.0 (TID 141, localhost, partition 2, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:21 INFO TaskSetManager: Starting task 3.0 in stage 31.0 (TID 142, localhost, partition 3, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:21 INFO TaskSetManager: Starting task 4.0 in stage 31.0 (TID 143, localhost, partition 4, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:21 INFO TaskSetManager: Starting task 5.0 in stage 31.0 (TID 144, localhost, partition 5, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:21 INFO TaskSetManager: Starting task 6.0 in stage 31.0 (TID 145, localhost, partition 6, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:21 INFO TaskSetManager: Starting task 7.0 in stage 31.0 (TID 146, localhost, partition 7, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:21 INFO Executor: Running task 0.0 in stage 31.0 (TID 139)
+16/05/17 18:07:21 INFO Executor: Running task 1.0 in stage 31.0 (TID 140)
+16/05/17 18:07:21 INFO Executor: Running task 3.0 in stage 31.0 (TID 142)
+16/05/17 18:07:21 INFO Executor: Running task 2.0 in stage 31.0 (TID 141)
+16/05/17 18:07:21 INFO Executor: Running task 4.0 in stage 31.0 (TID 143)
+16/05/17 18:07:21 INFO Executor: Running task 5.0 in stage 31.0 (TID 144)
+16/05/17 18:07:21 INFO Executor: Running task 6.0 in stage 31.0 (TID 145)
+16/05/17 18:07:21 INFO Executor: Running task 7.0 in stage 31.0 (TID 146)
+16/05/17 18:07:24 INFO BlockManagerInfo: Removed broadcast_56_piece0 on 9.30.123.230:60007 in memory (size: 25.9 KB, free: 941.3 MB)
+16/05/17 18:07:24 INFO BlockManagerInfo: Removed broadcast_55_piece0 on 9.30.123.230:60007 in memory (size: 1823.1 KB, free: 943.1 MB)
+16/05/17 18:07:24 INFO ContextCleaner: Cleaned shuffle 12
+16/05/17 18:07:24 INFO BlockManagerInfo: Removed broadcast_54_piece0 on 9.30.123.230:60007 in memory (size: 11.7 KB, free: 943.1 MB)
+16/05/17 18:07:24 INFO BlockManagerInfo: Removed broadcast_53_piece0 on 9.30.123.230:60007 in memory (size: 2.6 KB, free: 943.1 MB)
+16/05/17 18:07:24 INFO BlockManagerInfo: Removed broadcast_52_piece0 on 9.30.123.230:60007 in memory (size: 80.3 KB, free: 943.2 MB)
+16/05/17 18:07:24 INFO ContextCleaner: Cleaned shuffle 11
+16/05/17 18:07:24 INFO BlockManagerInfo: Removed broadcast_51_piece0 on 9.30.123.230:60007 in memory (size: 6.0 KB, free: 943.2 MB)
+16/05/17 18:07:24 INFO BlockManager: Found block rdd_164_3 locally
+16/05/17 18:07:24 INFO RandomForest: xusen, numNodes in each partition is 1994
+16/05/17 18:07:24 INFO BlockManager: Found block rdd_164_7 locally
+16/05/17 18:07:24 INFO RandomForest: xusen, numNodes in each partition is 1994
+16/05/17 18:07:24 INFO BlockManager: Found block rdd_164_0 locally
+16/05/17 18:07:24 INFO RandomForest: xusen, numNodes in each partition is 1994
+16/05/17 18:07:24 INFO Executor: Finished task 3.0 in stage 31.0 (TID 142). 5208 bytes result sent to driver
+16/05/17 18:07:24 INFO TaskSetManager: Starting task 8.0 in stage 31.0 (TID 147, localhost, partition 8, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:24 INFO TaskSetManager: Finished task 3.0 in stage 31.0 (TID 142) in 2611 ms on localhost (1/10)
+16/05/17 18:07:24 INFO Executor: Running task 8.0 in stage 31.0 (TID 147)
+16/05/17 18:07:24 INFO BlockManager: Found block rdd_164_6 locally
+16/05/17 18:07:24 INFO RandomForest: xusen, numNodes in each partition is 1994
+16/05/17 18:07:24 INFO Executor: Finished task 7.0 in stage 31.0 (TID 146). 5121 bytes result sent to driver
+16/05/17 18:07:24 INFO TaskSetManager: Starting task 9.0 in stage 31.0 (TID 148, localhost, partition 9, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:24 INFO Executor: Running task 9.0 in stage 31.0 (TID 148)
+16/05/17 18:07:24 INFO TaskSetManager: Finished task 7.0 in stage 31.0 (TID 146) in 2799 ms on localhost (2/10)
+16/05/17 18:07:24 INFO BlockManager: Found block rdd_164_2 locally
+16/05/17 18:07:24 INFO RandomForest: xusen, numNodes in each partition is 1994
+16/05/17 18:07:24 INFO BlockManager: Found block rdd_164_4 locally
+16/05/17 18:07:24 INFO RandomForest: xusen, numNodes in each partition is 1994
+16/05/17 18:07:24 INFO BlockManager: Found block rdd_164_1 locally
+16/05/17 18:07:24 INFO RandomForest: xusen, numNodes in each partition is 1994
+16/05/17 18:07:24 INFO BlockManager: Found block rdd_164_5 locally
+16/05/17 18:07:24 INFO RandomForest: xusen, numNodes in each partition is 1994
+16/05/17 18:07:24 INFO Executor: Finished task 6.0 in stage 31.0 (TID 145). 5121 bytes result sent to driver
+16/05/17 18:07:24 INFO TaskSetManager: Finished task 6.0 in stage 31.0 (TID 145) in 2987 ms on localhost (3/10)
+16/05/17 18:07:26 INFO Executor: Finished task 4.0 in stage 31.0 (TID 143). 5121 bytes result sent to driver
+16/05/17 18:07:26 INFO TaskSetManager: Finished task 4.0 in stage 31.0 (TID 143) in 4221 ms on localhost (4/10)
+16/05/17 18:07:26 INFO Executor: Finished task 5.0 in stage 31.0 (TID 144). 5121 bytes result sent to driver
+16/05/17 18:07:26 INFO TaskSetManager: Finished task 5.0 in stage 31.0 (TID 144) in 4239 ms on localhost (5/10)
+16/05/17 18:07:26 INFO Executor: Finished task 2.0 in stage 31.0 (TID 141). 5121 bytes result sent to driver
+16/05/17 18:07:26 INFO TaskSetManager: Finished task 2.0 in stage 31.0 (TID 141) in 4260 ms on localhost (6/10)
+16/05/17 18:07:26 INFO BlockManager: Found block rdd_164_8 locally
+16/05/17 18:07:26 INFO RandomForest: xusen, numNodes in each partition is 1994
+16/05/17 18:07:27 INFO BlockManager: Found block rdd_164_9 locally
+16/05/17 18:07:27 INFO RandomForest: xusen, numNodes in each partition is 1994
+16/05/17 18:07:27 INFO Executor: Finished task 8.0 in stage 31.0 (TID 147). 5121 bytes result sent to driver
+16/05/17 18:07:27 INFO TaskSetManager: Finished task 8.0 in stage 31.0 (TID 147) in 3450 ms on localhost (7/10)
+16/05/17 18:07:27 INFO Executor: Finished task 9.0 in stage 31.0 (TID 148). 5121 bytes result sent to driver
+16/05/17 18:07:27 INFO TaskSetManager: Finished task 9.0 in stage 31.0 (TID 148) in 3275 ms on localhost (8/10)
+16/05/17 18:07:30 INFO Executor: Finished task 1.0 in stage 31.0 (TID 140). 5202 bytes result sent to driver
+16/05/17 18:07:30 INFO TaskSetManager: Finished task 1.0 in stage 31.0 (TID 140) in 8853 ms on localhost (9/10)
+16/05/17 18:07:46 INFO Executor: Finished task 0.0 in stage 31.0 (TID 139). 5202 bytes result sent to driver
+16/05/17 18:07:46 INFO TaskSetManager: Finished task 0.0 in stage 31.0 (TID 139) in 24682 ms on localhost (10/10)
+16/05/17 18:07:46 INFO TaskSchedulerImpl: Removed TaskSet 31.0, whose tasks have all completed, from pool
+16/05/17 18:07:46 INFO DAGScheduler: ShuffleMapStage 31 (mapPartitions at RandomForest.scala:521) finished in 24.683 s
+16/05/17 18:07:46 INFO DAGScheduler: looking for newly runnable stages
+16/05/17 18:07:46 INFO DAGScheduler: running: Set()
+16/05/17 18:07:46 INFO DAGScheduler: waiting: Set(ResultStage 32)
+16/05/17 18:07:46 INFO DAGScheduler: failed: Set()
+16/05/17 18:07:46 INFO DAGScheduler: Submitting ResultStage 32 (MapPartitionsRDD[173] at map at RandomForest.scala:541), which has no missing parents
+16/05/17 18:07:46 INFO MemoryStore: Block broadcast_59 stored as values in memory (estimated size 166.7 KB, free 930.3 MB)
+16/05/17 18:07:46 INFO MemoryStore: Block broadcast_59_piece0 stored as bytes in memory (estimated size 51.0 KB, free 930.2 MB)
+16/05/17 18:07:46 INFO BlockManagerInfo: Added broadcast_59_piece0 in memory on 9.30.123.230:60007 (size: 51.0 KB, free: 943.2 MB)
+16/05/17 18:07:46 INFO SparkContext: Created broadcast 59 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:07:46 INFO DAGScheduler: Submitting 10 missing tasks from ResultStage 32 (MapPartitionsRDD[173] at map at RandomForest.scala:541)
+16/05/17 18:07:46 INFO TaskSchedulerImpl: Adding task set 32.0 with 10 tasks
+16/05/17 18:07:46 INFO TaskSetManager: Starting task 0.0 in stage 32.0 (TID 149, localhost, partition 0, ANY, 5147 bytes)
+16/05/17 18:07:46 INFO TaskSetManager: Starting task 1.0 in stage 32.0 (TID 150, localhost, partition 1, ANY, 5147 bytes)
+16/05/17 18:07:46 INFO TaskSetManager: Starting task 2.0 in stage 32.0 (TID 151, localhost, partition 2, ANY, 5147 bytes)
+16/05/17 18:07:46 INFO TaskSetManager: Starting task 3.0 in stage 32.0 (TID 152, localhost, partition 3, ANY, 5147 bytes)
+16/05/17 18:07:46 INFO TaskSetManager: Starting task 4.0 in stage 32.0 (TID 153, localhost, partition 4, ANY, 5147 bytes)
+16/05/17 18:07:46 INFO TaskSetManager: Starting task 5.0 in stage 32.0 (TID 154, localhost, partition 5, ANY, 5147 bytes)
+16/05/17 18:07:46 INFO TaskSetManager: Starting task 6.0 in stage 32.0 (TID 155, localhost, partition 6, ANY, 5147 bytes)
+16/05/17 18:07:46 INFO TaskSetManager: Starting task 7.0 in stage 32.0 (TID 156, localhost, partition 7, ANY, 5147 bytes)
+16/05/17 18:07:46 INFO Executor: Running task 2.0 in stage 32.0 (TID 151)
+16/05/17 18:07:46 INFO Executor: Running task 3.0 in stage 32.0 (TID 152)
+16/05/17 18:07:46 INFO Executor: Running task 7.0 in stage 32.0 (TID 156)
+16/05/17 18:07:46 INFO Executor: Running task 5.0 in stage 32.0 (TID 154)
+16/05/17 18:07:46 INFO Executor: Running task 6.0 in stage 32.0 (TID 155)
+16/05/17 18:07:46 INFO Executor: Running task 1.0 in stage 32.0 (TID 150)
+16/05/17 18:07:46 INFO Executor: Running task 0.0 in stage 32.0 (TID 149)
+16/05/17 18:07:46 INFO Executor: Running task 4.0 in stage 32.0 (TID 153)
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 1 ms
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 1 ms
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:46 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:48 INFO MemoryStore: Block taskresult_155 stored as bytes in memory (estimated size 1169.7 KB, free 923.7 MB)
+16/05/17 18:07:48 INFO BlockManagerInfo: Added taskresult_155 in memory on 9.30.123.230:60007 (size: 1169.7 KB, free: 942.0 MB)
+16/05/17 18:07:48 INFO Executor: Finished task 6.0 in stage 32.0 (TID 155). 1197763 bytes result sent via BlockManager)
+16/05/17 18:07:48 INFO TaskSetManager: Starting task 8.0 in stage 32.0 (TID 157, localhost, partition 8, ANY, 5147 bytes)
+16/05/17 18:07:48 INFO Executor: Running task 8.0 in stage 32.0 (TID 157)
+16/05/17 18:07:48 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:48 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:48 INFO TransportClientFactory: Successfully created connection to /9.30.123.230:60007 after 72 ms (0 ms spent in bootstraps)
+16/05/17 18:07:48 INFO MemoryStore: Block taskresult_149 stored as bytes in memory (estimated size 1339.8 KB, free 922.4 MB)
+16/05/17 18:07:48 INFO BlockManagerInfo: Added taskresult_149 in memory on 9.30.123.230:60007 (size: 1339.8 KB, free: 940.7 MB)
+16/05/17 18:07:48 INFO Executor: Finished task 0.0 in stage 32.0 (TID 149). 1371955 bytes result sent via BlockManager)
+16/05/17 18:07:48 INFO TaskSetManager: Starting task 9.0 in stage 32.0 (TID 158, localhost, partition 9, ANY, 5147 bytes)
+16/05/17 18:07:48 INFO Executor: Running task 9.0 in stage 32.0 (TID 158)
+16/05/17 18:07:48 INFO ShuffleBlockFetcherIterator: Getting 10 non-empty blocks out of 10 blocks
+16/05/17 18:07:48 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+16/05/17 18:07:49 INFO MemoryStore: Block taskresult_153 stored as bytes in memory (estimated size 1169.2 KB, free 921.2 MB)
+16/05/17 18:07:49 INFO BlockManagerInfo: Added taskresult_153 in memory on 9.30.123.230:60007 (size: 1169.2 KB, free: 939.6 MB)
+16/05/17 18:07:49 INFO Executor: Finished task 4.0 in stage 32.0 (TID 153). 1197293 bytes result sent via BlockManager)
+16/05/17 18:07:49 INFO BlockManagerInfo: Removed taskresult_149 on 9.30.123.230:60007 in memory (size: 1339.8 KB, free: 940.9 MB)
+16/05/17 18:07:49 INFO BlockManagerInfo: Removed taskresult_155 on 9.30.123.230:60007 in memory (size: 1169.7 KB, free: 942.0 MB)
+16/05/17 18:07:49 INFO MemoryStore: Block taskresult_150 stored as bytes in memory (estimated size 1366.0 KB, free 922.4 MB)
+16/05/17 18:07:49 INFO BlockManagerInfo: Added taskresult_150 in memory on 9.30.123.230:60007 (size: 1366.0 KB, free: 940.7 MB)
+16/05/17 18:07:49 INFO Executor: Finished task 1.0 in stage 32.0 (TID 150). 1398802 bytes result sent via BlockManager)
+16/05/17 18:07:49 INFO BlockManagerInfo: Removed taskresult_153 on 9.30.123.230:60007 in memory (size: 1169.2 KB, free: 941.8 MB)
+16/05/17 18:07:49 INFO MemoryStore: Block taskresult_151 stored as bytes in memory (estimated size 1273.6 KB, free 922.2 MB)
+16/05/17 18:07:49 INFO BlockManagerInfo: Added taskresult_151 in memory on 9.30.123.230:60007 (size: 1273.6 KB, free: 940.6 MB)
+16/05/17 18:07:49 INFO Executor: Finished task 2.0 in stage 32.0 (TID 151). 1304153 bytes result sent via BlockManager)
+16/05/17 18:07:49 INFO TaskSetManager: Finished task 6.0 in stage 32.0 (TID 155) in 2488 ms on localhost (1/10)
+16/05/17 18:07:49 INFO MemoryStore: Block taskresult_154 stored as bytes in memory (estimated size 1461.4 KB, free 926.2 MB)
+16/05/17 18:07:49 INFO BlockManagerInfo: Added taskresult_154 in memory on 9.30.123.230:60007 (size: 1461.4 KB, free: 939.2 MB)
+16/05/17 18:07:49 INFO Executor: Finished task 5.0 in stage 32.0 (TID 154). 1496517 bytes result sent via BlockManager)
+16/05/17 18:07:49 INFO MemoryStore: Block taskresult_156 stored as bytes in memory (estimated size 1393.9 KB, free 924.9 MB)
+16/05/17 18:07:49 INFO BlockManagerInfo: Added taskresult_156 in memory on 9.30.123.230:60007 (size: 1393.9 KB, free: 937.8 MB)
+16/05/17 18:07:49 INFO Executor: Finished task 7.0 in stage 32.0 (TID 156). 1427349 bytes result sent via BlockManager)
+16/05/17 18:07:49 INFO TaskSetManager: Finished task 4.0 in stage 32.0 (TID 153) in 2575 ms on localhost (2/10)
+16/05/17 18:07:49 INFO MemoryStore: Block taskresult_152 stored as bytes in memory (estimated size 1374.0 KB, free 923.5 MB)
+16/05/17 18:07:49 INFO BlockManagerInfo: Added taskresult_152 in memory on 9.30.123.230:60007 (size: 1374.0 KB, free: 936.4 MB)
+16/05/17 18:07:49 INFO Executor: Finished task 3.0 in stage 32.0 (TID 152). 1407015 bytes result sent via BlockManager)
+16/05/17 18:07:49 INFO TaskSetManager: Finished task 0.0 in stage 32.0 (TID 149) in 2679 ms on localhost (3/10)
+16/05/17 18:07:49 INFO BlockManagerInfo: Removed taskresult_150 on 9.30.123.230:60007 in memory (size: 1366.0 KB, free: 937.8 MB)
+16/05/17 18:07:49 INFO BlockManagerInfo: Removed taskresult_151 on 9.30.123.230:60007 in memory (size: 1273.6 KB, free: 939.0 MB)
+16/05/17 18:07:49 INFO BlockManagerInfo: Removed taskresult_156 on 9.30.123.230:60007 in memory (size: 1393.9 KB, free: 940.4 MB)
+16/05/17 18:07:49 INFO BlockManagerInfo: Removed taskresult_154 on 9.30.123.230:60007 in memory (size: 1461.4 KB, free: 941.8 MB)
+16/05/17 18:07:49 INFO TaskSetManager: Finished task 1.0 in stage 32.0 (TID 150) in 2788 ms on localhost (4/10)
+16/05/17 18:07:49 INFO TaskSetManager: Finished task 5.0 in stage 32.0 (TID 154) in 2888 ms on localhost (5/10)
+16/05/17 18:07:49 INFO TaskSetManager: Finished task 7.0 in stage 32.0 (TID 156) in 2976 ms on localhost (6/10)
+16/05/17 18:07:49 INFO TaskSetManager: Finished task 2.0 in stage 32.0 (TID 151) in 3075 ms on localhost (7/10)
+16/05/17 18:07:49 INFO BlockManagerInfo: Removed taskresult_152 on 9.30.123.230:60007 in memory (size: 1374.0 KB, free: 943.2 MB)
+16/05/17 18:07:49 INFO TaskSetManager: Finished task 3.0 in stage 32.0 (TID 152) in 3217 ms on localhost (8/10)
+16/05/17 18:07:50 INFO MemoryStore: Block taskresult_157 stored as bytes in memory (estimated size 1294.9 KB, free 929.0 MB)
+16/05/17 18:07:50 INFO BlockManagerInfo: Added taskresult_157 in memory on 9.30.123.230:60007 (size: 1294.9 KB, free: 941.9 MB)
+16/05/17 18:07:50 INFO Executor: Finished task 8.0 in stage 32.0 (TID 157). 1325964 bytes result sent via BlockManager)
+16/05/17 18:07:50 INFO BlockManagerInfo: Removed taskresult_157 on 9.30.123.230:60007 in memory (size: 1294.9 KB, free: 943.2 MB)
+16/05/17 18:07:50 INFO TaskSetManager: Finished task 8.0 in stage 32.0 (TID 157) in 1998 ms on localhost (9/10)
+16/05/17 18:07:50 INFO MemoryStore: Block taskresult_158 stored as bytes in memory (estimated size 1381.4 KB, free 928.9 MB)
+16/05/17 18:07:50 INFO BlockManagerInfo: Added taskresult_158 in memory on 9.30.123.230:60007 (size: 1381.4 KB, free: 941.8 MB)
+16/05/17 18:07:50 INFO Executor: Finished task 9.0 in stage 32.0 (TID 158). 1414567 bytes result sent via BlockManager)
+16/05/17 18:07:50 INFO BlockManagerInfo: Removed taskresult_158 on 9.30.123.230:60007 in memory (size: 1381.4 KB, free: 943.2 MB)
+16/05/17 18:07:50 INFO TaskSetManager: Finished task 9.0 in stage 32.0 (TID 158) in 1838 ms on localhost (10/10)
+16/05/17 18:07:50 INFO TaskSchedulerImpl: Removed TaskSet 32.0, whose tasks have all completed, from pool
+16/05/17 18:07:50 INFO DAGScheduler: ResultStage 32 (collectAsMap at RandomForest.scala:551) finished in 4.348 s
+16/05/17 18:07:50 INFO DAGScheduler: Job 20 finished: collectAsMap at RandomForest.scala:551, took 29.695915 s
+16/05/17 18:07:50 WARN RandomForest: Tree learning is using approximately 67135632 bytes per iteration, which exceeds requested limit maxMemoryUsage=67108864. This allows splitting 2887 nodes in this iteration.
+16/05/17 18:07:50 INFO MemoryStore: Block broadcast_60 stored as values in memory (estimated size 348.0 KB, free 929.9 MB)
+16/05/17 18:07:50 INFO MemoryStore: Block broadcast_60_piece0 stored as bytes in memory (estimated size 34.0 KB, free 929.9 MB)
+16/05/17 18:07:50 INFO BlockManagerInfo: Added broadcast_60_piece0 in memory on 9.30.123.230:60007 (size: 34.0 KB, free: 943.1 MB)
+16/05/17 18:07:51 INFO SparkContext: Created broadcast 60 from broadcast at RandomForest.scala:500
+16/05/17 18:07:52 INFO SparkContext: Starting job: collectAsMap at RandomForest.scala:551
+16/05/17 18:07:52 INFO DAGScheduler: Registering RDD 174 (mapPartitions at RandomForest.scala:521)
+16/05/17 18:07:52 INFO DAGScheduler: Got job 21 (collectAsMap at RandomForest.scala:551) with 10 output partitions
+16/05/17 18:07:52 INFO DAGScheduler: Final stage: ResultStage 34 (collectAsMap at RandomForest.scala:551)
+16/05/17 18:07:52 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 33)
+16/05/17 18:07:52 INFO DAGScheduler: Missing parents: List(ShuffleMapStage 33)
+16/05/17 18:07:52 INFO DAGScheduler: Submitting ShuffleMapStage 33 (MapPartitionsRDD[174] at mapPartitions at RandomForest.scala:521), which has no missing parents
+16/05/17 18:07:54 INFO MemoryStore: Block broadcast_61 stored as values in memory (estimated size 25.2 MB, free 904.6 MB)
+16/05/17 18:07:54 INFO MemoryStore: Block broadcast_61_piece0 stored as bytes in memory (estimated size 4.0 MB, free 900.6 MB)
+16/05/17 18:07:54 INFO BlockManagerInfo: Added broadcast_61_piece0 in memory on 9.30.123.230:60007 (size: 4.0 MB, free: 939.1 MB)
+16/05/17 18:07:54 INFO MemoryStore: Block broadcast_61_piece1 stored as bytes in memory (estimated size 4.0 MB, free 896.6 MB)
+16/05/17 18:07:54 INFO BlockManagerInfo: Added broadcast_61_piece1 in memory on 9.30.123.230:60007 (size: 4.0 MB, free: 935.1 MB)
+16/05/17 18:07:54 INFO MemoryStore: Block broadcast_61_piece2 stored as bytes in memory (estimated size 1627.0 KB, free 895.1 MB)
+16/05/17 18:07:54 INFO BlockManagerInfo: Added broadcast_61_piece2 in memory on 9.30.123.230:60007 (size: 1627.0 KB, free: 933.5 MB)
+16/05/17 18:07:54 INFO SparkContext: Created broadcast 61 from broadcast at DAGScheduler.scala:1012
+16/05/17 18:07:54 INFO DAGScheduler: Submitting 10 missing tasks from ShuffleMapStage 33 (MapPartitionsRDD[174] at mapPartitions at RandomForest.scala:521)
+16/05/17 18:07:54 INFO TaskSchedulerImpl: Adding task set 33.0 with 10 tasks
+16/05/17 18:07:54 INFO TaskSetManager: Starting task 0.0 in stage 33.0 (TID 159, localhost, partition 0, PROCESS_LOCAL, 6271 bytes)
+16/05/17 18:07:54 INFO TaskSetManager: Starting task 1.0 in stage 33.0 (TID 160, localhost, partition 1, PROCESS_LOCAL, 6271 bytes)
+16/05/17 18:07:54 INFO TaskSetManager: Starting task 2.0 in stage 33.0 (TID 161, localhost, partition 2, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:54 INFO TaskSetManager: Starting task 3.0 in stage 33.0 (TID 162, localhost, partition 3, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:54 INFO TaskSetManager: Starting task 4.0 in stage 33.0 (TID 163, localhost, partition 4, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:54 INFO TaskSetManager: Starting task 5.0 in stage 33.0 (TID 164, localhost, partition 5, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:54 INFO TaskSetManager: Starting task 6.0 in stage 33.0 (TID 165, localhost, partition 6, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:54 INFO TaskSetManager: Starting task 7.0 in stage 33.0 (TID 166, localhost, partition 7, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:07:54 INFO Executor: Running task 1.0 in stage 33.0 (TID 160)
+16/05/17 18:07:54 INFO Executor: Running task 0.0 in stage 33.0 (TID 159)
+16/05/17 18:07:54 INFO Executor: Running task 2.0 in stage 33.0 (TID 161)
+16/05/17 18:07:54 INFO Executor: Running task 3.0 in stage 33.0 (TID 162)
+16/05/17 18:07:54 INFO Executor: Running task 7.0 in stage 33.0 (TID 166)
+16/05/17 18:07:54 INFO Executor: Running task 6.0 in stage 33.0 (TID 165)
+16/05/17 18:07:54 INFO Executor: Running task 4.0 in stage 33.0 (TID 163)
+16/05/17 18:07:54 INFO Executor: Running task 5.0 in stage 33.0 (TID 164)
+16/05/17 18:07:56 INFO BlockManagerInfo: Removed broadcast_59_piece0 on 9.30.123.230:60007 in memory (size: 51.0 KB, free: 933.6 MB)
+16/05/17 18:07:56 INFO BlockManagerInfo: Removed broadcast_58_piece1 on 9.30.123.230:60007 in memory (size: 707.8 KB, free: 934.3 MB)
+16/05/17 18:07:56 INFO BlockManagerInfo: Removed broadcast_58_piece0 on 9.30.123.230:60007 in memory (size: 4.0 MB, free: 938.3 MB)
+16/05/17 18:07:56 INFO ContextCleaner: Cleaned shuffle 13
+16/05/17 18:07:56 INFO BlockManagerInfo: Removed broadcast_57_piece0 on 9.30.123.230:60007 in memory (size: 23.5 KB, free: 938.3 MB)
+16/05/17 18:08:15 INFO BlockManager: Found block rdd_164_7 locally
+16/05/17 18:08:15 INFO RandomForest: xusen, numNodes in each partition is 2886
+16/05/17 18:08:40 WARN Executor: 1 block locks were not released by TID = 166:
+[rdd_164_7]
+16/05/17 18:08:40 ERROR Executor: Exception in task 7.0 in stage 33.0 (TID 166)
+java.lang.OutOfMemoryError: Java heap space
+	at org.apache.spark.ml.tree.impl.DTStatsAggregator.<init>(DTStatsAggregator.scala:77)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9$$anonfun$10.apply(RandomForest.scala:529)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9$$anonfun$10.apply(RandomForest.scala:525)
+	at scala.Array$.tabulate(Array.scala:331)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9.apply(RandomForest.scala:525)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9.apply(RandomForest.scala:521)
+	at org.apache.spark.rdd.RDD$$anonfun$mapPartitions$1$$anonfun$apply$22.apply(RDD.scala:756)
+	at org.apache.spark.rdd.RDD$$anonfun$mapPartitions$1$$anonfun$apply$22.apply(RDD.scala:756)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:38)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:318)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:282)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:79)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:47)
+	at org.apache.spark.scheduler.Task.run(Task.scala:85)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:274)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+	at java.lang.Thread.run(Thread.java:745)
+16/05/17 18:08:40 WARN NettyRpcEnv: Ignored message: HeartbeatResponse(false)
+16/05/17 18:08:40 WARN NettyRpcEndpointRef: Error sending message [message = Heartbeat(driver,[Lscala.Tuple2;@7ed7df19,BlockManagerId(driver, 9.30.123.230, 60007))] in 1 attempts
+org.apache.spark.rpc.RpcTimeoutException: Cannot receive any reply in 10 seconds. This timeout is controlled by spark.executor.heartbeatInterval
+	at org.apache.spark.rpc.RpcTimeout.org$apache$spark$rpc$RpcTimeout$$createRpcTimeoutException(RpcTimeout.scala:48)
+	at org.apache.spark.rpc.RpcTimeout$$anonfun$addMessageIfTimeout$1.applyOrElse(RpcTimeout.scala:63)
+	at org.apache.spark.rpc.RpcTimeout$$anonfun$addMessageIfTimeout$1.applyOrElse(RpcTimeout.scala:59)
+	at scala.runtime.AbstractPartialFunction.apply(AbstractPartialFunction.scala:36)
+	at scala.util.Failure$$anonfun$recover$1.apply(Try.scala:216)
+	at scala.util.Try$.apply(Try.scala:192)
+	at scala.util.Failure.recover(Try.scala:216)
+	at scala.concurrent.Future$$anonfun$recover$1.apply(Future.scala:326)
+	at scala.concurrent.Future$$anonfun$recover$1.apply(Future.scala:326)
+	at scala.concurrent.impl.CallbackRunnable.run(Promise.scala:32)
+	at com.google.common.util.concurrent.MoreExecutors$SameThreadExecutorService.execute(MoreExecutors.java:293)
+	at scala.concurrent.impl.ExecutionContextImpl$$anon$1.execute(ExecutionContextImpl.scala:136)
+	at scala.concurrent.impl.CallbackRunnable.executeWithValue(Promise.scala:40)
+	at scala.concurrent.impl.Promise$DefaultPromise.tryComplete(Promise.scala:248)
+	at scala.concurrent.Promise$class.complete(Promise.scala:55)
+	at scala.concurrent.impl.Promise$DefaultPromise.complete(Promise.scala:153)
+	at scala.concurrent.Future$$anonfun$map$1.apply(Future.scala:237)
+	at scala.concurrent.Future$$anonfun$map$1.apply(Future.scala:237)
+	at scala.concurrent.impl.CallbackRunnable.run(Promise.scala:32)
+	at scala.concurrent.BatchingExecutor$Batch$$anonfun$run$1.processBatch$1(BatchingExecutor.scala:63)
+	at scala.concurrent.BatchingExecutor$Batch$$anonfun$run$1.apply$mcV$sp(BatchingExecutor.scala:78)
+	at scala.concurrent.BatchingExecutor$Batch$$anonfun$run$1.apply(BatchingExecutor.scala:55)
+	at scala.concurrent.BatchingExecutor$Batch$$anonfun$run$1.apply(BatchingExecutor.scala:55)
+	at scala.concurrent.BlockContext$.withBlockContext(BlockContext.scala:72)
+	at scala.concurrent.BatchingExecutor$Batch.run(BatchingExecutor.scala:54)
+	at scala.concurrent.Future$InternalCallbackExecutor$.unbatchedExecute(Future.scala:601)
+	at scala.concurrent.BatchingExecutor$class.execute(BatchingExecutor.scala:106)
+	at scala.concurrent.Future$InternalCallbackExecutor$.execute(Future.scala:599)
+	at scala.concurrent.impl.CallbackRunnable.executeWithValue(Promise.scala:40)
+	at scala.concurrent.impl.Promise$DefaultPromise.tryComplete(Promise.scala:248)
+	at scala.concurrent.Promise$class.tryFailure(Promise.scala:112)
+	at scala.concurrent.impl.Promise$DefaultPromise.tryFailure(Promise.scala:153)
+	at org.apache.spark.rpc.netty.NettyRpcEnv.org$apache$spark$rpc$netty$NettyRpcEnv$$onFailure$1(NettyRpcEnv.scala:205)
+	at org.apache.spark.rpc.netty.NettyRpcEnv$$anon$1.run(NettyRpcEnv.scala:239)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:471)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:262)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.access$201(ScheduledThreadPoolExecutor.java:178)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:292)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+	at java.lang.Thread.run(Thread.java:745)
+Caused by: java.util.concurrent.TimeoutException: Cannot receive any reply in 10 seconds
+	... 8 more
+16/05/17 18:08:40 INFO BlockManager: Found block rdd_164_5 locally
+16/05/17 18:08:40 INFO RandomForest: xusen, numNodes in each partition is 2886
+16/05/17 18:08:42 ERROR SparkUncaughtExceptionHandler: Uncaught exception in thread Thread[Executor task launch worker-5,5,run-main-group-0]
+java.lang.OutOfMemoryError: Java heap space
+	at org.apache.spark.ml.tree.impl.DTStatsAggregator.<init>(DTStatsAggregator.scala:77)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9$$anonfun$10.apply(RandomForest.scala:529)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9$$anonfun$10.apply(RandomForest.scala:525)
+	at scala.Array$.tabulate(Array.scala:331)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9.apply(RandomForest.scala:525)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9.apply(RandomForest.scala:521)
+	at org.apache.spark.rdd.RDD$$anonfun$mapPartitions$1$$anonfun$apply$22.apply(RDD.scala:756)
+	at org.apache.spark.rdd.RDD$$anonfun$mapPartitions$1$$anonfun$apply$22.apply(RDD.scala:756)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:38)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:318)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:282)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:79)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:47)
+	at org.apache.spark.scheduler.Task.run(Task.scala:85)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:274)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+	at java.lang.Thread.run(Thread.java:745)
+16/05/17 18:08:42 INFO TaskSetManager: Starting task 8.0 in stage 33.0 (TID 167, localhost, partition 8, PROCESS_LOCAL, 5790 bytes)
+16/05/17 18:08:42 INFO Executor: Running task 8.0 in stage 33.0 (TID 167)
+16/05/17 18:08:42 WARN TaskSetManager: Lost task 7.0 in stage 33.0 (TID 166, localhost): java.lang.OutOfMemoryError: Java heap space
+	at org.apache.spark.ml.tree.impl.DTStatsAggregator.<init>(DTStatsAggregator.scala:77)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9$$anonfun$10.apply(RandomForest.scala:529)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9$$anonfun$10.apply(RandomForest.scala:525)
+	at scala.Array$.tabulate(Array.scala:331)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9.apply(RandomForest.scala:525)
+	at org.apache.spark.ml.tree.impl.RandomForest$$anonfun$9.apply(RandomForest.scala:521)
+	at org.apache.spark.rdd.RDD$$anonfun$mapPartitions$1$$anonfun$apply$22.apply(RDD.scala:756)
+	at org.apache.spark.rdd.RDD$$anonfun$mapPartitions$1$$anonfun$apply$22.apply(RDD.scala:756)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:38)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:318)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:282)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:79)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:47)
+	at org.apache.spark.scheduler.Task.run(Task.scala:85)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:274)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+	at java.lang.Thread.run(Thread.java:745)
+
+16/05/17 18:08:45 INFO ContextCleaner: Cleaned accumulator 2200
+16/05/17 18:08:45 INFO BlockManager: Found block rdd_164_6 locally
+16/05/17 18:08:45 ERROR Executor: Exception in task 5.0 in stage 33.0 (TID 164)
+java.nio.channels.ClosedByInterruptException
+	at java.nio.channels.spi.AbstractInterruptibleChannel.end(AbstractInterruptibleChannel.java:202)
+	at sun.nio.ch.FileChannelImpl.position(FileChannelImpl.java:266)
+	at org.apache.spark.storage.DiskBlockObjectWriter.updateBytesWritten(DiskBlockObjectWriter.scala:229)
+	at org.apache.spark.storage.DiskBlockObjectWriter.recordWritten(DiskBlockObjectWriter.scala:208)
+	at org.apache.spark.storage.DiskBlockObjectWriter.write(DiskBlockObjectWriter.scala:186)
+	at org.apache.spark.util.collection.WritablePartitionedPairCollection$$anon$1.writeNext(WritablePartitionedPairCollection.scala:56)
+	at org.apache.spark.util.collection.ExternalSorter.writePartitionedFile(ExternalSorter.scala:710)
+	at org.apache.spark.shuffle.sort.SortShuffleWriter.write(SortShuffleWriter.scala:71)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:79)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:47)
+	at org.apache.spark.scheduler.Task.run(Task.scala:85)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:274)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+	at java.lang.Thread.run(Thread.java:745)
+16/05/17 18:08:45 INFO RandomForest: xusen, numNodes in each partition is 2886
+16/05/17 18:08:45 ERROR TaskSetManager: Task 7 in stage 33.0 failed 1 times; aborting job
+16/05/17 18:08:45 INFO BlockManager: Found block rdd_164_1 locally
+16/05/17 18:08:45 INFO RandomForest: xusen, numNodes in each partition is 2886
+16/05/17 18:08:47 ERROR ContextCleaner: Error in cleaning thread
+java.lang.InterruptedException
+	at java.lang.Object.wait(Native Method)
+	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:135)
+	at org.apache.spark.ContextCleaner$$anonfun$org$apache$spark$ContextCleaner$$keepCleaning$1.apply$mcV$sp(ContextCleaner.scala:175)
+	at org.apache.spark.util.Utils$.tryOrStopSparkContext(Utils.scala:1181)
+	at org.apache.spark.ContextCleaner.org$apache$spark$ContextCleaner$$keepCleaning(ContextCleaner.scala:172)
+	at org.apache.spark.ContextCleaner$$anon$1.run(ContextCleaner.scala:67)
+16/05/17 18:08:47 INFO BlockManager: Found block rdd_164_0 locally
+16/05/17 18:08:47 INFO RandomForest: xusen, numNodes in each partition is 2886
+16/05/17 18:08:47 INFO BlockManager: Found block rdd_164_3 locally
+16/05/17 18:08:47 INFO RandomForest: xusen, numNodes in each partition is 2886
+16/05/17 18:08:47 ERROR Utils: Uncaught exception in thread driver-heartbeater
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireSharedNanos(AbstractQueuedSynchronizer.java:1038)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer.tryAcquireSharedNanos(AbstractQueuedSynchronizer.java:1326)
+	at scala.concurrent.impl.Promise$DefaultPromise.tryAwait(Promise.scala:208)
+	at scala.concurrent.impl.Promise$DefaultPromise.ready(Promise.scala:218)
+	at scala.concurrent.impl.Promise$DefaultPromise.result(Promise.scala:223)
+	at scala.concurrent.Await$$anonfun$result$1.apply(package.scala:190)
+	at scala.concurrent.BlockContext$DefaultBlockContext$.blockOn(BlockContext.scala:53)
+	at scala.concurrent.Await$.result(package.scala:190)
+	at org.apache.spark.rpc.RpcTimeout.awaitResult(RpcTimeout.scala:81)
+	at org.apache.spark.rpc.RpcEndpointRef.askWithRetry(RpcEndpointRef.scala:102)
+	at org.apache.spark.executor.Executor.org$apache$spark$executor$Executor$$reportHeartBeat(Executor.scala:518)
+	at org.apache.spark.executor.Executor$$anon$1$$anonfun$run$1.apply$mcV$sp(Executor.scala:547)
+	at org.apache.spark.executor.Executor$$anon$1$$anonfun$run$1.apply(Executor.scala:547)
+	at org.apache.spark.executor.Executor$$anon$1$$anonfun$run$1.apply(Executor.scala:547)
+	at org.apache.spark.util.Utils$.logUncaughtExceptions(Utils.scala:1793)
+	at org.apache.spark.executor.Executor$$anon$1.run(Executor.scala:547)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:471)
+	at java.util.concurrent.FutureTask.runAndReset(FutureTask.java:304)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.access$301(ScheduledThreadPoolExecutor.java:178)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:293)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+	at java.lang.Thread.run(Thread.java:745)
+16/05/17 18:08:47 ERROR Utils: uncaught error in thread SparkListenerBus, stopping SparkContext
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireSharedInterruptibly(AbstractQueuedSynchronizer.java:996)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireSharedInterruptibly(AbstractQueuedSynchronizer.java:1303)
+	at java.util.concurrent.Semaphore.acquire(Semaphore.java:317)
+	at org.apache.spark.scheduler.LiveListenerBus$$anon$1$$anonfun$run$1$$anonfun$apply$mcV$sp$1.apply$mcV$sp(LiveListenerBus.scala:67)
+	at org.apache.spark.scheduler.LiveListenerBus$$anon$1$$anonfun$run$1$$anonfun$apply$mcV$sp$1.apply(LiveListenerBus.scala:66)
+	at org.apache.spark.scheduler.LiveListenerBus$$anon$1$$anonfun$run$1$$anonfun$apply$mcV$sp$1.apply(LiveListenerBus.scala:66)
+	at scala.util.DynamicVariable.withValue(DynamicVariable.scala:58)
+	at org.apache.spark.scheduler.LiveListenerBus$$anon$1$$anonfun$run$1.apply$mcV$sp(LiveListenerBus.scala:65)
+	at org.apache.spark.util.Utils$.tryOrStopSparkContext(Utils.scala:1181)
+	at org.apache.spark.scheduler.LiveListenerBus$$anon$1.run(LiveListenerBus.scala:64)
+16/05/17 18:08:49 WARN TaskSetManager: Lost task 5.0 in stage 33.0 (TID 164, localhost): java.nio.channels.ClosedByInterruptException
+	at java.nio.channels.spi.AbstractInterruptibleChannel.end(AbstractInterruptibleChannel.java:202)
+	at sun.nio.ch.FileChannelImpl.position(FileChannelImpl.java:266)
+	at org.apache.spark.storage.DiskBlockObjectWriter.updateBytesWritten(DiskBlockObjectWriter.scala:229)
+	at org.apache.spark.storage.DiskBlockObjectWriter.recordWritten(DiskBlockObjectWriter.scala:208)
+	at org.apache.spark.storage.DiskBlockObjectWriter.write(DiskBlockObjectWriter.scala:186)
+	at org.apache.spark.util.collection.WritablePartitionedPairCollection$$anon$1.writeNext(WritablePartitionedPairCollection.scala:56)
+	at org.apache.spark.util.collection.ExternalSorter.writePartitionedFile(ExternalSorter.scala:710)
+	at org.apache.spark.shuffle.sort.SortShuffleWriter.write(SortShuffleWriter.scala:71)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:79)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:47)
+	at org.apache.spark.scheduler.Task.run(Task.scala:85)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:274)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+	at java.lang.Thread.run(Thread.java:745)
+
+16/05/17 18:08:49 ERROR ContextCleaner: Error in cleaning thread
+java.lang.InterruptedException
+	at java.lang.Object.wait(Native Method)
+	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:135)
+	at org.apache.spark.ContextCleaner$$anonfun$org$apache$spark$ContextCleaner$$keepCleaning$1.apply$mcV$sp(ContextCleaner.scala:175)
+	at org.apache.spark.util.Utils$.tryOrStopSparkContext(Utils.scala:1181)
+	at org.apache.spark.ContextCleaner.org$apache$spark$ContextCleaner$$keepCleaning(ContextCleaner.scala:172)
+	at org.apache.spark.ContextCleaner$$anon$1.run(ContextCleaner.scala:67)
