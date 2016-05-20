@@ -15,8 +15,10 @@
  * limitations under the License.
  */
 
-// scalastyle:off println
+// scalastyle:off
 package org.apache.spark.examples.ml
+
+import scala.collection.mutable
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.ml.classification.{DecisionTreeClassifier, RandomForestClassificationModel, RandomForestClassifier}
@@ -27,11 +29,90 @@ import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.regression.LabeledPoint
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.types.DoubleType
+
+class DataIngestion (val data: DataFrame) {
+
+  val splitCol = "isTrain"
+  val labelCol = "dep_delayed_15min"
+  val featureCols = data.columns.filterNot(Set(splitCol, labelCol).contains)
+
+  /**
+    * Cast String columns to Double columns to prevent recognizing continuous features as
+    * categorical ones.
+    *
+    * @param col Column name
+    * @param cols Column names
+    * @return DataFrame with the same column names
+    */
+  def _castStringToDouble(col: String, cols: String*): DataFrame = {
+    (Seq(col) ++ cols).foldLeft(data) { case (df, c) =>
+      df.withColumn(c, df(c).cast(DoubleType))
+    }
+  }
+
+  /**
+    * Check the schema is right with all those columns.
+    */
+  def _checkSchema(): Unit = {
+    assert(Array(splitCol, labelCol).map(data.columns.contains).reduce(_ && _),
+      s"Your data does not contain $splitCol and $labelCol.")
+  }
+
+  /**
+    * Provide the training and test set with all columns set.
+    */
+  def withStringIndexer: (DataFrame, DataFrame) = {
+    _checkSchema()
+    val df = _castStringToDouble("DepTime", "Distance")
+
+    val si = new StringIndexer()
+    val cols = df.columns.filterNot(Set(splitCol, "DepTime", "Distance").contains)
+
+    val finalDF = cols.foldLeft(df) { case (aggregate, col) =>
+      si.setInputCol(col).setOutputCol(s"si_$col").fit(aggregate).transform(aggregate)
+    }
+
+    val newFeatureCols =
+      featureCols.map(s => if(Set("DepTime", "Distance").contains(s)) s else s"si_$s")
+    val newLabelCol = s"si_$labelCol"
+
+    val allData = new VectorAssembler()
+      .setInputCols(newFeatureCols).setOutputCol("features").transform(finalDF)
+      .select("features", newLabelCol, splitCol)
+      .withColumn("label", col(newLabelCol)).drop(col(newLabelCol))
+
+    (allData.where(col(splitCol)), allData.where(!col(splitCol)))
+  }
+
+  /**
+    * Provide the training and test set with all columns set.
+    */
+  def withRFormula: (DataFrame, DataFrame) = {
+    val allData = new RFormula().setFormula(s"$labelCol ~ . - $splitCol").fit(data).transform(data)
+    (allData.where(col(splitCol)), allData.where(!col(splitCol)))
+  }
+}
+
+object DataIngestion {
+  def apply(sqlCtx: SQLContext, trainPath: String, testPath: String): DataIngestion = {
+    // Read CSV as Spark DataFrames
+    val loader = sqlCtx.read.format("com.databricks.spark.csv").option("header", "true")
+    val trainDF = loader.load(trainPath)
+    val testDF = loader.load(testPath)
+
+    // Combine train, test temporarily
+    val fullDF = trainDF.withColumn("isTrain", lit(true))
+      .union(testDF.withColumn("isTrain", lit(false)))
+
+    new DataIngestion(fullDF)
+  }
+}
 
 object AirlineDataToNumeric {
+
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
       .setAppName("RFCAirline").setMaster("local[8]")
@@ -48,56 +129,28 @@ object AirlineDataToNumeric {
     val newTrainPath = s"$path/data/airline/spark1hot-train-${amount}m.parquet"
     val newTestPath = s"$path/data/airline/spark1hot-test-${amount}m.parquet"
 
-    // Read CSV as Spark DataFrames
-    val loader = sqlContext.read.format("com.databricks.spark.csv").option("header", "true")
-    val trainDF = loader.load(origTrainPath)
-    val testDF = loader.load(origTestPath)
+    val (trainDF, testDF) =
+      DataIngestion(sqlContext, origTrainPath, origTestPath).withStringIndexer
 
-    // Combine train, test temporarily
-    val fullDF = trainDF.withColumn("isTrain", lit(true))
-      .union(testDF.withColumn("isTrain", lit(false)))
+    val train = trainDF.coalesce(16).cache()
+    val test = testDF.cache()
 
-    val si = new StringIndexer()
-    val cols = fullDF.columns.filterNot(_ == "isTrain")
-    var finalDF = fullDF
-    val newCols = cols.map { colName =>
-      val newColName = colName + "_numeric"
-      finalDF = si.setInputCol(colName).setOutputCol(newColName).fit(finalDF).transform(finalDF)
-      newColName
-    }
-
-
-    val newData = finalDF.select("isTrain", newCols: _*)
-
-    val va = new VectorAssembler()
-      .setInputCols(newCols.filterNot(_ == "dep_delayed_15min_numeric")).setOutputCol("features")
-
-    val res = va.transform(newData).select("features", "dep_delayed_15min_numeric")
-      .withColumn("label", col("dep_delayed_15min_numeric")).drop(col("dep_delayed_15min_numeric"))
-
-    // Split back into train, test
-    val finalTrainDF = res.where(col("isTrain")).coalesce(16)
-    val finalTestDF = res.where(!col("isTrain"))
-
-
-    val train = finalTrainDF.cache()
-    val test = finalTestDF.cache()
     println(s"xusen, Partitions of train set is ${train.rdd.partitions.size}")
-
     train.show()
 
     val rfc = new RandomForestClassifier()
     val metrics = new BinaryClassificationEvaluator().setMetricName("areaUnderROC")
 
     val grid = new ParamGridBuilder()
-      .addGrid(rfc.maxBins, Array(2000))
-      .addGrid(rfc.maxDepth, Array(5))
+      .addGrid(rfc.maxBins, Array(400))
+      .addGrid(rfc.maxDepth, Array(10))
       .addGrid(rfc.impurity, Array("gini"))
       // .addGrid(rfc.featureSubsetStrategy, Array("all"))
       // .addGrid(rfc.numTrees, Array(50, 100, 250, 500))
-      .baseOn(ParamPair(rfc.numTrees, 500))
-      .baseOn(ParamPair(rfc.maxMemoryInMB, 32))
-      .addGrid(rfc.subsamplingRate, Array(1.0))
+      .baseOn(ParamPair(rfc.numTrees, 1))
+      // .baseOn(ParamPair(rfc.maxMemoryInMB, 32))
+      .baseOn(ParamPair(rfc.cacheNodeIds, true))
+      // .addGrid(rfc.subsamplingRate, Array(0.68))
       .build()
 
     val cv = new CrossValidator()
@@ -128,4 +181,4 @@ object AirlineDataToNumeric {
     sc.stop()
   }
 }
-// scalastyle:on println
+// scalastyle:on

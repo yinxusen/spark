@@ -101,6 +101,7 @@ class RandomForestClassifier @Since("1.4.0") (
   override protected def train(dataset: Dataset[_]): RandomForestClassificationModel = {
     val categoricalFeatures: Map[Int, Int] =
       MetadataUtils.getCategoricalFeatures(dataset.schema($(featuresCol)))
+    logInfo(s"xusen, categorical features are ${categoricalFeatures}")
     val numClasses: Int = getNumClasses(dataset)
     val oldDataset: RDD[LabeledPoint] = extractLabeledPoints(dataset, numClasses)
     val strategy =

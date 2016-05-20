@@ -91,6 +91,9 @@ class VectorAssembler(override val uid: String)
     }
     val metadata = new AttributeGroup($(outputCol), attrs).toMetadata()
 
+    logInfo(s"xusen, column names are ${attrs.map(_.name.getOrElse("UNKNOWN")).mkString(",")}")
+    logInfo(s"xusen, column attribtue types are ${attrs.map(_.attrType.name).mkString(",")}")
+
     // Data transformation.
     val assembleFunc = udf { r: Row =>
       VectorAssembler.assemble(r.toSeq: _*)
