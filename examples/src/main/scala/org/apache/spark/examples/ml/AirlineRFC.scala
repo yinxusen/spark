@@ -18,64 +18,242 @@
 // scalastyle:off
 package org.apache.spark.examples.ml
 
-import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.ml.classification.RandomForestClassifier
+import scopt.OptionParser
+
+import org.apache.spark.examples.mllib.AbstractParams
+import org.apache.spark.ml.classification.{RandomForestClassificationModel, RandomForestClassifier}
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
-import org.apache.spark.ml.feature.RFormula
+import org.apache.spark.ml.feature.{RFormula, StringIndexer, VectorAssembler}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
-import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.types.DoubleType
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
-object AirlineRFC {
-  def main(args: Array[String]): Unit = {
-    val conf = new SparkConf().setAppName("RFCAirline").setMaster("local[8]")
-    val sc = new SparkContext(conf)
-    sc.setLogLevel("INFO")
-    val sqlContext = new SQLContext(sc)
+/**
+ * An example runner for Random Forest with Airline Dataset. Run with
+ * {{{
+ * ./bin/run-example ml.AirlineRFC [options]
+ * }}}
+ * Decision Trees and ensembles can take a large amount of memory. If the run-example command
+ * above fails, try running via spark-submit and specifying the amount of memory as at least 1g.
+ * For local mode, run
+ * {{{
+ * ./bin/spark-submit --class org.apache.spark.examples.ml.AirlineRFC --driver-memory 1g
+ *   [examples JAR path] [options]
+ * }}}
+ * If you use it as a template to create your own app, please use `spark-submit` to submit your app.
+ */
 
-    // Paths
-    val path = if (args.length > 0) args(0) else "/Users/panda"
-    val amount = if (args.length > 1) args(1) else "0.1"
-    val origTrainPath = s"$path/data/airline/train-${amount}m.csv"
-    val origTestPath = s"$path/data/airline/test.csv"
-    val newTrainPath = s"$path/data/airline/spark1hot-train-${amount}m.parquet"
-    val newTestPath = s"$path/data/airline/spark1hot-test-${amount}m.parquet"
+class DataIngestion (val data: DataFrame) {
 
+  val splitCol = "isTrain"
+  val labelCol = "dep_delayed_15min"
+  val featureCols = data.columns.filterNot(Set(splitCol, labelCol).contains)
+
+  /**
+    * Cast String columns to Double columns to prevent recognizing continuous features as
+    * categorical ones.
+    *
+    * @param col Column name
+    * @param cols Column names
+    * @return DataFrame with the same column names
+    */
+  def _castStringToDouble(col: String, cols: String*): DataFrame = {
+    (Seq(col) ++ cols).foldLeft(data) { case (df, c) =>
+      df.withColumn(c, df(c).cast(DoubleType))
+    }
+  }
+
+  /**
+    * Check the schema is right with all those columns.
+    */
+  def _checkSchema(): Unit = {
+    assert(Array(splitCol, labelCol).map(data.columns.contains).reduce(_ && _),
+      s"Your data does not contain $splitCol and $labelCol.")
+  }
+
+  /**
+    * Provide the training and test set with all columns set.
+    */
+  def withStringIndexer: (DataFrame, DataFrame) = {
+    _checkSchema()
+    val df = _castStringToDouble("DepTime", "Distance")
+
+    val si = new StringIndexer()
+    val cols = df.columns.filterNot(Set(splitCol, "DepTime", "Distance").contains)
+
+    val finalDF = cols.foldLeft(df) { case (aggregate, col) =>
+      si.setInputCol(col).setOutputCol(s"si_$col").fit(aggregate).transform(aggregate)
+    }
+
+    val newFeatureCols =
+      featureCols.map(s => if(Set("DepTime", "Distance").contains(s)) s else s"si_$s")
+    val newLabelCol = s"si_$labelCol"
+
+    val allData = new VectorAssembler()
+      .setInputCols(newFeatureCols).setOutputCol("features").transform(finalDF)
+      .select("features", newLabelCol, splitCol)
+      .withColumn("label", col(newLabelCol)).drop(col(newLabelCol))
+
+    (allData.where(col(splitCol)), allData.where(!col(splitCol)))
+  }
+
+  /**
+    * Provide the training and test set with all columns set.
+    */
+  def withRFormula: (DataFrame, DataFrame) = {
+    val allData = new RFormula().setFormula(s"$labelCol ~ . - $splitCol").fit(data).transform(data)
+    (allData.where(col(splitCol)), allData.where(!col(splitCol)))
+  }
+}
+
+object DataIngestion {
+  def apply(session: SparkSession, trainPath: String, testPath: String): DataIngestion = {
     // Read CSV as Spark DataFrames
-    val loader = sqlContext.read.format("com.databricks.spark.csv").option("header", "true")
-    val trainDF = loader.load(origTrainPath)
-    val testDF = loader.load(origTestPath)
+    val loader = session.read.format("com.databricks.spark.csv").option("header", "true")
+    val trainDF = loader.load(trainPath)
+    val testDF = loader.load(testPath)
 
     // Combine train, test temporarily
     val fullDF = trainDF.withColumn("isTrain", lit(true))
       .union(testDF.withColumn("isTrain", lit(false)))
 
-    // Use RFormula to generate training data.
-    val res = new RFormula().setFormula("dep_delayed_15min ~ .").fit(fullDF).transform(fullDF)
+    new DataIngestion(fullDF)
+  }
+}
 
-    // Split back into train, test
-    val finalTrainDF = res.where(col("isTrain"))
-    val finalTestDF = res.where(!col("isTrain"))
+object AirlineRFC {
 
-    // Save Spark DataFrames as Parquet
-    finalTrainDF.write.mode("overwrite").parquet(newTrainPath)
-    finalTestDF.write.mode("overwrite").parquet(newTestPath)
+  case class Params(
+      input: String = null,
+      testInput: String = "",
+      dataFormat: String = "libsvm",
+      algo: String = "classification",
+      maxDepth: Int = 5,
+      maxBins: Int = 32,
+      minInstancesPerNode: Int = 1,
+      minInfoGain: Double = 0.0,
+      numTrees: Int = 10,
+      featureSubsetStrategy: String = "auto",
+      fracTest: Double = 0.2,
+      cacheNodeIds: Boolean = false,
+      checkpointDir: Option[String] = None,
+      checkpointInterval: Int = 10) extends AbstractParams[Params]
 
+  def main(args: Array[String]): Unit = {
+    val defaultParams = Params()
 
-    val train = finalTrainDF.cache()
-    val test = finalTestDF.cache()
+    val parser = new OptionParser[Params]("RandomForestExample") {
+      head("RandomForestExample: an example random forest app.")
+      opt[String]("algo")
+        .text(s"algorithm (classification, regression), default: ${defaultParams.algo}")
+        .action((x, c) => c.copy(algo = x))
+      opt[Int]("maxDepth")
+        .text(s"max depth of the tree, default: ${defaultParams.maxDepth}")
+        .action((x, c) => c.copy(maxDepth = x))
+      opt[Int]("maxBins")
+        .text(s"max number of bins, default: ${defaultParams.maxBins}")
+        .action((x, c) => c.copy(maxBins = x))
+      opt[Int]("minInstancesPerNode")
+        .text(s"min number of instances required at child nodes to create the parent split," +
+        s" default: ${defaultParams.minInstancesPerNode}")
+        .action((x, c) => c.copy(minInstancesPerNode = x))
+      opt[Double]("minInfoGain")
+        .text(s"min info gain required to create a split, default: ${defaultParams.minInfoGain}")
+        .action((x, c) => c.copy(minInfoGain = x))
+      opt[Int]("numTrees")
+        .text(s"number of trees in ensemble, default: ${defaultParams.numTrees}")
+        .action((x, c) => c.copy(numTrees = x))
+      opt[String]("featureSubsetStrategy")
+        .text(s"number of features to use per node (supported:" +
+        s" ${RandomForestClassifier.supportedFeatureSubsetStrategies.mkString(",")})," +
+        s" default: ${defaultParams.numTrees}")
+        .action((x, c) => c.copy(featureSubsetStrategy = x))
+      opt[Double]("fracTest")
+        .text(s"fraction of data to hold out for testing. If given option testInput, " +
+        s"this option is ignored. default: ${defaultParams.fracTest}")
+        .action((x, c) => c.copy(fracTest = x))
+      opt[Boolean]("cacheNodeIds")
+        .text(s"whether to use node Id cache during training, " +
+        s"default: ${defaultParams.cacheNodeIds}")
+        .action((x, c) => c.copy(cacheNodeIds = x))
+      opt[String]("checkpointDir")
+        .text(s"checkpoint directory where intermediate node Id caches will be stored, " +
+        s"default: ${
+          defaultParams.checkpointDir match {
+            case Some(strVal) => strVal
+            case None => "None"
+          }
+        }")
+        .action((x, c) => c.copy(checkpointDir = Some(x)))
+      opt[Int]("checkpointInterval")
+        .text(s"how often to checkpoint the node Id cache, " +
+        s"default: ${defaultParams.checkpointInterval}")
+        .action((x, c) => c.copy(checkpointInterval = x))
+      opt[String]("testInput")
+        .text(s"input path to test dataset. If given, option fracTest is ignored." +
+        s" default: ${defaultParams.testInput}")
+        .action((x, c) => c.copy(testInput = x))
+      opt[String]("dataFormat")
+        .text("data format: libsvm (default), dense (deprecated in Spark v1.1)")
+        .action((x, c) => c.copy(dataFormat = x))
+      arg[String]("<input>")
+        .text("input path to labeled examples")
+        .required()
+        .action((x, c) => c.copy(input = x))
+      checkConfig { params =>
+        if (params.fracTest < 0 || params.fracTest >= 1) {
+          failure(s"fracTest ${params.fracTest} value incorrect; should be in [0,1).")
+        } else {
+          success
+        }
+      }
+    }
+
+    parser.parse(args, defaultParams).map { params =>
+      run(params)
+    }.getOrElse {
+      sys.exit(1)
+    }
+  }
+
+  def run(params: Params): Unit = {
+    val spark = SparkSession
+      .builder()
+      .appName(s"RandomForestExample of Airline with $params")
+      .getOrCreate()
+
+    spark.sparkContext.setLogLevel("INFO")
+    params.checkpointDir.foreach(spark.sparkContext.setCheckpointDir)
+    val algo = params.algo.toLowerCase
+
+    println(s"RandomForestExample with parameters:\n$params")
+
+    val (trainDF, testDF) =
+      DataIngestion(spark, params.input, params.testInput).withStringIndexer
+
+    val train = trainDF.coalesce(16).cache()
+    val test = testDF.cache()
+
+    println(s"xusen, Partitions of train set is ${train.rdd.partitions.size}")
     train.show()
 
     val rfc = new RandomForestClassifier()
     val metrics = new BinaryClassificationEvaluator().setMetricName("areaUnderROC")
 
     val grid = new ParamGridBuilder()
-      .addGrid(rfc.maxBins, Array(50))
-      .addGrid(rfc.maxDepth, Array(20))
-      .addGrid(rfc.impurity, Array("entropy"))
-      .baseOn(ParamPair(rfc.numTrees, 500))
-      .addGrid(rfc.subsamplingRate, Array(1.0))
+      .addGrid(rfc.maxBins, Array(400))
+      .addGrid(rfc.maxDepth, Array(10))
+      .addGrid(rfc.impurity, Array("gini"))
+      .addGrid(rfc.featureSubsetStrategy, Array("all"))
+      .addGrid(rfc.minInstancesPerNode, Array(1))
+      .addGrid(rfc.numTrees, Array(50, 100, 250, 500))
+      .baseOn(ParamPair(rfc.numTrees, 1))
+      .baseOn(ParamPair(rfc.maxMemoryInMB, 32))
+      .baseOn(ParamPair(rfc.cacheNodeIds, true))
+      .baseOn(ParamPair(rfc.checkpointInterval, 10))
+      .addGrid(rfc.subsamplingRate, Array(0.68))
       .build()
 
     val cv = new CrossValidator()
@@ -85,6 +263,16 @@ object AirlineRFC {
 
     val model = cv.fit(train)
 
+    val importance =
+      model.bestModel.asInstanceOf[RandomForestClassificationModel].featureImportances
+
+    val trees = model.bestModel.asInstanceOf[RandomForestClassificationModel].trees
+    val weights = model.bestModel.asInstanceOf[RandomForestClassificationModel].treeWeights
+
+    println(s"xusen, importance is $importance")
+    println(s"xusen, trees are\n${trees.map(_.toDebugString).mkString("\n")}")
+    println(s"xusen, tree weights are ${weights}")
+
     val elapsed = (System.nanoTime - begin) / 1e9
     println(s"Elapsed time for training is $elapsed")
 
@@ -93,7 +281,7 @@ object AirlineRFC {
     val testElapsed = (System.nanoTime - testBegin) / 1e9
     println(s"Elapsed time for testing is $testElapsed")
 
-    sc.stop()
+    spark.stop()
   }
 }
 // scalastyle:on
