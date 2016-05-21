@@ -127,16 +127,16 @@ object AirlineRFC {
 
   case class Params(
       input: String = null,
-      testInput: String = "",
-      dataFormat: String = "libsvm",
+      testInput: String = null,
       algo: String = "classification",
-      maxDepth: Int = 5,
-      maxBins: Int = 32,
-      minInstancesPerNode: Int = 1,
-      minInfoGain: Double = 0.0,
-      numTrees: Int = 10,
-      featureSubsetStrategy: String = "auto",
-      fracTest: Double = 0.2,
+      impurity: Seq[String] = Seq("gini"),
+      maxDepth: Seq[Int] = Seq(5),
+      maxBins: Seq[Int] = Seq(400),
+      minInstancesPerNode: Seq[Int] = Seq(1),
+      numTrees: Seq[Int] = Seq(10),
+      featureSubsetStrategy: Seq[String] = Seq("auto"),
+      subsamplingRate: Seq[Double] = Seq(1.0),
+      maxMemoryInMB: Int = 32,
       cacheNodeIds: Boolean = false,
       checkpointDir: Option[String] = None,
       checkpointInterval: Int = 10) extends AbstractParams[Params]
@@ -149,35 +149,39 @@ object AirlineRFC {
       opt[String]("algo")
         .text(s"algorithm (classification, regression), default: ${defaultParams.algo}")
         .action((x, c) => c.copy(algo = x))
-      opt[Int]("maxDepth")
+      opt[Seq[String]]("impurity")
+        .text(s"Impurity (gini, entropy, variance(only for regression))," +
+          s" default ${defaultParams.impurity}")
+        .action((x, c) => c.copy(impurity = x))
+      opt[Seq[Double]]("subsamplingRate")
+        .text(s"Subsampling rate, default ${defaultParams.subsamplingRate}")
+        .action((x, c) => c.copy(subsamplingRate = x))
+      opt[Seq[Int]]("maxDepth")
         .text(s"max depth of the tree, default: ${defaultParams.maxDepth}")
         .action((x, c) => c.copy(maxDepth = x))
-      opt[Int]("maxBins")
+      opt[Seq[Int]]("maxBins")
         .text(s"max number of bins, default: ${defaultParams.maxBins}")
         .action((x, c) => c.copy(maxBins = x))
-      opt[Int]("minInstancesPerNode")
+      opt[Seq[Int]]("minInstancesPerNode")
         .text(s"min number of instances required at child nodes to create the parent split," +
         s" default: ${defaultParams.minInstancesPerNode}")
         .action((x, c) => c.copy(minInstancesPerNode = x))
-      opt[Double]("minInfoGain")
-        .text(s"min info gain required to create a split, default: ${defaultParams.minInfoGain}")
-        .action((x, c) => c.copy(minInfoGain = x))
-      opt[Int]("numTrees")
+      opt[Seq[Int]]("numTrees")
         .text(s"number of trees in ensemble, default: ${defaultParams.numTrees}")
         .action((x, c) => c.copy(numTrees = x))
-      opt[String]("featureSubsetStrategy")
+      opt[Seq[String]]("featureSubsetStrategy")
         .text(s"number of features to use per node (supported:" +
         s" ${RandomForestClassifier.supportedFeatureSubsetStrategies.mkString(",")})," +
         s" default: ${defaultParams.numTrees}")
         .action((x, c) => c.copy(featureSubsetStrategy = x))
-      opt[Double]("fracTest")
-        .text(s"fraction of data to hold out for testing. If given option testInput, " +
-        s"this option is ignored. default: ${defaultParams.fracTest}")
-        .action((x, c) => c.copy(fracTest = x))
       opt[Boolean]("cacheNodeIds")
         .text(s"whether to use node Id cache during training, " +
         s"default: ${defaultParams.cacheNodeIds}")
         .action((x, c) => c.copy(cacheNodeIds = x))
+      opt[Int]("maxMemoryInMB")
+        .text(s"maximum memory to collect histogram in a task, default" +
+          s" ${defaultParams.maxMemoryInMB}")
+        .action((x, c) => c.copy(maxMemoryInMB = x))
       opt[String]("checkpointDir")
         .text(s"checkpoint directory where intermediate node Id caches will be stored, " +
         s"default: ${
@@ -192,23 +196,14 @@ object AirlineRFC {
         s"default: ${defaultParams.checkpointInterval}")
         .action((x, c) => c.copy(checkpointInterval = x))
       opt[String]("testInput")
-        .text(s"input path to test dataset. If given, option fracTest is ignored." +
-        s" default: ${defaultParams.testInput}")
+        .text(s"input path to test dataset")
+        .required()
         .action((x, c) => c.copy(testInput = x))
-      opt[String]("dataFormat")
-        .text("data format: libsvm (default), dense (deprecated in Spark v1.1)")
-        .action((x, c) => c.copy(dataFormat = x))
       arg[String]("<input>")
         .text("input path to labeled examples")
         .required()
         .action((x, c) => c.copy(input = x))
-      checkConfig { params =>
-        if (params.fracTest < 0 || params.fracTest >= 1) {
-          failure(s"fracTest ${params.fracTest} value incorrect; should be in [0,1).")
-        } else {
-          success
-        }
-      }
+      checkConfig { params => success }
     }
 
     parser.parse(args, defaultParams).map { params =>
@@ -243,17 +238,16 @@ object AirlineRFC {
     val metrics = new BinaryClassificationEvaluator().setMetricName("areaUnderROC")
 
     val grid = new ParamGridBuilder()
-      .addGrid(rfc.maxBins, Array(400))
-      .addGrid(rfc.maxDepth, Array(10))
-      .addGrid(rfc.impurity, Array("gini"))
-      .addGrid(rfc.featureSubsetStrategy, Array("all"))
-      .addGrid(rfc.minInstancesPerNode, Array(1))
-      .addGrid(rfc.numTrees, Array(50, 100, 250, 500))
-      .baseOn(ParamPair(rfc.numTrees, 1))
-      .baseOn(ParamPair(rfc.maxMemoryInMB, 32))
-      .baseOn(ParamPair(rfc.cacheNodeIds, true))
-      .baseOn(ParamPair(rfc.checkpointInterval, 10))
-      .addGrid(rfc.subsamplingRate, Array(0.68))
+      .addGrid(rfc.maxBins, params.maxBins)
+      .addGrid(rfc.maxDepth, params.maxDepth)
+      .addGrid(rfc.impurity, params.impurity)
+      .addGrid(rfc.featureSubsetStrategy, params.featureSubsetStrategy)
+      .addGrid(rfc.minInstancesPerNode, params.minInstancesPerNode)
+      .addGrid(rfc.numTrees, params.numTrees)
+      .addGrid(rfc.subsamplingRate, params.subsamplingRate)
+      .baseOn(ParamPair(rfc.maxMemoryInMB, params.maxMemoryInMB))
+      .baseOn(ParamPair(rfc.cacheNodeIds, params.cacheNodeIds))
+      .baseOn(ParamPair(rfc.checkpointInterval, params.checkpointInterval))
       .build()
 
     val cv = new CrossValidator()
@@ -269,12 +263,12 @@ object AirlineRFC {
     val trees = model.bestModel.asInstanceOf[RandomForestClassificationModel].trees
     val weights = model.bestModel.asInstanceOf[RandomForestClassificationModel].treeWeights
 
+    val elapsed = (System.nanoTime - begin) / 1e9
+    println(s"Elapsed time for training is $elapsed")
+
     println(s"xusen, importance is $importance")
     println(s"xusen, trees are\n${trees.map(_.toDebugString).mkString("\n")}")
     println(s"xusen, tree weights are ${weights}")
-
-    val elapsed = (System.nanoTime - begin) / 1e9
-    println(s"Elapsed time for training is $elapsed")
 
     val testBegin = System.nanoTime
     println(s"AUC is ${metrics.evaluate(model.transform(test))}")
