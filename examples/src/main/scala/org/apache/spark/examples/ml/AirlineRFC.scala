@@ -195,14 +195,14 @@ object AirlineRFC {
         .text(s"how often to checkpoint the node Id cache, " +
         s"default: ${defaultParams.checkpointInterval}")
         .action((x, c) => c.copy(checkpointInterval = x))
-      opt[String]("testInput")
-        .text(s"input path to test dataset")
-        .required()
-        .action((x, c) => c.copy(testInput = x))
       arg[String]("<input>")
         .text("input path to labeled examples")
         .required()
         .action((x, c) => c.copy(input = x))
+      arg[String]("<testInput>")
+        .text(s"input path to test dataset")
+        .required()
+        .action((x, c) => c.copy(testInput = x))
       checkConfig { params => success }
     }
 
