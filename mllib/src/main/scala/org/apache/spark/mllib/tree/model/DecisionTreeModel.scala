@@ -17,6 +17,7 @@
 
 package org.apache.spark.mllib.tree.model
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 import org.json4s._
@@ -85,6 +86,23 @@ class DecisionTreeModel @Since("1.0.0") (
   @Since("1.1.0")
   def numNodes: Int = {
     1 + topNode.numDescendants
+  }
+
+  /**
+   * Get the number of nodes in tree below this node, including leaf nodes.
+   * E.g., if this is a leaf, returns 0.  If both children are leaves, returns 2.
+   */
+  private[tree] def numLeavesForSubTree(node: Node): Int = {
+    if (node.isLeaf) {
+      1
+    } else {
+      node.leftNode.map(numLeavesForSubTree).getOrElse(0) +
+      node.rightNode.map(numLeavesForSubTree).getOrElse(0)
+    }
+  }
+
+  def numLeaves: Int = {
+    numLeavesForSubTree(topNode)
   }
 
   /**

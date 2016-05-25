@@ -1,0 +1,19 @@
+RandomForestExample with parameters:
+{
+  input:	/Users/panda/data/airline/train-10m.csv,
+  testInput:	/Users/panda/data/airline/test.csv,
+  algo:	classification,
+  impurity:	List(gini),
+  maxDepth:	ArraySeq(20),
+  maxBins:	List(400),
+  minInstancesPerNode:	List(1),
+  minInfoGain:	List(0.0),
+  numTrees:	ArraySeq(1),
+  featureSubsetStrategy:	List(auto),
+  subsamplingRate:	List(1.0),
+  maxMemoryInMB:	32,
+  cacheNodeIds:	false,
+  checkpointDir:	None,
+  checkpointInterval:	10
+}
+xusen, Partitions of train set is 16

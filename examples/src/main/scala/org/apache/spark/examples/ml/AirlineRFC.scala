@@ -133,6 +133,7 @@ object AirlineRFC {
       maxDepth: Seq[Int] = Seq(5),
       maxBins: Seq[Int] = Seq(400),
       minInstancesPerNode: Seq[Int] = Seq(1),
+      minInfoGain: Seq[Double] = Seq(0.0),
       numTrees: Seq[Int] = Seq(10),
       featureSubsetStrategy: Seq[String] = Seq("auto"),
       subsamplingRate: Seq[Double] = Seq(1.0),
@@ -166,6 +167,9 @@ object AirlineRFC {
         .text(s"min number of instances required at child nodes to create the parent split," +
         s" default: ${defaultParams.minInstancesPerNode}")
         .action((x, c) => c.copy(minInstancesPerNode = x))
+      opt[Seq[Double]]("minInfoGain")
+        .text(s"min info gain required to create a split, default: ${defaultParams.minInfoGain}")
+        .action((x, c) => c.copy(minInfoGain = x))
       opt[Seq[Int]]("numTrees")
         .text(s"number of trees in ensemble, default: ${defaultParams.numTrees}")
         .action((x, c) => c.copy(numTrees = x))
@@ -232,7 +236,6 @@ object AirlineRFC {
     val test = testDF.cache()
 
     println(s"xusen, Partitions of train set is ${train.rdd.partitions.size}")
-    train.show()
 
     val rfc = new RandomForestClassifier()
     val metrics = new BinaryClassificationEvaluator().setMetricName("areaUnderROC")
@@ -245,6 +248,7 @@ object AirlineRFC {
       .addGrid(rfc.minInstancesPerNode, params.minInstancesPerNode)
       .addGrid(rfc.numTrees, params.numTrees)
       .addGrid(rfc.subsamplingRate, params.subsamplingRate)
+      .addGrid(rfc.minInfoGain, params.minInfoGain)
       .baseOn(ParamPair(rfc.maxMemoryInMB, params.maxMemoryInMB))
       .baseOn(ParamPair(rfc.cacheNodeIds, params.cacheNodeIds))
       .baseOn(ParamPair(rfc.checkpointInterval, params.checkpointInterval))
@@ -267,8 +271,10 @@ object AirlineRFC {
     println(s"Elapsed time for training is $elapsed")
 
     println(s"xusen, importance is $importance")
-    println(s"xusen, trees are\n${trees.map(_.toDebugString).mkString("\n")}")
-    println(s"xusen, tree weights are ${weights}")
+    println(s"xusen, depths of trees are\n${trees.map(_.depth).mkString("\n")}")
+    println(s"xusen, nodes of trees are\n${trees.map(x => x.toOld.numNodes).mkString("\n")}")
+    println(s"xusen, leaves of trees are\n${trees.map(x => x.toOld.numLeaves).mkString("\n")}")
+    println(s"xusen, tree weights are ${weights.mkString(", ")}")
 
     val testBegin = System.nanoTime
     println(s"AUC is ${metrics.evaluate(model.transform(test))}")

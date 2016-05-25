@@ -391,6 +391,9 @@ private[spark] object RandomForest extends Logging {
       metadata.isMulticlassWithCategoricalFeatures)
     logDebug("using nodeIdCache = " + nodeIdCache.nonEmpty.toString)
 
+    logInfo("========================= xusen, begin a group ============================")
+    logInfo(s"xusen, numNodes in this group is $numNodes")
+
     /**
      * Performs a sequential aggregation over a partition for a particular tree and node.
      *
@@ -575,11 +578,21 @@ private[spark] object RandomForest extends Logging {
         node.stats = stats
         logDebug("Node = " + node)
 
+        /**
+          * Debug purpose
+          */
+        var leftChildLeaf = false
+        var rightChildLeaf = false
+
         if (!isLeaf) {
           node.split = Some(split)
           val childIsLeaf = (LearningNode.indexToLevel(nodeIndex) + 1) == metadata.maxDepth
           val leftChildIsLeaf = childIsLeaf || (stats.leftImpurity == 0.0)
           val rightChildIsLeaf = childIsLeaf || (stats.rightImpurity == 0.0)
+
+          leftChildLeaf = leftChildIsLeaf
+          rightChildLeaf = rightChildIsLeaf
+
           node.leftChild = Some(LearningNode(LearningNode.leftChildIndex(nodeIndex),
             leftChildIsLeaf, ImpurityStats.getEmptyImpurityStats(stats.leftImpurityCalculator)))
           node.rightChild = Some(LearningNode(LearningNode.rightChildIndex(nodeIndex),
@@ -605,6 +618,10 @@ private[spark] object RandomForest extends Logging {
           logDebug("rightChildIndex = " + node.rightChild.get.id +
             ", impurity = " + stats.rightImpurity)
         }
+        logInfo(s"xusen, finished Node ID ${node.id}")
+        logInfo(s"xusen, current level for current Node is ${LearningNode.indexToLevel(node.id)}")
+        logInfo(s"xusen, is left child leaf? ${leftChildLeaf}")
+        logInfo(s"xusen, is right child leaf? ${rightChildLeaf}")
       }
     }
 
