@@ -11,7 +11,7 @@ RandomForestExample with parameters:
   numTrees:	ArraySeq(1),
   featureSubsetStrategy:	List(auto),
   subsamplingRate:	List(1.0),
-  maxMemoryInMB:	32,
+  maxMemoryInMB:	500,
   cacheNodeIds:	false,
   checkpointDir:	None,
   checkpointInterval:	10

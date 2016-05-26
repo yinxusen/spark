@@ -137,6 +137,7 @@ object AirlineRFC {
       numTrees: Seq[Int] = Seq(10),
       featureSubsetStrategy: Seq[String] = Seq("auto"),
       subsamplingRate: Seq[Double] = Seq(1.0),
+      numPartitions: Int = 16,
       maxMemoryInMB: Int = 32,
       cacheNodeIds: Boolean = false,
       checkpointDir: Option[String] = None,
@@ -170,6 +171,9 @@ object AirlineRFC {
       opt[Seq[Double]]("minInfoGain")
         .text(s"min info gain required to create a split, default: ${defaultParams.minInfoGain}")
         .action((x, c) => c.copy(minInfoGain = x))
+      opt[Int]("numPartitions")
+        .text(s"Number of partitions of training data, default: ${defaultParams.numPartitions}")
+        .action((x, c) => c.copy(numPartitions = x))
       opt[Seq[Int]]("numTrees")
         .text(s"number of trees in ensemble, default: ${defaultParams.numTrees}")
         .action((x, c) => c.copy(numTrees = x))
