@@ -236,7 +236,7 @@ object AirlineRFC {
     val (trainDF, testDF) =
       DataIngestion(spark, params.input, params.testInput).withStringIndexer
 
-    val train = trainDF.coalesce(16).cache()
+    val train = trainDF.coalesce(params.numPartitions).cache()
     val test = testDF.cache()
 
     println(s"xusen, Partitions of train set is ${train.rdd.partitions.size}")
