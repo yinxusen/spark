@@ -11,9 +11,21 @@ RandomForestExample with parameters:
   numTrees:	ArraySeq(1),
   featureSubsetStrategy:	List(auto),
   subsamplingRate:	List(1.0),
+  numPartitions:	1,
   maxMemoryInMB:	500,
   cacheNodeIds:	false,
   checkpointDir:	None,
   checkpointInterval:	10
 }
-xusen, Partitions of train set is 16
+xusen, Partitions of train set is 1
+Elapsed time for training is 2153.606306717
+xusen, importance is (8,[0,1,2,3,4,5,6,7],[0.061237865099082106,0.09711194325241372,0.0346971019373466,0.31178546876416646,0.07845150858301063,0.15587536693725174,0.16470149307101684,0.09613925235571201])
+xusen, depths of trees are
+20
+xusen, nodes of trees are
+308827
+xusen, leaves of trees are
+154414
+xusen, tree weights are 1.0
+AUC is 0.6880662093840664
+Elapsed time for testing is 15.106150292
