@@ -141,7 +141,8 @@ object AirlineRFC {
       maxMemoryInMB: Int = 32,
       cacheNodeIds: Boolean = false,
       checkpointDir: Option[String] = None,
-      checkpointInterval: Int = 10) extends AbstractParams[Params]
+      checkpointInterval: Int = 10,
+      preparedData: Boolean = false) extends AbstractParams[Params]
 
   def main(args: Array[String]): Unit = {
     val defaultParams = Params()
@@ -186,6 +187,10 @@ object AirlineRFC {
         .text(s"whether to use node Id cache during training, " +
         s"default: ${defaultParams.cacheNodeIds}")
         .action((x, c) => c.copy(cacheNodeIds = x))
+      opt[Boolean]("prepareData")
+        .text(s"Is data already pre-processed for this training, " +
+        s"default: ${defaultParams.preparedData}")
+        .action((x, c) => c.copy(preparedData = x))
       opt[Int]("maxMemoryInMB")
         .text(s"maximum memory to collect histogram in a task, default" +
           s" ${defaultParams.maxMemoryInMB}")
@@ -233,13 +238,29 @@ object AirlineRFC {
 
     println(s"RandomForestExample with parameters:\n$params")
 
-    val (trainDF, testDF) =
-      DataIngestion(spark, params.input, params.testInput).withStringIndexer
+    val (train, test) =
+      if (params.preparedData) {
+        val trainDF = spark.read.parquet(params.input).cache()
+        val testDF = spark.read.parquet(params.testInput).cache()
+        println("We've read prepared data in:")
+        println(s"Training data has ${trainDF.count()} rows.")
+        println(s"Test data has ${testDF.count()} rows.")
+        println(s"xusen, Partitions of train set is ${trainDF.rdd.partitions.size}")
+        (trainDF, testDF)
+      } else {
+        val (trainDF, testDF) = DataIngestion(spark, params.input, params.testInput).withStringIndexer
+        trainDF.coalesce(params.numPartitions).cache()
+        testDF.cache()
+        println("We've read the unprepared data in:")
+        println(s"Training data has ${trainDF.count()} rows.")
+        println(s"Test data has ${testDF.count()} rows.")
+        println(s"xusen, Partitions of train set is ${trainDF.rdd.partitions.size}")
+        trainDF.write.mode("overwrite").parquet(s"${params.input}-prepared.parquet")
+        testDF.write.mode("overwrite").parquet(s"${params.testInput}-prepared.parquet")
+        println("We've saved the prepared data for your next training.")
+        (trainDF, testDF)
+      }
 
-    val train = trainDF.coalesce(params.numPartitions).cache()
-    val test = testDF.cache()
-
-    println(s"xusen, Partitions of train set is ${train.rdd.partitions.size}")
 
     val rfc = new RandomForestClassifier()
     val metrics = new BinaryClassificationEvaluator().setMetricName("areaUnderROC")

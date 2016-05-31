@@ -28,6 +28,7 @@ build/scala*
 build/zinc*
 cache
 checkpoint
+rf_test/*.log
 #conf/*.cmd
 #conf/*.conf
 #conf/*.properties
