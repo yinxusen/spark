@@ -1,6 +1,6 @@
 RandomForestExample with parameters:
 {
-  input:	/Users/panda/data/airline/train-10m.csv,
+  input:	/Users/panda/data/airline/train-0.01m.csv,
   testInput:	/Users/panda/data/airline/test.csv,
   algo:	classification,
   impurity:	List(gini),
@@ -8,24 +8,129 @@ RandomForestExample with parameters:
   maxBins:	List(400),
   minInstancesPerNode:	List(1),
   minInfoGain:	List(0.0),
-  numTrees:	ArraySeq(1),
+  numTrees:	ArraySeq(10),
   featureSubsetStrategy:	List(auto),
   subsamplingRate:	List(1.0),
-  numPartitions:	1,
-  maxMemoryInMB:	500,
+  numPartitions:	16,
+  maxMemoryInMB:	32,
   cacheNodeIds:	false,
   checkpointDir:	None,
   checkpointInterval:	10
 }
-xusen, Partitions of train set is 1
-Elapsed time for training is 2153.606306717
-xusen, importance is (8,[0,1,2,3,4,5,6,7],[0.061237865099082106,0.09711194325241372,0.0346971019373466,0.31178546876416646,0.07845150858301063,0.15587536693725174,0.16470149307101684,0.09613925235571201])
+xusen, Partitions of train set is 9
+Elapsed time for training is 32.521724235
+xusen, importance is (8,[0,1,2,3,4,5,6,7],[0.06991850925340025,0.11192707879410654,0.03205538179428834,0.13715370012725397,0.07342648275840538,0.23809039561285283,0.2847520549445067,0.052676396715185966])
 xusen, depths of trees are
 20
+20
+20
+20
+20
+20
+20
+20
+20
+20
 xusen, nodes of trees are
-308827
+1433
+1295
+1395
+1331
+1411
+1299
+1325
+1391
+1307
+1335
 xusen, leaves of trees are
-154414
-xusen, tree weights are 1.0
-AUC is 0.6880662093840664
-Elapsed time for testing is 15.106150292
+717
+648
+698
+666
+706
+650
+663
+696
+654
+668
+xusen, tree weights are 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+AUC is 0.6334486816891238
+Elapsed time for testing is 1.8626058
+RandomForestExample with parameters:
+{
+  input:	/Users/panda/data/airline/train-0.1m.csv,
+  testInput:	/Users/panda/data/airline/test.csv,
+  algo:	classification,
+  impurity:	List(gini),
+  maxDepth:	ArraySeq(20),
+  maxBins:	List(400),
+  minInstancesPerNode:	List(1),
+  minInfoGain:	List(0.0),
+  numTrees:	ArraySeq(10),
+  featureSubsetStrategy:	List(auto),
+  subsamplingRate:	List(1.0),
+  numPartitions:	16,
+  maxMemoryInMB:	32,
+  cacheNodeIds:	false,
+  checkpointDir:	None,
+  checkpointInterval:	10
+}
+xusen, Partitions of train set is 10
+Elapsed time for training is 391.861155515
+xusen, importance is (8,[0,1,2,3,4,5,6,7],[0.06538231213573457,0.12525647673780302,0.037615952667466,0.17199441185194708,0.06549482026860053,0.21343037843085041,0.25909408293574515,0.061731564971853094])
+xusen, depths of trees are
+20
+20
+20
+20
+20
+20
+20
+20
+20
+20
+xusen, nodes of trees are
+10139
+12705
+13145
+10469
+12021
+12691
+11585
+11707
+10629
+12505
+xusen, leaves of trees are
+5070
+6353
+6573
+5235
+6011
+6346
+5793
+5854
+5315
+6253
+xusen, tree weights are 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+AUC is 0.6748572691413156
+Elapsed time for testing is 5.439433435
+RandomForestExample with parameters:
+{
+  input:	/Users/panda/data/airline/train-1m.csv,
+  testInput:	/Users/panda/data/airline/test.csv,
+  algo:	classification,
+  impurity:	List(gini),
+  maxDepth:	ArraySeq(20),
+  maxBins:	List(400),
+  minInstancesPerNode:	List(1),
+  minInfoGain:	List(0.0),
+  numTrees:	ArraySeq(10),
+  featureSubsetStrategy:	List(auto),
+  subsamplingRate:	List(1.0),
+  numPartitions:	16,
+  maxMemoryInMB:	32,
+  cacheNodeIds:	false,
+  checkpointDir:	None,
+  checkpointInterval:	10
+}
+xusen, Partitions of train set is 16
