@@ -187,7 +187,7 @@ object AirlineRFC {
         .text(s"whether to use node Id cache during training, " +
         s"default: ${defaultParams.cacheNodeIds}")
         .action((x, c) => c.copy(cacheNodeIds = x))
-      opt[Boolean]("prepareData")
+      opt[Boolean]("preparedData")
         .text(s"Is data already pre-processed for this training, " +
         s"default: ${defaultParams.preparedData}")
         .action((x, c) => c.copy(preparedData = x))
@@ -240,7 +240,7 @@ object AirlineRFC {
 
     val (train, test) =
       if (params.preparedData) {
-        val trainDF = spark.read.parquet(params.input).cache()
+        val trainDF = spark.read.parquet(params.input).coalesce(params.numPartitions).cache()
         val testDF = spark.read.parquet(params.testInput).cache()
         println("We've read prepared data in:")
         println(s"Training data has ${trainDF.count()} rows.")
