@@ -128,6 +128,7 @@ object AirlineRFC {
   case class Params(
       input: String = null,
       testInput: String = null,
+      modelPath: String = null,
       algo: String = "classification",
       impurity: Seq[String] = Seq("gini"),
       maxDepth: Seq[Int] = Seq(5),
@@ -208,6 +209,9 @@ object AirlineRFC {
         .text(s"how often to checkpoint the node Id cache, " +
         s"default: ${defaultParams.checkpointInterval}")
         .action((x, c) => c.copy(checkpointInterval = x))
+      opt[String]("modelPath")
+        .text(s"The path to save model for test, default null means no persistence.")
+        .action((x, c) => c.copy(modelPath = x))
       arg[String]("<input>")
         .text("input path to labeled examples")
         .required()
@@ -285,6 +289,10 @@ object AirlineRFC {
     val begin = System.nanoTime
 
     val model = cv.fit(train)
+
+    if (params.modelPath != null) {
+      model.write.overwrite().save(params.modelPath)
+    }
 
     val importance =
       model.bestModel.asInstanceOf[RandomForestClassificationModel].featureImportances
