@@ -158,18 +158,6 @@ hive_thriftserver = Module(
 )
 
 
-hivecontext_compatibility = Module(
-    name="hivecontext-compatibility",
-    dependencies=[hive],
-    source_file_regexes=[
-        "sql/hivecontext-compatibility/",
-    ],
-    sbt_test_goals=[
-        "hivecontext-compatibility/test"
-    ]
-)
-
-
 sketch = Module(
     name="sketch",
     dependencies=[tags],
@@ -413,6 +401,7 @@ pyspark_ml = Module(
         "pyspark.ml.feature",
         "pyspark.ml.classification",
         "pyspark.ml.clustering",
+        "pyspark.ml.linalg.__init__",
         "pyspark.ml.recommendation",
         "pyspark.ml.regression",
         "pyspark.ml.tuning",
