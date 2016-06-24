@@ -335,6 +335,16 @@ class StageWrapper(object):
         except:
             self.failure = traceback.format_exc()
 
+    def evaluate(self, jdf):
+        self.failure = None
+        try:
+            df = DataFrame(jdf, self.sql_ctx) if jdf else None
+            r = self.stage.evaluate(df)
+            if r:
+                return r
+        except:
+            self.failure = traceback.format_exc()
+
     def getLastFailure(self):
         return self.failure
 

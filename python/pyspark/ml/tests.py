@@ -50,7 +50,7 @@ from pyspark import keyword_only, SparkContext
 from pyspark.ml import Estimator, Model, Pipeline, PipelineModel, Transformer
 from pyspark.ml.classification import *
 from pyspark.ml.clustering import *
-from pyspark.ml.evaluation import BinaryClassificationEvaluator, RegressionEvaluator
+from pyspark.ml.evaluation import BinaryClassificationEvaluator, Evaluator, RegressionEvaluator
 from pyspark.ml.feature import *
 from pyspark.ml.linalg import Vector, SparseVector, DenseVector, VectorUDT,\
     DenseMatrix, SparseMatrix, Vectors, Matrices, MatrixUDT, _convert_to_vector
@@ -206,6 +206,12 @@ class MockEstimator(Estimator, HasInputCol, HasOutputCol):
         cnt = dataset.count()
         model = MockModel()._set(factor=cnt)._resetUid(self.uid)
         return self._copyValues(model)
+
+
+class MockEvaluator(Evaluator):
+
+    def _evaluate(self, dataset):
+        return dataset.count()
 
 
 class PipelineTests(SparkSessionTestCase):

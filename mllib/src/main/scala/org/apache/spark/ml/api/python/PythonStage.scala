@@ -28,6 +28,7 @@ import org.json4s._
 
 import org.apache.spark.SparkException
 import org.apache.spark.ml.{Estimator, Model, PipelineStage, Transformer}
+import org.apache.spark.ml.evaluation.Evaluator
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.util._
 import org.apache.spark.sql.{DataFrame, Dataset}
@@ -47,6 +48,8 @@ private[python] trait PythonStageWrapper {
   def transform(dataset: Dataset[_]): DataFrame
 
   def transformSchema(schema: StructType): StructType
+
+  def evaluate(dataset: Dataset[_]): Double
 
   def getStage: Array[Byte]
 
@@ -296,6 +299,47 @@ object PythonTransformer extends MLReadable[PythonTransformer] {
     extends PythonStage.Writer[PythonTransformer](instance)
 
   private class PythonTransformerReader extends PythonStage.Reader[PythonTransformer]
+}
+
+/**
+ * A proxy evaluator for all PySpark evaluators written in pure Python.
+ */
+class PythonEvaluator(@transient private var proxy: PythonStageWrapper)
+  extends Evaluator with PythonStageBase with MLWritable {
+
+  override val uid: String = callFromPython(proxy.getUid)
+
+  private[python] override def getProxy = this.proxy
+
+  override def evaluate(dataset: Dataset[_]): Double = {
+    callFromPython(proxy.evaluate(dataset))
+  }
+
+  override def copy(extra: ParamMap): PythonEvaluator = {
+    this.proxy = callFromPython(proxy.copy(extra))
+    this
+  }
+
+  override def write: MLWriter = new PythonEvaluator.PythonEvaluatorWriter(this)
+
+  private def readObject(in: ObjectInputStream): Unit = Utils.tryOrIOException {
+    val length = in.readInt()
+    val bytes = new Array[Byte](length)
+    in.readFully(bytes)
+    proxy = PythonStageSerializer.deserialize(bytes)
+  }
+}
+
+object PythonEvaluator extends MLReadable[PythonEvaluator] {
+
+  override def read: MLReader[PythonEvaluator] = new PythonEvaluatorReader
+
+  override def load(path: String): PythonEvaluator = super.load(path)
+
+  private[python] class PythonEvaluatorWriter(instance: PythonEvaluator)
+    extends PythonStage.Writer[PythonEvaluator](instance)
+
+  private class PythonEvaluatorReader extends PythonStage.Reader[PythonEvaluator]
 }
 
 /**
