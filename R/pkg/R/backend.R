@@ -25,24 +25,68 @@ isInstanceOf <- function(jobj, className) {
   callJMethod(cls, "isInstance", jobj)
 }
 
-# Call a Java method named methodName on the object
-# specified by objId. objId should be a "jobj" returned
-# from the SparkRBackend.
-callJMethod <- function(objId, methodName, ...) {
-  stopifnot(class(objId) == "jobj")
-  if (!isValidJobj(objId)) {
-    stop("Invalid jobj ", objId$id,
+# Call a Java method named "methodName" on the object specified by jobj, which should be a JVM
+# object returned from the SparkRBackend.
+
+#' Invoke a Java method on a given JVM object
+#'
+#' @param jobj A JVM object returned from the SparkRBackend.
+#' @param methodName Method name to invoke.
+#' @param ... Arguments of the Java method.
+#' @rdname jvm.functions.callJMethod
+#' @export
+#' @examples
+#' \dontrun{
+#' vec <- callJStatic("org.apache.spark.ml.linalg.Vectors", "dense", as.array(c(1, 2, 3)))
+#' str <- callJMethod(vec, "toString")
+#' str
+#' }
+#' @note callJMethod(jobj, character, ...) since 2.1.0
+#' @seealso \link{callJStatic}, \link{newJObject}
+callJMethod <- function(jobj, methodName, ...) {
+  stopifnot(class(jobj) == "jobj")
+  if (!isValidJobj(jobj)) {
+    stop("Invalid jobj ", jobj$id,
          ". If SparkR was restarted, Spark operations need to be re-executed.")
   }
-  invokeJava(isStatic = FALSE, objId$id, methodName, ...)
+  invokeJava(isStatic = FALSE, jobj$id, methodName, ...)
 }
 
-# Call a static method on a specified className
+# Call a Java static method on a specified className.
+
+#' Invoke a Java static method of a given className
+#'
+#' @param className Java class name, which should be reachable by the SparkRBackend.
+#' @param methodName Static method of the given Java class
+#' @param ... Arguments of the static method
+#' @rdname jvm.functions.callJStatic
+#' @export
+#' @examples
+#' \dontrun{
+#' vec <- callJStatic("org.apache.spark.ml.linalg.Vectors", "dense", as.array(c(1, 2, 3)))
+#' vec
+#' }
+#' @note callJStatic(character, character, ...) since 2.1.0
+#' @seealso \link{sparkR.session}, \link{callJMethod}, \link{newJObject}
 callJStatic <- function(className, methodName, ...) {
   invokeJava(isStatic = TRUE, className, methodName, ...)
 }
 
-# Create a new object of the specified class name
+# Create a new object of the specified class name.
+
+#' Create a new JVM object
+#'
+#' @param className Java class name, which should be reachable by the SparkRBackend.
+#' @param ... Initialization arguments of the given class
+#' @rdname jvm.functions.newJObject
+#' @export
+#' @examples
+#' \dontrun{
+#' date <- newJObject("java.util.Date")
+#' date
+#' }
+#' @note newJObject(character, ...) since 2.1.0
+#' @seealso \link{callJMethod}, \link{callJStatic}
 newJObject <- function(className, ...) {
   invokeJava(isStatic = TRUE, className, methodName = "<init>", ...)
 }

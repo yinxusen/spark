@@ -356,3 +356,9 @@ S3method(structType, jobj)
 S3method(structType, structField)
 
 export("install.spark")
+
+# export SparkR backend JVM functions
+export("callJMethod")
+export("callJStatic")
+export("newJObject")
+export("cleanup.jobj")

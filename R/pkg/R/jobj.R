@@ -82,6 +82,14 @@ getClassName.jobj <- function(x) {
   callJMethod(cls, "getName")
 }
 
+# Clean up a JVM object that operated by SparkR.
+
+#' Clean up a JVM object that operated by SparkR
+#'
+#' @param jobj A JVM object to be removed.
+#' @rdname jvm.functions.cleanup.jobj
+#' @export
+#' note spark.cleanup.obj(jobj) since 2.1.0
 cleanup.jobj <- function(jobj) {
   if (isValidJobj(jobj)) {
     objId <- jobj$id
