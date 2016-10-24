@@ -1522,6 +1522,12 @@ class DataFrame(object):
         1    5    Bob
         """
         import pandas as pd
+        # TODO - use Arrow python API to create Pandas DataFrame
+        '''
+        with SCCallSiteSync(self._sc) as css:
+            port = self._jdf.collectAsArrowToPython()
+        return list(_load_from_socket(port, BatchedSerializer(PickleSerializer())))
+        '''
         return pd.DataFrame.from_records(self.collect(), columns=self.columns)
 
     ##########################################################################################

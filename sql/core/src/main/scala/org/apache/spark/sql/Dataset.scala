@@ -2290,8 +2290,12 @@ class Dataset[T] private[sql](
    */
   @DeveloperApi
   def collectAsArrow(): Array[ArrowBuf] = {
-
     val vector = MinorType.LIST.getNewVector("TODO", null, null)
+
+    // TODO
+    withNewExecutionId {
+      queryExecution.executedPlan.executeToIterator().map(boundEnc.fromRow)
+    }
 
     vector.getFieldBuffers.asScala.toArray
   }
@@ -2661,6 +2665,15 @@ class Dataset[T] private[sql](
       val toJava: (Any) => Any = EvaluatePython.toJava(_, schema)
       val iter = new SerDeUtil.AutoBatchedPickler(
         queryExecution.executedPlan.executeCollect().iterator.map(toJava))
+      PythonRDD.serveIterator(iter, "serve-DataFrame")
+    }
+  }
+
+  private[sql] def collectAsArrowToPython(): Int = {
+    EvaluatePython.registerPicklers()
+    withNewExecutionId {
+      val iter = new SerDeUtil.AutoBatchedPickler(
+        collectAsArrow().iterator)
       PythonRDD.serveIterator(iter, "serve-DataFrame")
     }
   }
