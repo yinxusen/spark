@@ -17,13 +17,18 @@
 
 package org.apache.spark.sql
 
+import io.netty.buffer.ArrowBuf
+
 import java.io.CharArrayWriter
+
+import org.apache.arrow.vector.types.Types.MinorType
 
 import scala.collection.JavaConverters._
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.control.NonFatal
 
+import org.apache.arrow.vector.NullableVector
 import org.apache.commons.lang3.StringUtils
 
 import org.apache.spark.annotation.{DeveloperApi, Experimental, InterfaceStability}
@@ -2275,6 +2280,20 @@ class Dataset[T] private[sql](
     } else {
       execute()
     }
+  }
+
+  /**
+   * Return an array of ArrowBufs
+   *
+   * @group action
+   * @since 2.2.0
+   */
+  @DeveloperApi
+  def collectAsArrow(): Array[ArrowBuf] = {
+
+    val vector = MinorType.LIST.getNewVector("TODO", null, null)
+
+    vector.getFieldBuffers.asScala.toArray
   }
 
   /**
