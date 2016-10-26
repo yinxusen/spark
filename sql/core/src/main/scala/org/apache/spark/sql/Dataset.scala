@@ -20,15 +20,18 @@ package org.apache.spark.sql
 import io.netty.buffer.ArrowBuf
 
 import java.io.CharArrayWriter
+import java.nio.channels.SocketChannel
 
-import org.apache.arrow.vector.types.Types.MinorType
+import org.apache.arrow.memory.RootAllocator
+import org.apache.arrow.vector.file.ArrowWriter
+import org.apache.arrow.vector.schema.{ArrowFieldNode, ArrowRecordBatch}
+import org.apache.arrow.vector.types.pojo.Schema
 
 import scala.collection.JavaConverters._
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.control.NonFatal
 
-import org.apache.arrow.vector.NullableVector
 import org.apache.commons.lang3.StringUtils
 
 import org.apache.spark.annotation.{DeveloperApi, Experimental, InterfaceStability}
@@ -2283,21 +2286,42 @@ class Dataset[T] private[sql](
   }
 
   /**
-   * Return an array of ArrowBufs
+   * Return an ArrowRecordBatch
    *
    * @group action
    * @since 2.2.0
    */
   @DeveloperApi
-  def collectAsArrow(): Array[ArrowBuf] = {
-    val vector = MinorType.LIST.getNewVector("TODO", null, null)
+  def collectAsArrow(): ArrowRecordBatch = {
 
-    // TODO
+    // TODO - might be more efficient to do conversion on workers before collect
+    /*
+    val vector = MinorType.LIST.getNewVector("TODO", null, null)
     withNewExecutionId {
       queryExecution.executedPlan.executeToIterator().map(boundEnc.fromRow)
     }
-
     vector.getFieldBuffers.asScala.toArray
+    */
+
+    withNewExecutionId {
+      try {
+        val rootAllocator = new RootAllocator(1024) // TODO - size??
+
+        def toArrow(internalRow: InternalRow): ArrowBuf = {
+          val buf = rootAllocator.buffer(512)  // TODO - size??
+          // TODO internalRow -> buf
+          buf
+        }
+        val iter = queryExecution.executedPlan.executeCollect().iterator.map(toArrow)
+        val arrowBufList = iter.toList
+        val nodes: List[ArrowFieldNode] = null // TODO
+        new ArrowRecordBatch(arrowBufList.length, nodes.asJava, arrowBufList.asJava)
+      } catch {
+        case e: Exception =>
+          //logError(s"Error converting InternalRow to ArrowBuf; ${e.getMessage}:\n$queryExecution")
+          throw e
+      }
+    }
   }
 
   /**
@@ -2670,11 +2694,21 @@ class Dataset[T] private[sql](
   }
 
   private[sql] def collectAsArrowToPython(): Int = {
-    EvaluatePython.registerPicklers()
     withNewExecutionId {
-      val iter = new SerDeUtil.AutoBatchedPickler(
-        collectAsArrow().iterator)
-      PythonRDD.serveIterator(iter, "serve-DataFrame")
+      val batch = collectAsArrow()
+      val schema: Schema = null  // TODO
+      val channel: SocketChannel = null  // TODO
+      try {
+        val writer = new ArrowWriter(channel, schema)
+        writer.writeRecordBatch(batch)
+        writer.close()
+        //PythonRDD.serveIterator(iter, "serve-DataFrame")
+      } catch {
+        case e: Exception =>
+          //logError(s"Error writing ArrowRecordBatch to Python; ${e.getMessage}:\n$queryExecution")
+          throw e
+      }
+      99999  // TODO - return port
     }
   }
 
