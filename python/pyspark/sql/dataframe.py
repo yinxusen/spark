@@ -1508,7 +1508,7 @@ class DataFrame(object):
         return DataFrame(jdf, self.sql_ctx)
 
     @since(1.3)
-    def toPandas(self):
+    def toPandas(self, useArrow=True):
         """Returns the contents of this :class:`DataFrame` as Pandas ``pandas.DataFrame``.
 
         Note that this method should only be used if the resulting Pandas's DataFrame is expected
@@ -1521,14 +1521,47 @@ class DataFrame(object):
         0    2  Alice
         1    5    Bob
         """
-        import pandas as pd
-        # TODO - use Arrow python API to create Pandas DataFrame
-        '''
-        with SCCallSiteSync(self._sc) as css:
-            port = self._jdf.collectAsArrowToPython()
-        return list(_load_from_socket(port, BatchedSerializer(PickleSerializer())))
-        '''
-        return pd.DataFrame.from_records(self.collect(), columns=self.columns)
+        if useArrow:
+            from pyarrow.ipc import ArrowFileReader
+            import socket
+
+            with SCCallSiteSync(self._sc) as css:
+                port = self._jdf.collectAsArrowToPython()
+
+            # TODO - copied from rdd._load_from_socket(), possible to reuse?
+            sock = None
+            # Support for both IPv4 and IPv6.
+            # On most of IPv6-ready systems, IPv6 will take precedence.
+            for res in socket.getaddrinfo("localhost", port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+                af, socktype, proto, canonname, sa = res
+                sock = socket.socket(af, socktype, proto)
+                try:
+                    sock.settimeout(3)
+                    sock.connect(sa)
+                except socket.error:
+                    sock.close()
+                    sock = None
+                    continue
+                break
+            if not sock:
+                raise Exception("could not open socket")
+            try:
+                rf = sock.makefile("rb", 65536)
+                reader = ArrowFileReader(rf)  # TODO - not sure if this works
+                #for i in range(reader.num_record_batches):
+                batch = reader.get_record_batch(0)  # TODO - read more than one batch?
+                return batch.to_pandas()
+                #for item in serializer.load_stream(rf):
+                    #yield item
+            finally:
+                sock.close()
+            # TODO - use Arrow python API to create Pandas DataFrame
+            # with SCCallSiteSync(self._sc) as css:
+            #     port = self._jdf.collectAsArrowToPython()
+            # return list(_load_from_socket(port, BatchedSerializer(PickleSerializer())))
+        else:
+            import pandas as pd
+            return pd.DataFrame.from_records(self.collect(), columns=self.columns)
 
     ##########################################################################################
     # Pandas compatibility
