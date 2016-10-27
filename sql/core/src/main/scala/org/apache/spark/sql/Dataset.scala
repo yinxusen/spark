@@ -2696,19 +2696,8 @@ class Dataset[T] private[sql](
   private[sql] def collectAsArrowToPython(): Int = {
     withNewExecutionId {
       val batch = collectAsArrow()
-      val schema: Schema = null  // TODO
-      val channel: SocketChannel = null  // TODO
-      try {
-        val writer = new ArrowWriter(channel, schema)
-        writer.writeRecordBatch(batch)
-        writer.close()
-        //PythonRDD.serveIterator(iter, "serve-DataFrame")
-      } catch {
-        case e: Exception =>
-          //logError(s"Error writing ArrowRecordBatch to Python; ${e.getMessage}:\n$queryExecution")
-          throw e
-      }
-      99999  // TODO - return port
+      val schema: Schema = null
+      PythonRDD.serveIterator(Iterator((batch, schema)), "serve-Arrow")
     }
   }
 

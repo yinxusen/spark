@@ -19,19 +19,22 @@ package org.apache.spark.api.python
 
 import java.io._
 import java.net._
+import java.nio.channels.Channels
 import java.nio.charset.StandardCharsets
 import java.util.{ArrayList => JArrayList, List => JList, Map => JMap}
+
+import org.apache.arrow.vector.file.ArrowWriter
+import org.apache.arrow.vector.schema.ArrowRecordBatch
+import org.apache.arrow.vector.types.pojo.Schema
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.language.existentials
 import scala.util.control.NonFatal
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.io.compress.CompressionCodec
 import org.apache.hadoop.mapred.{InputFormat, JobConf, OutputFormat}
 import org.apache.hadoop.mapreduce.{InputFormat => NewInputFormat, OutputFormat => NewOutputFormat}
-
 import org.apache.spark._
 import org.apache.spark.api.java.{JavaPairRDD, JavaRDD, JavaSparkContext}
 import org.apache.spark.broadcast.Broadcast
@@ -487,6 +490,18 @@ private[spark] object PythonRDD extends Logging {
     def write(obj: Any): Unit = obj match {
       case null =>
         dataOut.writeInt(SpecialLengths.NULL)
+      case batch: (ArrowRecordBatch, Schema) =>
+        try {
+          val channel = Channels.newChannel(dataOut)
+          val writer = new ArrowWriter(channel, batch._2)
+          writer.writeRecordBatch(batch._1)
+          writer.close()
+      } catch {
+        case e: Exception =>
+          // logError
+          // (s"Error writing ArrowRecordBatch to Python; ${e.getMessage}:\n$queryExecution")
+          throw e
+      }
       case arr: Array[Byte] =>
         dataOut.writeInt(arr.length)
         dataOut.write(arr)
