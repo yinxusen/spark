@@ -51,6 +51,7 @@ which contains two batches of two objects:
 
 import sys
 from itertools import chain, product
+from pyarrow.ipc import ArrowFileReader
 import marshal
 import struct
 import types
@@ -175,6 +176,26 @@ class FramedSerializer(Serializer):
         Deserialize an object from a byte array.
         """
         raise NotImplementedError
+
+
+class ArrowSerializer(Serializer):
+
+    """
+    Serializes an Arrow stream.
+    """
+
+    def dump_stream(self, iterator, stream):
+        raise NotImplementedError
+
+    def load_stream(self, stream):
+        reader = ArrowFileReader(stream)
+        return reader.get_record_batch(0)
+
+    def _load_stream_without_unbatching(self, stream):
+        raise NotImplementedError
+
+    def __repr__(self):
+        return "ArrowSerializer"
 
 
 class BatchedSerializer(Serializer):

@@ -28,7 +28,7 @@ else:
 
 from pyspark import copy_func, since
 from pyspark.rdd import RDD, _load_from_socket, ignore_unicode_prefix
-from pyspark.serializers import BatchedSerializer, PickleSerializer, UTF8Deserializer
+from pyspark.serializers import ArrowSerializer, BatchedSerializer, PickleSerializer, UTF8Deserializer
 from pyspark.storagelevel import StorageLevel
 from pyspark.traceback_utils import SCCallSiteSync
 from pyspark.sql.types import _parse_datatype_json_string
@@ -342,6 +342,15 @@ class DataFrame(object):
         with SCCallSiteSync(self._sc) as css:
             port = self._jdf.collectToPython()
         return list(_load_from_socket(port, BatchedSerializer(PickleSerializer())))
+
+    @ignore_unicode_prefix
+    @since(2.0)
+    def collectAsArrow(self):
+        """Returns all the records as an Arrow
+        """
+        with SCCallSiteSync(self._sc) as css:
+            port = self._jdf.collectAsArrowToPython()
+        return (_load_from_socket(port, ArrowSerializer))[0]
 
     @ignore_unicode_prefix
     @since(2.0)
@@ -1521,46 +1530,10 @@ class DataFrame(object):
         0    2  Alice
         1    5    Bob
         """
+        import pandas as pd
         if useArrow:
-            from pyarrow.ipc import ArrowFileReader
-            import socket
-
-            with SCCallSiteSync(self._sc) as css:
-                port = self._jdf.collectAsArrowToPython()
-
-            # TODO - copied from rdd._load_from_socket(), possible to reuse?
-            sock = None
-            # Support for both IPv4 and IPv6.
-            # On most of IPv6-ready systems, IPv6 will take precedence.
-            for res in socket.getaddrinfo("localhost", port, socket.AF_UNSPEC, socket.SOCK_STREAM):
-                af, socktype, proto, canonname, sa = res
-                sock = socket.socket(af, socktype, proto)
-                try:
-                    sock.settimeout(3)
-                    sock.connect(sa)
-                except socket.error:
-                    sock.close()
-                    sock = None
-                    continue
-                break
-            if not sock:
-                raise Exception("could not open socket")
-            try:
-                rf = sock.makefile("rb", 65536)
-                reader = ArrowFileReader(rf)  # TODO - not sure if this works
-                #for i in range(reader.num_record_batches):
-                batch = reader.get_record_batch(0)  # TODO - read more than one batch?
-                return batch.to_pandas()
-                #for item in serializer.load_stream(rf):
-                    #yield item
-            finally:
-                sock.close()
-            # TODO - use Arrow python API to create Pandas DataFrame
-            # with SCCallSiteSync(self._sc) as css:
-            #     port = self._jdf.collectAsArrowToPython()
-            # return list(_load_from_socket(port, BatchedSerializer(PickleSerializer())))
+            return self.collectAsArrow().toPandas
         else:
-            import pandas as pd
             return pd.DataFrame.from_records(self.collect(), columns=self.columns)
 
     ##########################################################################################
