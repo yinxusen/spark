@@ -20,10 +20,8 @@ package org.apache.spark.sql
 import io.netty.buffer.ArrowBuf
 
 import java.io.CharArrayWriter
-import java.nio.channels.SocketChannel
 
 import org.apache.arrow.memory.RootAllocator
-import org.apache.arrow.vector.file.ArrowWriter
 import org.apache.arrow.vector.schema.{ArrowFieldNode, ArrowRecordBatch}
 import org.apache.arrow.vector.types.pojo.Schema
 
