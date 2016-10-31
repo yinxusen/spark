@@ -37,7 +37,7 @@ import org.apache.commons.lang3.StringUtils
 import org.apache.spark.annotation.{DeveloperApi, Experimental, InterfaceStability}
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.api.java.function._
-import org.apache.spark.api.python.{PythonRDD, SerDeUtil}
+import org.apache.spark.api.python.{PythonRDD, SerDeUtil, PythonRDDArrowObj}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst._
@@ -2697,7 +2697,7 @@ class Dataset[T] private[sql](
     withNewExecutionId {
       val batch = collectAsArrow()
       val schema: Schema = null
-      PythonRDD.serveIterator(Iterator((batch, schema)), "serve-Arrow")
+      PythonRDD.serveIterator(Iterator(PythonRDDArrowObj(schema, batch)), "serve-Arrow")
     }
   }
 

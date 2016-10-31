@@ -405,6 +405,8 @@ private object SpecialLengths {
   val NULL = -5
 }
 
+private[spark] case class PythonRDDArrowObj(schema: Schema, batch: ArrowRecordBatch)
+
 private[spark] object PythonRDD extends Logging {
 
   // remember the broadcasts sent to each worker
@@ -490,11 +492,12 @@ private[spark] object PythonRDD extends Logging {
     def write(obj: Any): Unit = obj match {
       case null =>
         dataOut.writeInt(SpecialLengths.NULL)
-      case batch: (ArrowRecordBatch, Schema) =>
+      case arrow: PythonRDDArrowObj =>
+
         try {
           val channel = Channels.newChannel(dataOut)
-          val writer = new ArrowWriter(channel, batch._2)
-          writer.writeRecordBatch(batch._1)
+          val writer = new ArrowWriter(channel, arrow.schema)
+          writer.writeRecordBatch(arrow.batch)
           writer.close()
       } catch {
         case e: Exception =>
