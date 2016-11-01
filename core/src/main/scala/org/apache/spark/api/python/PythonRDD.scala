@@ -493,18 +493,17 @@ private[spark] object PythonRDD extends Logging {
       case null =>
         dataOut.writeInt(SpecialLengths.NULL)
       case arrow: PythonRDDArrowObj =>
-
         try {
           val channel = Channels.newChannel(dataOut)
           val writer = new ArrowWriter(channel, arrow.schema)
           writer.writeRecordBatch(arrow.batch)
           writer.close()
-      } catch {
+        } catch {
         case e: Exception =>
           // logError
           // (s"Error writing ArrowRecordBatch to Python; ${e.getMessage}:\n$queryExecution")
           throw e
-      }
+        }
       case arr: Array[Byte] =>
         dataOut.writeInt(arr.length)
         dataOut.write(arr)
