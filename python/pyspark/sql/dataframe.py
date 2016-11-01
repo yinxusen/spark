@@ -350,7 +350,7 @@ class DataFrame(object):
         """
         with SCCallSiteSync(self._sc) as css:
             port = self._jdf.collectAsArrowToPython()
-        return (_load_from_socket(port, ArrowSerializer))[0]
+        return list(_load_from_socket(port, ArrowSerializer))[0]
 
     @ignore_unicode_prefix
     @since(2.0)

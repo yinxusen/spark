@@ -2306,7 +2306,7 @@ class Dataset[T] private[sql](
         val rootAllocator = new RootAllocator(1024) // TODO - size??
 
         def toArrow(internalRow: InternalRow): ArrowBuf = {
-          val buf = rootAllocator.buffer(512)  // TODO - size??
+          val buf = rootAllocator.buffer(128)  // TODO - size??
           // TODO internalRow -> buf
           buf
         }
@@ -2692,8 +2692,8 @@ class Dataset[T] private[sql](
   }
 
   private[sql] def collectAsArrowToPython(): Int = {
+    val batch = collectAsArrow()
     withNewExecutionId {
-      val batch = collectAsArrow()
       val schema: Schema = null
       PythonRDD.serveIterator(Iterator(PythonRDDArrowObj(schema, batch)), "serve-Arrow")
     }
