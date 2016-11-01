@@ -55,6 +55,15 @@ from pyspark.sql.window import Window
 from pyspark.sql.utils import AnalysisException, ParseException, IllegalArgumentException
 
 
+_have_arrow = False
+try:
+    import pyarrow
+    _have_arrow = True
+except:
+    # No Arrow, but that's okay, we'll skip those tests
+    pass
+
+
 class UTCOffsetTimezone(datetime.tzinfo):
     """
     Specifies timezone in UTC offset
@@ -1952,6 +1961,24 @@ class HiveContextSQLTests(ReusedPySparkTestCase):
         assert_runs_only_one_job_stage_and_task("take", lambda: df.take(1))
         # Regression test for SPARK-17514: limit(n).collect() should the perform same as take(n)
         assert_runs_only_one_job_stage_and_task("collect_limit", lambda: df.limit(1).collect())
+
+
+@unittest.skipIf(not _have_arrow, "Arrow not installed")
+class ArrowTests(ReusedPySparkTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        ReusedPySparkTestCase.setUpClass()
+        cls.spark = SparkSession(cls.sc)
+
+    def test_arrow_round_trip(self):
+        df = self.spark.createDataFrame([(1, "1"), (2, "2"), (1, "2"), (1, "2")], ["key", "value"])
+        df.show()
+        pdf = df.toPandas(useArrow=False)
+        print(pdf)
+        pdf_arrow = df.toPandas(useArrow=True)
+        print(pdf_arrow)
+        self.assertTrue(False)
 
 
 if __name__ == "__main__":
