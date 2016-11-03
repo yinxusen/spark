@@ -19,13 +19,8 @@ package org.apache.spark.api.python
 
 import java.io._
 import java.net._
-import java.nio.channels.Channels
 import java.nio.charset.StandardCharsets
 import java.util.{ArrayList => JArrayList, List => JList, Map => JMap}
-
-import org.apache.arrow.vector.file.ArrowWriter
-import org.apache.arrow.vector.schema.ArrowRecordBatch
-import org.apache.arrow.vector.types.pojo.Schema
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -405,8 +400,6 @@ private object SpecialLengths {
   val NULL = -5
 }
 
-private[spark] case class PythonRDDArrowObj(schema: Schema, batch: ArrowRecordBatch)
-
 private[spark] object PythonRDD extends Logging {
 
   // remember the broadcasts sent to each worker
@@ -492,18 +485,6 @@ private[spark] object PythonRDD extends Logging {
     def write(obj: Any): Unit = obj match {
       case null =>
         dataOut.writeInt(SpecialLengths.NULL)
-      case arrow: PythonRDDArrowObj =>
-        try {
-          val channel = Channels.newChannel(dataOut)
-          val writer = new ArrowWriter(channel, arrow.schema)
-          writer.writeRecordBatch(arrow.batch)
-          writer.close()
-        } catch {
-        case e: Exception =>
-          // logError
-          // (s"Error writing ArrowRecordBatch to Python; ${e.getMessage}:\n$queryExecution")
-          throw e
-        }
       case arr: Array[Byte] =>
         dataOut.writeInt(arr.length)
         dataOut.write(arr)

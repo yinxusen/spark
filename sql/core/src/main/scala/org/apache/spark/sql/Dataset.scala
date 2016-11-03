@@ -19,23 +19,25 @@ package org.apache.spark.sql
 
 import io.netty.buffer.ArrowBuf
 
-import java.io.CharArrayWriter
-
-import org.apache.arrow.memory.RootAllocator
-import org.apache.arrow.vector.schema.{ArrowFieldNode, ArrowRecordBatch}
-import org.apache.arrow.vector.types.pojo.Schema
+import java.io.{ByteArrayOutputStream, CharArrayWriter}
+import java.nio.channels.Channels
 
 import scala.collection.JavaConverters._
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.control.NonFatal
 
+import org.apache.arrow.memory.RootAllocator
+import org.apache.arrow.vector.file.ArrowWriter
+import org.apache.arrow.vector.schema.{ArrowFieldNode, ArrowRecordBatch}
+import org.apache.arrow.vector.types.pojo.Schema
+
 import org.apache.commons.lang3.StringUtils
 
 import org.apache.spark.annotation.{DeveloperApi, Experimental, InterfaceStability}
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.api.java.function._
-import org.apache.spark.api.python.{PythonRDD, SerDeUtil, PythonRDDArrowObj}
+import org.apache.spark.api.python.{PythonRDD, SerDeUtil}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst._
@@ -2693,9 +2695,22 @@ class Dataset[T] private[sql](
 
   private[sql] def collectAsArrowToPython(): Int = {
     val batch = collectAsArrow()
+    val schema: Schema = null  // TODO
+    // TODO - if write to Array[Byte], then don't need to change PythonRDD writeIteratorToStream or PythonRDDArrowObj
+    val out = new ByteArrayOutputStream()
+    try {
+      val writer = new ArrowWriter(Channels.newChannel(out), schema)
+      writer.writeRecordBatch(batch)
+      writer.close()
+    } catch {
+      case e: Exception =>
+        // logError
+        // (s"Error writing ArrowRecordBatch to Python; ${e.getMessage}:\n$queryExecution")
+        throw e
+    }
+    val arr = new Array[Byte](out.size())
     withNewExecutionId {
-      val schema: Schema = null
-      PythonRDD.serveIterator(Iterator(PythonRDDArrowObj(schema, batch)), "serve-Arrow")
+      PythonRDD.serveIterator(Iterator(arr), "serve-Arrow")
     }
   }
 
