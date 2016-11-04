@@ -30,7 +30,7 @@ import scala.util.control.NonFatal
 import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.file.ArrowWriter
 import org.apache.arrow.vector.schema.{ArrowFieldNode, ArrowRecordBatch}
-import org.apache.arrow.vector.types.pojo.Schema
+import org.apache.arrow.vector.types.pojo.{Field, ArrowType, Schema}
 
 import org.apache.commons.lang3.StringUtils
 
@@ -2303,11 +2303,18 @@ class Dataset[T] private[sql](
     vector.getFieldBuffers.asScala.toArray
     */
 
+    val rootAllocator = new RootAllocator(1024) // TODO - size??
+
+    def buf(bytes: Array[Byte]): ArrowBuf = {
+      val buffer = rootAllocator.buffer(bytes.length)
+      buffer.writeBytes(bytes)
+      buffer
+    }
+
     withNewExecutionId {
       try {
-        val rootAllocator = new RootAllocator(1024) // TODO - size??
 
-        def toArrow(internalRow: InternalRow): ArrowBuf = {
+        /*def toArrow(internalRow: InternalRow): ArrowBuf = {
           val buf = rootAllocator.buffer(128)  // TODO - size??
           // TODO internalRow -> buf
           buf
@@ -2315,7 +2322,12 @@ class Dataset[T] private[sql](
         val iter = queryExecution.executedPlan.executeCollect().iterator.map(toArrow)
         val arrowBufList = iter.toList
         val nodes: List[ArrowFieldNode] = null // TODO
-        new ArrowRecordBatch(arrowBufList.length, nodes.asJava, arrowBufList.asJava)
+        new ArrowRecordBatch(arrowBufList.length, nodes.asJava, arrowBufList.asJava)*/
+        val validity = Array[Byte](255.asInstanceOf[Byte], 0)
+        val values = Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+        val validityb = buf(validity)
+        val valuesb = buf(values)
+        new ArrowRecordBatch(16, List(new ArrowFieldNode(16, 8)).asJava, List(validityb, valuesb).asJava)
       } catch {
         case e: Exception =>
           //logError(s"Error converting InternalRow to ArrowBuf; ${e.getMessage}:\n$queryExecution")
@@ -2695,8 +2707,10 @@ class Dataset[T] private[sql](
 
   private[sql] def collectAsArrowToPython(): Int = {
     val batch = collectAsArrow()
-    val schema: Schema = null  // TODO
-    // TODO - if write to Array[Byte], then don't need to change PythonRDD writeIteratorToStream or PythonRDDArrowObj
+    // TODO - temporary schema to test
+    val schema = new Schema(Seq(
+      new Field("testField", false, new ArrowType.Int(8, true), List.empty[Field].asJava)
+    ).asJava)
     val out = new ByteArrayOutputStream()
     try {
       val writer = new ArrowWriter(Channels.newChannel(out), schema)
@@ -2708,9 +2722,8 @@ class Dataset[T] private[sql](
         // (s"Error writing ArrowRecordBatch to Python; ${e.getMessage}:\n$queryExecution")
         throw e
     }
-    val arr = new Array[Byte](out.size())
     withNewExecutionId {
-      PythonRDD.serveIterator(Iterator(arr), "serve-Arrow")
+      PythonRDD.serveIterator(Iterator(out.toByteArray), "serve-Arrow")
     }
   }
 
