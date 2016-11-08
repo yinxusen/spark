@@ -1532,7 +1532,7 @@ class DataFrame(object):
         """
         import pandas as pd
         if useArrow:
-            return self.collectAsArrow().toPandas
+            return self.collectAsArrow().to_pandas()
         else:
             return pd.DataFrame.from_records(self.collect(), columns=self.columns)
 
