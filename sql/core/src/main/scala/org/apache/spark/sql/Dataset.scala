@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql
 
-import io.netty.buffer.ArrowBuf
-
 import java.io.{ByteArrayOutputStream, CharArrayWriter}
 import java.nio.channels.Channels
 
@@ -27,11 +25,11 @@ import scala.language.implicitConversions
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.control.NonFatal
 
+import io.netty.buffer.ArrowBuf
 import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.file.ArrowWriter
 import org.apache.arrow.vector.schema.{ArrowFieldNode, ArrowRecordBatch}
-import org.apache.arrow.vector.types.pojo.{Field, ArrowType, Schema}
-
+import org.apache.arrow.vector.types.pojo.{ArrowType, Field, Schema}
 import org.apache.commons.lang3.StringUtils
 
 import org.apache.spark.annotation.{DeveloperApi, Experimental, InterfaceStability}
@@ -58,6 +56,7 @@ import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery}
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.util.Utils
+
 
 private[sql] object Dataset {
   def apply[T: Encoder](sparkSession: SparkSession, logicalPlan: LogicalPlan): Dataset[T] = {
@@ -2314,23 +2313,29 @@ class Dataset[T] private[sql](
     withNewExecutionId {
       try {
 
-        /*def toArrow(internalRow: InternalRow): ArrowBuf = {
+        def toArrow(internalRow: InternalRow): ArrowBuf = {
           val buf = rootAllocator.buffer(128)  // TODO - size??
           // TODO internalRow -> buf
+          buf.setInt(0, 1)
           buf
         }
-        val iter = queryExecution.executedPlan.executeCollect().iterator.map(toArrow)
+        val iter = queryExecution.executedPlan.executeCollect().map(toArrow)
         val arrowBufList = iter.toList
         val nodes: List[ArrowFieldNode] = null // TODO
-        new ArrowRecordBatch(arrowBufList.length, nodes.asJava, arrowBufList.asJava)*/
+        new ArrowRecordBatch(arrowBufList.length, nodes.asJava, arrowBufList.asJava)
+
+        /*
         val validity = Array[Byte](255.asInstanceOf[Byte], 0)
         val values = Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
         val validityb = buf(validity)
         val valuesb = buf(values)
-        new ArrowRecordBatch(16, List(new ArrowFieldNode(16, 8)).asJava, List(validityb, valuesb).asJava)
+        new ArrowRecordBatch(
+          16, List(new ArrowFieldNode(16, 8)).asJava, List(validityb, valuesb).asJava)
+        */
       } catch {
         case e: Exception =>
-          //logError(s"Error converting InternalRow to ArrowBuf; ${e.getMessage}:\n$queryExecution")
+          // logError
+          // (s"Error converting InternalRow to ArrowBuf; ${e.getMessage}:\n$queryExecution")
           throw e
       }
     }
