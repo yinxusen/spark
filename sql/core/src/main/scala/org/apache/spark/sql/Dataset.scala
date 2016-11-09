@@ -2709,7 +2709,7 @@ class Dataset[T] private[sql](
     val batch = collectAsArrow()
     // TODO - temporary schema to test
     val schema = new Schema(Seq(
-      new Field("testField", false, new ArrowType.Int(8, true), List.empty[Field].asJava)
+      new Field("testField", true, new ArrowType.Int(8, true), List.empty[Field].asJava)
     ).asJava)
     val out = new ByteArrayOutputStream()
     try {

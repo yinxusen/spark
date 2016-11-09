@@ -51,7 +51,6 @@ which contains two batches of two objects:
 
 import sys
 from itertools import chain, product
-from pyarrow.ipc import ArrowFileReader
 import marshal
 import struct
 import types
@@ -188,6 +187,7 @@ class ArrowSerializer(FramedSerializer):
         raise NotImplementedError
 
     def loads(self, obj):
+        from pyarrow.ipc import ArrowFileReader
         reader = ArrowFileReader(obj)
         return reader.get_record_batch(0)
 

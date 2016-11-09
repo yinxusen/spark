@@ -1971,6 +1971,8 @@ class ArrowTests(ReusedPySparkTestCase):
         ReusedPySparkTestCase.setUpClass()
         cls.spark = SparkSession(cls.sc)
 
+    '''
+    # TODO - remove, just testing pyarrow api
     def test_no_ser(self):
         import io
         import pandas as pd
@@ -1990,16 +1992,16 @@ class ArrowTests(ReusedPySparkTestCase):
         batch_rt = reader.get_record_batch(0)
         pdf_rt = batch_rt.to_pandas()
         assert_frame_equal(pdf, pdf_rt)
+    '''
 
     def test_arrow_round_trip(self):
         df = self.spark.createDataFrame([(1, "1"), (2, "2"), (1, "2"), (1, "2")], ["key", "value"])
-        df.show()
-        pdf = df.toPandas(useArrow=False)
-        print(pdf)
+        #df.show()
+        #pdf = df.toPandas(useArrow=False)
+        #print(pdf)
         pdf_arrow = df.toPandas(useArrow=True)
         print(pdf_arrow)
         self.assertTrue(False)
-
 
 
 if __name__ == "__main__":
