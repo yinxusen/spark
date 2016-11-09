@@ -1971,37 +1971,11 @@ class ArrowTests(ReusedPySparkTestCase):
         ReusedPySparkTestCase.setUpClass()
         cls.spark = SparkSession(cls.sc)
 
-    '''
-    # TODO - remove, just testing pyarrow api
-    def test_no_ser(self):
-        import io
-        import pandas as pd
-        from pandas.util.testing import assert_frame_equal
-        from pyarrow.ipc import ArrowFileReader, ArrowFileWriter
-        pdf = pd.DataFrame({'test': [1.5]})
-        batch = pyarrow.RecordBatch.from_pandas(pdf)
-        sink = io.BytesIO()
-        writer = ArrowFileWriter(sink, batch.schema)
-        writer.write_record_batch(batch)
-        writer.close()
-        data = [[bytearray(sink.getvalue())]]
-        schema = StructType([StructField('test', BinaryType())])
-        df = self.spark.createDataFrame(data, schema=schema)
-        rows = df.collect()
-        reader = ArrowFileReader(bytes(rows[0][0]))
-        batch_rt = reader.get_record_batch(0)
-        pdf_rt = batch_rt.to_pandas()
-        assert_frame_equal(pdf, pdf_rt)
-    '''
-
-    def test_arrow_round_trip(self):
+    def test_arrow_toPandas(self):
         df = self.spark.createDataFrame([(1, "1"), (2, "2"), (1, "2"), (1, "2")], ["key", "value"])
         pdf = df.toPandas(useArrow=False)
         pdf_arrow = df.toPandas(useArrow=True)
-        # TODO - compare Pandas DataFrames
-        print(pdf)
-        print(pdf_arrow)
-        self.assertTrue(False)
+        self.assertTrue(pdf.equals(pdf_arrow))
 
 
 if __name__ == "__main__":
