@@ -1996,10 +1996,10 @@ class ArrowTests(ReusedPySparkTestCase):
 
     def test_arrow_round_trip(self):
         df = self.spark.createDataFrame([(1, "1"), (2, "2"), (1, "2"), (1, "2")], ["key", "value"])
-        #df.show()
-        #pdf = df.toPandas(useArrow=False)
-        #print(pdf)
+        pdf = df.toPandas(useArrow=False)
         pdf_arrow = df.toPandas(useArrow=True)
+        # TODO - compare Pandas DataFrames
+        print(pdf)
         print(pdf_arrow)
         self.assertTrue(False)
 
