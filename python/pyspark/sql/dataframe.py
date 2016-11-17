@@ -37,6 +37,7 @@ from pyspark.sql.readwriter import DataFrameWriter
 from pyspark.sql.streaming import DataStreamWriter
 from pyspark.sql.types import *
 
+
 __all__ = ["DataFrame", "DataFrameNaFunctions", "DataFrameStatFunctions"]
 
 
@@ -1517,7 +1518,7 @@ class DataFrame(object):
         return DataFrame(jdf, self.sql_ctx)
 
     @since(1.3)
-    def toPandas(self, useArrow=True):
+    def toPandas(self, useArrow=True, pyArrowOnly=True):
         """Returns the contents of this :class:`DataFrame` as Pandas ``pandas.DataFrame``.
 
         Note that this method should only be used if the resulting Pandas's DataFrame is expected
@@ -1530,19 +1531,21 @@ class DataFrame(object):
         0    2  Alice
         1    5    Bob
         """
+        # TODO - put imports in proper place
+        import io
         import pandas as pd
+        from pyarrow.array import from_pylist
+        from pyarrow.table import RecordBatch
+        from pyarrow.ipc import ArrowFileReader, ArrowFileWriter
 
         if useArrow:
-            import io
-            from pyarrow.array import from_pylist
-            from pyarrow.table import RecordBatch
-            from pyarrow.ipc import ArrowFileReader, ArrowFileWriter
-
+            # testing pyarrow api to convert a dataset then collect batches
             names = self.columns  # capture for closure
 
             # reduce a partition to a serialized ArrowRecordBatch
             def reducePartition(iterator):
                 cols = [[] for _ in range(len(names))]
+
                 for row in iterator:
                     for i in range(len(row)):
                         cols[i].append(row[i])
@@ -1567,15 +1570,6 @@ class DataFrame(object):
 
             # merge all DataFrames to one
             return pd.concat(frames, ignore_index=True)
-
-            # ~ alternate to concat ~
-            # batch = read_batch(batch_bytes[0])
-            # pdf = batch.to_pandas()
-            # for i in range(1, len(batch_bytes)):
-            #     batch = read_batch(batch_bytes[i])
-            #     pdf = pdf.append(batch.to_pandas(), ignore_index=True)
-            #
-            # return pdf
 
             # TODO - Uses Arrow hybrid (Java -> C++) pipeline
             #return self.collectAsArrow().to_pandas()
