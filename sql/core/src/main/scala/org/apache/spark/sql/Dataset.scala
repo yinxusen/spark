@@ -2284,6 +2284,9 @@ class Dataset[T] private[sql](
     }
   }
 
+  /**
+   * Transform Spark DataType to Arrow ArrowType.
+   */
   private[sql] def dataTypeToArrowType(dt: DataType): ArrowType = {
     dt match {
       case IntegerType =>
@@ -2293,6 +2296,9 @@ class Dataset[T] private[sql](
     }
   }
 
+  /**
+   * Transform Spark StructType to Arrow Schema.
+   */
   private[sql] def schemaToArrowSchema(schema: StructType): Schema = {
     val arrowFields = schema.fields.map {
       case StructField(name, dataType, nullable, metadata) =>
@@ -2303,16 +2309,31 @@ class Dataset[T] private[sql](
     arrowSchema
   }
 
+  /**
+   * Compute the number of bytes needed to build validity map. According to
+   * [Arrow Layout](https://github.com/apache/arrow/blob/master/format/Layout.md#null-bitmaps),
+   * the length of the validity bitmap should be multiples of 64 bytes.
+   */
   private def numBytesOfBitmap(numOfRows: Int): Int = {
     Math.ceil(numOfRows / 64.0).toInt * 8
   }
 
+  /**
+   * Infer the validity map from the internal rows.
+   * @param rows An array of InternalRows
+   * @param idx Index of current column in the array of InternalRows
+   * @param field StructField related to the current column
+   * @param allocator ArrowBuf allocator
+   */
   private def internalRowToValidityMap(
     rows: Array[InternalRow], idx: Int, field: StructField, allocator: RootAllocator): ArrowBuf = {
     val buf = allocator.buffer(numBytesOfBitmap(rows.length))
     buf
   }
 
+  /**
+   * Transfer an array of InternalRow to an ArrowRecordBatch.
+   */
   private[sql] def internalRowsToArrowRecordBatch(
       rows: Array[InternalRow], allocator: RootAllocator): ArrowRecordBatch = {
     val numOfRows = rows.length
@@ -2336,7 +2357,7 @@ class Dataset[T] private[sql](
   }
 
   /**
-   * Return an ArrowRecordBatch
+   * Collect a Dataset to an ArrowRecordBatch.
    *
    * @group action
    * @since 2.2.0
@@ -2725,6 +2746,9 @@ class Dataset[T] private[sql](
     }
   }
 
+  /**
+   * Collect a Dataset as an ArrowRecordBatch, and serve the ArrowRecordBatch to PySpark.
+   */
   private[sql] def collectAsArrowToPython(): Int = {
     val recordBatch = collectAsArrow()
     val arrowSchema = schemaToArrowSchema(this.schema)

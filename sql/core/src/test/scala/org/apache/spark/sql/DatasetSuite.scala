@@ -18,14 +18,7 @@
 package org.apache.spark.sql
 
 import java.io._
-import java.net.{InetAddress, InetSocketAddress, Socket}
-import java.nio.ByteBuffer
-import java.nio.channels.{Channels, FileChannel, SocketChannel}
 import java.sql.{Date, Timestamp}
-
-import io.netty.buffer.ArrowBuf
-import org.apache.arrow.memory.RootAllocator
-import org.apache.arrow.vector.file.ArrowReader
 
 import org.apache.spark.sql.catalyst.encoders.{OuterScopes, RowEncoder}
 import org.apache.spark.sql.catalyst.util.sideBySide
@@ -925,49 +918,6 @@ class DatasetSuite extends QueryTest with SharedSQLContext {
     checkDataset(
       df.withColumn("b", expr("0")).as[ClassData]
         .groupByKey(_.a).flatMapGroups { case (x, iter) => List[Int]() })
-  }
-
-  def array(buf: ArrowBuf): Array[Byte] = {
-    val bytes = Array.ofDim[Byte](buf.readableBytes())
-    buf.readBytes(bytes)
-    bytes
-  }
-
-  test("Collect as arrow to python") {
-    val ds = Seq(1).toDS()
-    val port = ds.collectAsArrowToPython()
-
-    val s = new Socket(InetAddress.getByName("localhost"), port)
-    val is = s.getInputStream
-
-    val dis = new DataInputStream(is)
-    val len = dis.readInt()
-    val allocator = new RootAllocator(len)
-
-    val buffer = Array.ofDim[Byte](len)
-    val bytes = dis.read(buffer)
-
-
-    var aFile = new RandomAccessFile("/tmp/nio-data.txt", "rw")
-    aFile.write(bytes)
-    aFile.close()
-
-    aFile = new RandomAccessFile("/tmp/nio-data.txt", "r")
-    val fChannel = aFile.getChannel
-
-    val reader = new ArrowReader(fChannel, allocator)
-    val footer = reader.readFooter()
-    val schema = footer.getSchema
-    val blocks = footer.getRecordBatches
-    val recordBatch = reader.readRecordBatch(blocks.get(0))
-
-    val nodes = recordBatch.getNodes
-    val buffers = recordBatch.getBuffers
-
-    // scalastyle:off println
-    println(array(buffers.get(0)).mkString(", "))
-    println(array(buffers.get(1)).mkString(", "))
-    // scalastyle:on println
   }
 }
 
