@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql
 
-import java.io._
+import java.io.{Externalizable, ObjectInput, ObjectOutput}
 import java.sql.{Date, Timestamp}
 
 import org.apache.spark.sql.catalyst.encoders.{OuterScopes, RowEncoder}
