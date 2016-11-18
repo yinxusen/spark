@@ -2285,57 +2285,93 @@ class Dataset[T] private[sql](
   }
 
   /**
-   * Return an ArrowRecordBatch
+   * Transform Spark DataType to Arrow ArrowType.
+   */
+  private[sql] def dataTypeToArrowType(dt: DataType): ArrowType = {
+    dt match {
+      case IntegerType =>
+        new ArrowType.Int(8 * IntegerType.defaultSize, true)
+      case _ =>
+        throw new IllegalArgumentException(s"Unsupported data type")
+    }
+  }
+
+  /**
+   * Transform Spark StructType to Arrow Schema.
+   */
+  private[sql] def schemaToArrowSchema(schema: StructType): Schema = {
+    val arrowFields = schema.fields.map {
+      case StructField(name, dataType, nullable, metadata) =>
+        // TODO: Consider nested types
+        new Field(name, nullable, dataTypeToArrowType(dataType), List.empty[Field].asJava)
+    }
+    val arrowSchema = new Schema(arrowFields.toIterable.asJava)
+    arrowSchema
+  }
+
+  /**
+   * Compute the number of bytes needed to build validity map. According to
+   * [Arrow Layout](https://github.com/apache/arrow/blob/master/format/Layout.md#null-bitmaps),
+   * the length of the validity bitmap should be multiples of 64 bytes.
+   */
+  private def numBytesOfBitmap(numOfRows: Int): Int = {
+    Math.ceil(numOfRows / 64.0).toInt * 8
+  }
+
+  /**
+   * Infer the validity map from the internal rows.
+   * @param rows An array of InternalRows
+   * @param idx Index of current column in the array of InternalRows
+   * @param field StructField related to the current column
+   * @param allocator ArrowBuf allocator
+   */
+  private def internalRowToValidityMap(
+    rows: Array[InternalRow], idx: Int, field: StructField, allocator: RootAllocator): ArrowBuf = {
+    val buf = allocator.buffer(numBytesOfBitmap(rows.length))
+    buf
+  }
+
+  /**
+   * Transfer an array of InternalRow to an ArrowRecordBatch.
+   */
+  private[sql] def internalRowsToArrowRecordBatch(
+      rows: Array[InternalRow], allocator: RootAllocator): ArrowRecordBatch = {
+    val numOfRows = rows.length
+
+    val buffers = this.schema.fields.zipWithIndex.flatMap { case (field, idx) =>
+      val validity = internalRowToValidityMap(rows, idx, field, allocator)
+      val buf = allocator.buffer(numOfRows * field.dataType.defaultSize)
+      rows.foreach { row => buf.writeInt(row.getInt(idx)) }
+      Array(validity, buf)
+    }.toList.asJava
+
+    val fieldNodes = this.schema.fields.zipWithIndex.map { case (field, idx) =>
+      if (field.nullable) {
+        new ArrowFieldNode(numOfRows, 0)
+      } else {
+        new ArrowFieldNode(numOfRows, 0)
+      }
+    }.toList.asJava
+
+    new ArrowRecordBatch(numOfRows, fieldNodes, buffers)
+  }
+
+  /**
+   * Collect a Dataset to an ArrowRecordBatch.
    *
    * @group action
    * @since 2.2.0
    */
   @DeveloperApi
   def collectAsArrow(): ArrowRecordBatch = {
-
-    // TODO - might be more efficient to do conversion on workers before collect
-    /*
-    val vector = MinorType.LIST.getNewVector("TODO", null, null)
-    withNewExecutionId {
-      queryExecution.executedPlan.executeToIterator().map(boundEnc.fromRow)
-    }
-    vector.getFieldBuffers.asScala.toArray
-    */
-
-    val rootAllocator = new RootAllocator(1024) // TODO - size??
-
-    def buf(bytes: Array[Byte]): ArrowBuf = {
-      val buffer = rootAllocator.buffer(bytes.length)
-      buffer.writeBytes(bytes)
-      buffer
-    }
-
+    val allocator = new RootAllocator(Long.MaxValue)
     withNewExecutionId {
       try {
-
-        def toArrow(internalRow: InternalRow): ArrowBuf = {
-          val buf = rootAllocator.buffer(128)  // TODO - size??
-          // TODO internalRow -> buf
-          buf.setInt(0, 1)
-          buf
-        }
-        val iter = queryExecution.executedPlan.executeCollect().map(toArrow)
-        val arrowBufList = iter.toList
-        val nodes: List[ArrowFieldNode] = null // TODO
-        new ArrowRecordBatch(arrowBufList.length, nodes.asJava, arrowBufList.asJava)
-
-        /*
-        val validity = Array[Byte](255.asInstanceOf[Byte], 0)
-        val values = Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
-        val validityb = buf(validity)
-        val valuesb = buf(values)
-        new ArrowRecordBatch(
-          16, List(new ArrowFieldNode(16, 8)).asJava, List(validityb, valuesb).asJava)
-        */
+        val collectedRows = queryExecution.executedPlan.executeCollect()
+        val recordBatch = internalRowsToArrowRecordBatch(collectedRows, allocator)
+        recordBatch
       } catch {
         case e: Exception =>
-          // logError
-          // (s"Error converting InternalRow to ArrowBuf; ${e.getMessage}:\n$queryExecution")
           throw e
       }
     }
@@ -2710,23 +2746,22 @@ class Dataset[T] private[sql](
     }
   }
 
+  /**
+   * Collect a Dataset as an ArrowRecordBatch, and serve the ArrowRecordBatch to PySpark.
+   */
   private[sql] def collectAsArrowToPython(): Int = {
-    val batch = collectAsArrow()
-    // TODO - temporary schema to test
-    val schema = new Schema(Seq(
-      new Field("testField", true, new ArrowType.Int(8, true), List.empty[Field].asJava)
-    ).asJava)
+    val recordBatch = collectAsArrow()
+    val arrowSchema = schemaToArrowSchema(this.schema)
     val out = new ByteArrayOutputStream()
     try {
-      val writer = new ArrowWriter(Channels.newChannel(out), schema)
-      writer.writeRecordBatch(batch)
+      val writer = new ArrowWriter(Channels.newChannel(out), arrowSchema)
+      writer.writeRecordBatch(recordBatch)
       writer.close()
     } catch {
       case e: Exception =>
-        // logError
-        // (s"Error writing ArrowRecordBatch to Python; ${e.getMessage}:\n$queryExecution")
         throw e
     }
+
     withNewExecutionId {
       PythonRDD.serveIterator(Iterator(out.toByteArray), "serve-Arrow")
     }
