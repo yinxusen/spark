@@ -1518,7 +1518,7 @@ class DataFrame(object):
         return DataFrame(jdf, self.sql_ctx)
 
     @since(1.3)
-    def toPandas(self, useArrow=True, pyArrowOnly=True):
+    def toPandas(self, useArrow=True):
         """Returns the contents of this :class:`DataFrame` as Pandas ``pandas.DataFrame``.
 
         Note that this method should only be used if the resulting Pandas's DataFrame is expected
