@@ -1566,7 +1566,7 @@ class DataFrame(object):
                 return reader.get_record_batch(0)
 
             # deserialize ArrowRecordBatch and create a Pandas DataFrame for each batch
-            frames = list(map(lambda b: read_batch(b).to_pandas(), batch_bytes))
+            frames = [read_batch(b).to_pandas() for b in batch_bytes]
 
             # merge all DataFrames to one
             return pd.concat(frames, ignore_index=True)
