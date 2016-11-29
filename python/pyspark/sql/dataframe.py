@@ -1544,13 +1544,14 @@ class DataFrame(object):
 
             # reduce a partition to a serialized ArrowRecordBatch
             def reducePartition(iterator):
-                cols = [[] for _ in range(len(names))]
+
+                cols = [[] for _ in xrange(len(names))]
 
                 for row in iterator:
-                    for i in range(len(row)):
+                    for i in xrange(len(row)):
                         cols[i].append(row[i])
 
-                arrs = list(map(lambda c: from_pylist(c), cols))
+                arrs = [from_pylist(c) for c in cols]
                 batch = RecordBatch.from_arrays(names, arrs)
                 sink = io.BytesIO()
                 writer = ArrowFileWriter(sink, batch.schema)
