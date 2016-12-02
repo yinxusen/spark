@@ -1518,7 +1518,7 @@ class DataFrame(object):
         return DataFrame(jdf, self.sql_ctx)
 
     @since(1.3)
-    def toPandas(self, useArrow=True):
+    def toPandas(self, useArrow=False):
         """Returns the contents of this :class:`DataFrame` as Pandas ``pandas.DataFrame``.
 
         Note that this method should only be used if the resulting Pandas's DataFrame is expected
@@ -1531,49 +1531,10 @@ class DataFrame(object):
         0    2  Alice
         1    5    Bob
         """
-        # TODO - put imports in proper place
-        import io
         import pandas as pd
-        from pyarrow.array import from_pylist
-        from pyarrow.table import RecordBatch
-        from pyarrow.ipc import ArrowFileReader, ArrowFileWriter
 
         if useArrow:
-            # testing pyarrow api to convert a dataset then collect batches
-            names = self.columns  # capture for closure
-
-            # reduce a partition to a serialized ArrowRecordBatch
-            def reducePartition(iterator):
-
-                cols = [[] for _ in xrange(len(names))]
-
-                for row in iterator:
-                    for i in xrange(len(row)):
-                        cols[i].append(row[i])
-
-                arrs = [from_pylist(c) for c in cols]
-                batch = RecordBatch.from_arrays(names, arrs)
-                sink = io.BytesIO()
-                writer = ArrowFileWriter(sink, batch.schema)
-                writer.write_record_batch(batch)
-                writer.close()
-                yield sink.getvalue()
-
-            # convert partitions to serialized ArrowRecordBatches and collect byte arrays
-            batch_bytes = self.rdd.mapPartitions(reducePartition).collect()
-
-            def read_batch(b):
-                reader = ArrowFileReader(bytes(b))
-                return reader.get_record_batch(0)
-
-            # deserialize ArrowRecordBatch and create a Pandas DataFrame for each batch
-            frames = [read_batch(b).to_pandas() for b in batch_bytes]
-
-            # merge all DataFrames to one
-            return pd.concat(frames, ignore_index=True)
-
-            # TODO - Uses Arrow hybrid (Java -> C++) pipeline
-            #return self.collectAsArrow().to_pandas()
+            return self.collectAsArrow().to_pandas()
         else:
             return pd.DataFrame.from_records(self.collect(), columns=self.columns)
 
