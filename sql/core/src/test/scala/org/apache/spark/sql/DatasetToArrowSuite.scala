@@ -17,100 +17,156 @@
 
 package org.apache.spark.sql
 
-import java.io.{DataInputStream, EOFException, RandomAccessFile}
+import java.io._
 import java.net.{InetAddress, Socket}
+import java.nio.{ByteBuffer, ByteOrder}
 import java.nio.channels.FileChannel
 
+import scala.util.Random
+
 import io.netty.buffer.ArrowBuf
+import org.apache.arrow.flatbuf.Precision
 import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.file.ArrowReader
-import org.apache.arrow.vector.schema.ArrowRecordBatch
+import org.apache.arrow.vector.types.pojo.{ArrowType, Field}
 
 import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.UTF8String
+import org.apache.spark.util.Utils
 
-case class ArrowIntTest(a: Int, b: Int)
+
+case class ArrowTestClass(col1: Int, col2: Double, col3: String)
 
 class DatasetToArrowSuite extends QueryTest with SharedSQLContext {
 
   import testImplicits._
 
+  final val numElements = 4
+  @transient var data: Seq[ArrowTestClass] = _
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    data = Seq.fill(numElements)(ArrowTestClass(
+      Random.nextInt, Random.nextDouble, Random.nextString(Random.nextInt(100))))
+  }
+
   test("Collect as arrow to python") {
+    val dataset = data.toDS()
 
-    val ds = Seq(ArrowIntTest(1, 2), ArrowIntTest(2, 3), ArrowIntTest(3, 4)).toDS()
+    val port = dataset.collectAsArrowToPython()
 
-    val port = ds.collectAsArrowToPython()
+    val receiver: RecordBatchReceiver = new RecordBatchReceiver
+    val (buffer, numBytesRead) = receiver.connectAndRead(port)
+    val channel = receiver.makeFile(buffer)
+    val reader = new ArrowReader(channel, receiver.allocator)
 
-    val clientThread: Thread = new Thread(new Runnable() {
-      def run() {
-        try {
-          val receiver: RecordBatchReceiver = new RecordBatchReceiver
-          val record: ArrowRecordBatch = receiver.read(port)
-        }
-          catch {
-            case e: Exception =>
-              throw e
-          }
-        }
-    })
+    val footer = reader.readFooter()
+    val schema = footer.getSchema
 
-    clientThread.start()
+    val numCols = schema.getFields.size()
+    assert(numCols === dataset.schema.fields.length)
+    for (i <- 0 until schema.getFields.size()) {
+      val arrowField = schema.getFields.get(i)
+      val sparkField = dataset.schema.fields(i)
+      assert(arrowField.getName === sparkField.name)
+      assert(arrowField.isNullable === sparkField.nullable)
+      assert(DatasetToArrowSuite.compareSchemaTypes(arrowField, sparkField))
+    }
 
-    try {
-      clientThread.join()
-    } catch {
-      case e: InterruptedException =>
-        throw e
-      case _ =>
+    val blockMetadata = footer.getRecordBatches
+    assert(blockMetadata.size() === 1)
+
+    val recordBatch = reader.readRecordBatch(blockMetadata.get(0))
+    val nodes = recordBatch.getNodes
+    assert(nodes.size() === numCols + 1)  // +1 for Type String, which has two nodes.
+
+    val firstNode = nodes.get(0)
+    assert(firstNode.getLength === numElements)
+    assert(firstNode.getNullCount === 0)
+
+    val buffers = recordBatch.getBuffers
+    assert(buffers.size() === (numCols + 1) * 2)  // +1 for Type String
+
+    assert(receiver.getIntArray(buffers.get(1)) === data.map(_.col1))
+    assert(receiver.getDoubleArray(buffers.get(3)) === data.map(_.col2))
+    assert(receiver.getStringArray(buffers.get(5), buffers.get(7)) ===
+      data.map(d => UTF8String.fromString(d.col3)).toArray)
+  }
+}
+
+object DatasetToArrowSuite {
+  def compareSchemaTypes(arrowField: Field, sparkField: StructField): Boolean = {
+    val arrowType = arrowField.getType
+    val sparkType = sparkField.dataType
+    (arrowType, sparkType) match {
+      case (_: ArrowType.Int, _: IntegerType) => true
+      case (_: ArrowType.FloatingPoint, _: DoubleType) =>
+        arrowType.asInstanceOf[ArrowType.FloatingPoint].getPrecision == Precision.DOUBLE
+      case (_: ArrowType.FloatingPoint, _: FloatType) =>
+        arrowType.asInstanceOf[ArrowType.FloatingPoint].getPrecision == Precision.SINGLE
+      case (_: ArrowType.List, _: StringType) =>
+        val subField = arrowField.getChildren
+        (subField.size() == 1) && subField.get(0).getType.isInstanceOf[ArrowType.Utf8]
+      case (_: ArrowType.Bool, _: BooleanType) => true
+      case _ => false
     }
   }
 }
 
 class RecordBatchReceiver {
 
-  def array(buf: ArrowBuf): Array[Byte] = {
+  val allocator = new RootAllocator(Long.MaxValue)
+
+  def getIntArray(buf: ArrowBuf): Array[Int] = {
+    val buffer = ByteBuffer.wrap(array(buf)).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer()
+    val resultArray = Array.ofDim[Int](buffer.remaining())
+    buffer.get(resultArray)
+    resultArray
+  }
+
+  def getDoubleArray(buf: ArrowBuf): Array[Double] = {
+    val buffer = ByteBuffer.wrap(array(buf)).order(ByteOrder.LITTLE_ENDIAN).asDoubleBuffer()
+    val resultArray = Array.ofDim[Double](buffer.remaining())
+    buffer.get(resultArray)
+    resultArray
+  }
+
+  def getStringArray(bufOffsets: ArrowBuf, bufValues: ArrowBuf): Array[UTF8String] = {
+    val offsets = getIntArray(bufOffsets)
+    val lens = offsets.zip(offsets.drop(1))
+      .map { case (prevOffset, offset) => offset - prevOffset }
+
+    val values = array(bufValues)
+    val strings = offsets.zip(lens).map { case (offset, len) =>
+      UTF8String.fromBytes(values, offset, len)
+    }
+    strings
+  }
+
+  private def array(buf: ArrowBuf): Array[Byte] = {
     val bytes = Array.ofDim[Byte](buf.readableBytes())
     buf.readBytes(bytes)
     bytes
   }
 
   def connectAndRead(port: Int): (Array[Byte], Int) = {
-    val s = new Socket(InetAddress.getByName("localhost"), port)
-    val is = s.getInputStream
-
-    val dis = new DataInputStream(is)
-    val len = dis.readInt()
-
-    val buffer = Array.ofDim[Byte](len)
-    val bytesRead = dis.read(buffer)
-    if (bytesRead != len) {
-      throw new EOFException("Wrong EOF")
-    }
-    (buffer, len)
+    val clientSocket = new Socket(InetAddress.getByName("localhost"), port)
+    val clientDataIns = new DataInputStream(clientSocket.getInputStream)
+    val messageLength = clientDataIns.readInt()
+    val buffer = Array.ofDim[Byte](messageLength)
+    clientDataIns.readFully(buffer, 0, messageLength)
+    (buffer, messageLength)
   }
 
   def makeFile(buffer: Array[Byte]): FileChannel = {
-    var aFile = new RandomAccessFile("/tmp/nio-data.txt", "rw")
-    aFile.write(buffer)
-    aFile.close()
+    val tempDir = Utils.createTempDir(namePrefix = this.getClass.getName).getPath
+    val arrowFile = new File(tempDir, "arrow-bytes")
+    val arrowOus = new FileOutputStream(arrowFile.getPath)
+    arrowOus.write(buffer)
+    arrowOus.close()
 
-    aFile = new RandomAccessFile("/tmp/nio-data.txt", "r")
-    val fChannel = aFile.getChannel
-    fChannel
-  }
-
-  def readRecordBatch(fc: FileChannel, len: Int): ArrowRecordBatch = {
-    val allocator = new RootAllocator(len)
-    val reader = new ArrowReader(fc, allocator)
-    val footer = reader.readFooter()
-    val schema = footer.getSchema
-    val blocks = footer.getRecordBatches
-    val recordBatch = reader.readRecordBatch(blocks.get(0))
-    recordBatch
-  }
-
-  def read(port: Int): ArrowRecordBatch = {
-    val (buffer, len) = connectAndRead(port)
-    val fc = makeFile(buffer)
-    readRecordBatch(fc, len)
+    val arrowIns = new FileInputStream(arrowFile.getPath)
+    arrowIns.getChannel
   }
 }
